@@ -1,18 +1,29 @@
-# Configuração Netlify — frontend estático (Vite).
-# As variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY têm de ser definidas
-# em Site settings → Environment variables (são embebidas no build).
-#
-# NOTA: os endpoints Express (/api/gemini/chat e /api/admin/convidar) NÃO correm
-# em hosting estático. Ficam para Netlify Functions num passo seguinte.
+# Configuração Netlify — frontend estático (Vite) + Functions para os /api.
+# Variáveis a definir em Site settings → Environment variables:
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY  (cliente, build)
+#   GEMINI_API_KEY                              (function do assistente IA)
+#   SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL (function de convites)
 
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA: tudo serve o index.html (app de página única).
+# /api/* → Netlify Functions (tem de vir ANTES do catch-all SPA).
+[[redirects]]
+  from = "/api/gemini/chat"
+  to = "/.netlify/functions/gemini-chat"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/convidar"
+  to = "/.netlify/functions/admin-convidar"
+  status = 200
+
+# SPA: tudo o resto serve o index.html (app de página única).
 [[redirects]]
   from = "/*"
   to = "/index.html"

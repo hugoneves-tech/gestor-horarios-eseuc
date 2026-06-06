@@ -1374,14 +1374,19 @@ export default function App() {
 
   const handleAcceptAiRule = () => {
     if (!pendingAiRule) return;
+    // Coordenador/vice: a regra criada por IA fica obrigatoriamente do seu ano.
+    const escopo = ehDiretor ? (pendingAiRule.escopo ?? "transversal") : "ano";
+    const anoCurricular = ehDiretor ? (pendingAiRule.anoCurricular ?? "todos") : (anoDoPerfil ?? 1);
     const realRule: RegraHorario = {
       ...pendingAiRule,
       id: "ai_rule_" + Date.now(),
+      escopo,
+      anoCurricular,
       ativa: true
     };
     setRegras([realRule, ...regras]);
     setPendingAiRule(null);
-    showToast(` A regra "${realRule.nome}" formulada pela IA foi gravada no cofre!`);
+    showToast(`A regra "${realRule.nome}" criada pela IA foi gravada no Supabase.`);
   };
 
   const removeUc = (id: string) => setUcs(ucs.filter(u => u.id !== id));

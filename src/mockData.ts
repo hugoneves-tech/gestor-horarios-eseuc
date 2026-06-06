@@ -215,6 +215,16 @@ export const regrasIniciais: RegraHorario[] = [
     ativa: true
   },
   {
+    id: "h_mi_pl_computador",
+    nome: "PL de MI em salas de computadores (paralelas às de laboratório)",
+    tipo: "hard",
+    categoria: "Sala",
+    descricao: "As PL de Metodologia de Investigação (MI) decorrem em salas de computadores, não nos laboratórios de simulação. Por isso podem ocorrer em simultâneo com outras PL, contando num conjunto de salas próprio (4 a 6 PL de MI em simultâneo).",
+    config: { traducaoSimples: "As PL de MI usam salas de computadores: têm o seu próprio limite (até 6 em simultâneo) e não competem pelas manchas dos laboratórios de simulação." },
+    peso: 9,
+    ativa: true
+  },
+  {
     id: "h2",
     nome: "Evitar ocupação dupla de salas de práticas simuladas ou anfiteatros",
     tipo: "hard",

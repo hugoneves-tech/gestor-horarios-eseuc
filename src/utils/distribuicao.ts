@@ -160,8 +160,6 @@ const TP_DIAS_PREF = ["Quarta", "Quinta"];
 // Thu/Fri capacity (6 PL per mancha) is exhausted, so all PL hours still fit.
 const PL_DIAS_PREF = ["Quinta", "Sexta", "Quarta"];
 
-const MAX_PL_POR_MANCHA = 6; // physical simulation labs per year
-
 type Slot = { dia: string; hora: string };
 
 /**
@@ -253,8 +251,15 @@ function slotKey(ano: number, semanaGlobal: number, turma: string, dia: string, 
   return `${ano}|${semanaGlobal}|${turma}|${dia}|${hora}`;
 }
 
-function manchaKey(ano: number, semanaGlobal: number, dia: string, hora: string): string {
-  return `${ano}|${semanaGlobal}|${dia}|${hora}`;
+// Conjuntos de salas práticas independentes. As PL de laboratório de simulação
+// e as PL de sala de computadores ocupam espaços diferentes → contadores separados,
+// podendo decorrer em simultâneo. (ex.: MI usa salas de computadores.)
+export type SalaPool = "lab" | "comp";
+const UCS_PL_COMPUTADOR = new Set(["MI"]); // UCs cujas PL decorrem em salas de computadores
+const MAX_PL_POR_POOL: Record<SalaPool, number> = { lab: 6, comp: 6 };
+
+function manchaKey(ano: number, semanaGlobal: number, dia: string, hora: string, pool: SalaPool = "lab"): string {
+  return `${ano}|${semanaGlobal}|${dia}|${hora}|${pool}`;
 }
 
 /**
@@ -319,15 +324,17 @@ function encontrarSlotLivre(
   tipo: "T" | "TP" | "PL" | "S",
   ocupacao: OcupacaoGlobal,
   plCount: ContagemPL,
-  startIdx: number
+  startIdx: number,
+  salaPool: SalaPool = "lab"
 ): Slot | null {
   if (!pool.length) return null;
   for (let i = 0; i < pool.length; i++) {
     const slot = pool[(startIdx + i) % pool.length];
     if (ocupacao.has(slotKey(ano, semanaGlobal, turma, slot.dia, slot.hora))) continue;
     if (tipo === "PL") {
-      const c = plCount.get(manchaKey(ano, semanaGlobal, slot.dia, slot.hora)) || 0;
-      if (c >= MAX_PL_POR_MANCHA) continue; // max 6 PL per mancha per year
+      // Cap por conjunto de salas: lab e comp são contados em separado.
+      const c = plCount.get(manchaKey(ano, semanaGlobal, slot.dia, slot.hora, salaPool)) || 0;
+      if (c >= MAX_PL_POR_POOL[salaPool]) continue;
     }
     return slot;
   }
@@ -512,6 +519,7 @@ export function gerarSessoesConjunto(
   interface Task {
     ano: number; ucNome: string; ucSigla: string; ucKey: string; family: "A" | "B";
     turmaNome: string; tipo: "T" | "TP" | "PL" | "S"; salaTipo: string; manha: boolean;
+    salaPool: SalaPool; // "comp" para PL de salas de computadores (ex.: MI), senão "lab"
     weeks: WeekRef[]; total: number; placed: number;
   }
 
@@ -539,9 +547,11 @@ export function gerarSessoesConjunto(
     if (!uc.turmasConfig?.length) continue;
     const ano = Number(uc.anoCurricular) || 1;
     const weeks = buildWeeks(semanas, semanaGlobalOffset);
+    const usaComputador = UCS_PL_COMPUTADOR.has(uc.sigla);
     const add = (turmaNome: string, tipo: Task["tipo"], salaTipo: string, manha: boolean, family: "A" | "B", total: number) => {
       if (total <= 0) return;
-      tasks.push({ ano, ucNome: uc.nome, ucSigla: uc.sigla, ucKey: uc.id, family, turmaNome, tipo, salaTipo, manha, weeks, total, placed: 0 });
+      const salaPool: SalaPool = tipo === "PL" && usaComputador ? "comp" : "lab";
+      tasks.push({ ano, ucNome: uc.nome, ucSigla: uc.sigla, ucKey: uc.id, family, turmaNome, tipo, salaTipo, manha, salaPool, weeks, total, placed: 0 });
       const s = getStat(`${uc.id}|${family}`);
       if (tipo === "T") s.totalT += total; else if (tipo === "TP") s.totalTP += total; else if (tipo === "PL") s.totalPL += total;
     };
@@ -555,7 +565,8 @@ export function gerarSessoesConjunto(
     });
     uc.turmasConfig.filter(t => t.tipo === "Prática").forEach((t, i) => {
       const inA = i < 12;
-      add(t.nome, "PL", "Laboratório de Simulação PL", (inA && turmaAManha) || (!inA && !turmaAManha), inA ? "A" : "B", Math.floor(uc.cargaHorariaPratica / 2));
+      const salaTipoPL = usaComputador ? "Sala de Computadores PL" : "Laboratório de Simulação PL";
+      add(t.nome, "PL", salaTipoPL, (inA && turmaAManha) || (!inA && !turmaAManha), inA ? "A" : "B", Math.floor(uc.cargaHorariaPratica / 2));
     });
     uc.turmasConfig.filter(t => t.tipo === "Seminário").forEach((t) => {
       add(t.nome, "S", "Sala Comum TP", turmaAManha, "A", Math.floor((uc.cargaHorariaS ?? 0) / 2));
@@ -564,11 +575,11 @@ export function gerarSessoesConjunto(
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
     const pool = poolDoTipo(t.tipo, wk.diasBloqueados, t.manha);
-    const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0);
+    const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
     registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
     if (t.tipo === "PL") {
-      const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
+      const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora, t.salaPool);
       plCount.set(k, (plCount.get(k) || 0) + 1);
     }
     t.placed++;

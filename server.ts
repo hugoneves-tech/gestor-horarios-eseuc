@@ -175,7 +175,7 @@ Pode clicar em "Adicionar Regra" no assistente acima para ativ?-la no motor de o
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.0-flash",
       contents: contents,
       config: {
         systemInstruction,
