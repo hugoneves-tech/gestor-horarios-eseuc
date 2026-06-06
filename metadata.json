@@ -1,0 +1,6 @@
+{
+  "name": "Gestor de Horários de Enfermagem de Coimbra (ESEUC)",
+  "description": "Sistema avançado para criação, validação, otimização e gestão de horários teóricos, práticos, laboratoriais e clínicos da Escola Superior de Enfermagem da Universidade de Coimbra (ESEUC) para o ano letivo 2026/2027.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
