@@ -670,9 +670,10 @@ export function gerarSessoesConjunto(
   // Limite de TP em simultâneo por mancha = nº de salas de TP. Com 2 salas, as 4 TP
   // de uma família partem-se por 2 manchas e sobram slots para as 6 PL desdobradas
   // das outras 2 TP. Sem limite definido, 4 TP podem coexistir (não se descarta).
-  // Máx. TP em simultâneo por mancha. Por defeito 4 (uma família: TP1-4 ou TP5-8) —
-  // evita 8 TPs ao mesmo tempo (docentes a mais). Configurável via opts.
-  const MAX_TP_POR_MANCHA = (opts.maxTPporMancha && opts.maxTPporMancha > 0) ? opts.maxTPporMancha : 4;
+  // Máx. TP da MESMA UC por mancha (uma família: TP1-4 ou TP5-8). Por defeito 4 — uma
+  // UC nunca tem 8 TPs no mesmo bloco (docentes a mais). Mas DUAS UCs diferentes podem
+  // partilhar o bloco (ex.: Turma B de uma UC + Turma A em overflow de OUTRA UC = 4+4).
+  const MAX_TP_POR_UC_MANCHA = (opts.maxTPporMancha && opts.maxTPporMancha > 0) ? opts.maxTPporMancha : 4;
   const tpCount = new Map<string, number>(); // `${ano}|${week}|${dia}|${hora}` → nº de TP
   const tpManchaKey = (ano: number, week: number, dia: string, hora: string) => `${ano}|${week}|${dia}|${hora}`;
   // Carga diária por aluno (grupo-folha PL): base de 6h (3 blocos) numa só metade do dia
@@ -696,7 +697,7 @@ export function gerarSessoesConjunto(
     }
     // Limite de 2 TP por mancha (salas de TP): não juntar as 4 TP no mesmo slot.
     if (t.tipo === "TP") {
-      pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora)) || 0) < MAX_TP_POR_MANCHA);
+      pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
       // Agrupar as 4 TP da MESMA UC (de UMA família) na mesma mancha — só DENTRO da
       // metade do dia da turma (TP1-4 de manhã, TP5-8 à tarde): nunca juntar as 8.
       // O bloco da metade oposta (overflow / "8h") fica no fim e NÃO agrupa a mesma UC
@@ -756,7 +757,8 @@ export function gerarSessoesConjunto(
     }
     if (t.tipo === "TP") {
       const mk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
-      tpCount.set(mk, (tpCount.get(mk) || 0) + 1);
+      const ck = mk + "|" + t.ucKey;
+      tpCount.set(ck, (tpCount.get(ck) || 0) + 1);
       const sc = meioCohort(t.turmaNome);
       if (sc) {
         let set = tpCohortMancha.get(mk);
