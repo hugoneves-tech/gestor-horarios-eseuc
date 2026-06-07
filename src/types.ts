@@ -39,6 +39,7 @@ export interface UC {
   dataFim?: string; // YYYY-MM-DD
   periodo?: string;
   observacoes?: string;
+  semanasPL?: number[]; // semanas (relativas ao semestre) em que as PL podem decorrer; vazio/indefinido = todas
   turmasConfig?: {
     id: string;
     nome: string;

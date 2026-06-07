@@ -30,6 +30,7 @@ export const ucToRow = (u: UC) => ({
   semana_inicio: u.semanaInicio ?? null, semana_fim: u.semanaFim ?? null,
   num_semanas: u.numSemanas, data_inicio: u.dataInicio ?? null, data_fim: u.dataFim ?? null,
   periodo: u.periodo ?? null, observacoes: u.observacoes ?? null,
+  semanas_pl: u.semanasPL ?? null,
   turmas_config: u.turmasConfig ?? [],
 });
 export const rowToUc = (r: any): UC => ({
@@ -40,6 +41,7 @@ export const rowToUc = (r: any): UC => ({
   semanaInicio: r.semana_inicio ?? undefined, semanaFim: r.semana_fim ?? undefined,
   numSemanas: r.num_semanas, dataInicio: r.data_inicio ?? undefined, dataFim: r.data_fim ?? undefined,
   periodo: r.periodo ?? undefined, observacoes: r.observacoes ?? undefined,
+  semanasPL: r.semanas_pl ?? undefined,
   turmasConfig: r.turmas_config ?? [],
 });
 

@@ -150,6 +150,24 @@ export default function App() {
   // Temporary item creation variables
   const [isAddingUc, setIsAddingUc] = useState(false);
   const [editingUcId, setEditingUcId] = useState<string | null>(null);
+  const [horasUcModal, setHorasUcModal] = useState<UC | null>(null);
+  // Preferência manhã/tarde da turma teórica (Turma A) por ano do CLE e semestre.
+  // Chave `${ano}|${semestre}` → "manha" | "tarde". Default: manhã no 1.º sem., tarde no 2.º.
+  const [prefTurmaA, setPrefTurmaA] = useState<Record<string, "manha" | "tarde">>(() => {
+    try { const raw = localStorage.getItem("eseuc_pref_turma_a"); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
+    return {};
+  });
+  const prefManhaDe = (ano: number, sem: number): boolean => {
+    const v = prefTurmaA[`${ano}|${sem}`];
+    return v ? v === "manha" : sem === 1;
+  };
+  const setPrefManha = (ano: number, sem: number, manha: boolean) => {
+    setPrefTurmaA(prev => {
+      const next = { ...prev, [`${ano}|${sem}`]: (manha ? "manha" : "tarde") as "manha" | "tarde" };
+      try { localStorage.setItem("eseuc_pref_turma_a", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
   const [editingDocenteId, setEditingDocenteId] = useState<string | null>(null);
   const [editingSalaId, setEditingSalaId] = useState<string | null>(null);
   const [newUc, setNewUc] = useState<Partial<UC>>({
@@ -205,6 +223,66 @@ export default function App() {
       ]
     }
   ];
+
+  const renderSeletorSemanasPL = (
+    semanasPL: number[] | undefined,
+    numSemanas: number | undefined,
+    semestre: number | undefined,
+    onChange: (s: number[] | undefined) => void
+  ) => {
+    const total = Math.max(1, Math.min(20, numSemanas || 15));
+    const sel = new Set(semanasPL || []);
+    const semanaGlobalBase = (semestre === 2 ? 15 : 0);
+    const toggle = (n: number) => {
+      const next = new Set(sel);
+      if (next.has(n)) next.delete(n); else next.add(n);
+      const arr = [...next].sort((a, b) => a - b);
+      onChange(arr.length ? arr : undefined);
+    };
+    return (
+      <div className="bg-gradient-to-br from-indigo-50/70 to-violet-50/40 border border-indigo-200/70 rounded-xl p-3 space-y-2 shadow-3xs">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <span className="block text-[9px] uppercase font-black text-indigo-700 tracking-wide flex items-center gap-1">
+              <span className="text-[11px]">🧪</span> Semanas das Práticas (PL)
+            </span>
+            <p className="text-[9px] text-indigo-700/70 leading-snug mt-0.5">
+              Clique nas semanas em que as PL podem decorrer. {sel.size === 0 ? "Nenhuma selecionada = todas as semanas válidas." : `${sel.size} semana(s) escolhida(s).`}
+            </p>
+          </div>
+          {sel.size > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange(undefined)}
+              className="shrink-0 text-[8.5px] font-bold uppercase font-mono text-indigo-600 hover:text-indigo-800 border border-indigo-300 hover:border-indigo-400 bg-white/70 rounded px-2 py-1 cursor-pointer transition-colors"
+            >
+              Limpar
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from({ length: total }, (_, i) => i + 1).map((n) => {
+            const ativa = sel.has(n);
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => toggle(n)}
+                title={`Semana ${n} (global ${semanaGlobalBase + n})`}
+                className={`w-8 h-8 rounded-lg text-[11px] font-bold font-mono transition-all cursor-pointer border ${
+                  ativa
+                    ? "bg-indigo-600 border-indigo-700 text-white shadow-sm scale-105"
+                    : "bg-white border-indigo-200 text-indigo-500 hover:border-indigo-400 hover:bg-indigo-50"
+                }`}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const renderEstruturaEstudantes = (turmasConfig?: UC["turmasConfig"]) => {
     const activeNames = new Set((turmasConfig || []).map(t => t.nome));
@@ -1248,9 +1326,23 @@ export default function App() {
         (uc.semestre === 2 ? entradasS2 : entradasS1).push(entrada);
       }
 
+      // Regra opcional (ligável/desligável): PL só de 4.ª a 6.ª feira.
+      const regraPLDias = regras.find(r => r.id === "h_pl_dias_4a_6a" && r.ativa);
+      // Preferência manhã/tarde da Turma A por ano+semestre (do painel de configuração).
+      const prefTurmaAManha: Record<string, boolean> = {};
+      for (let ano = 1; ano <= 4; ano++) for (const sem of [1, 2]) prefTurmaAManha[`${ano}|${sem}`] = prefManhaDe(ano, sem);
+      const opcoes = {
+        plDiasPermitidos: regraPLDias
+          ? (regraPLDias.config?.diasPermitidos ?? ["Quarta", "Quinta", "Sexta"])
+          : null,
+        // Sem limite de TP por mancha nesta fase: 4 TP podem coexistir.
+        maxTPporMancha: null,
+        prefTurmaAManha,
+      };
+
       // Schedule each semester fairly across its UCs (round-robin per week).
-      const sessoesS1 = gerarSessoesConjunto(entradasS1, 1, 0, ocupacaoGlobal, plCount);
-      const sessoesS2 = gerarSessoesConjunto(entradasS2, 2, sessoesS1.length, ocupacaoGlobal, plCount);
+      const sessoesS1 = gerarSessoesConjunto(entradasS1, 1, 0, ocupacaoGlobal, plCount, opcoes);
+      const sessoesS2 = gerarSessoesConjunto(entradasS2, 2, sessoesS1.length, ocupacaoGlobal, plCount, opcoes);
       const allSessoes: SessaoHorario[] = [...sessoesS1, ...sessoesS2];
 
       // Preservar (1) as SEMANAS validadas/bloqueadas inteiras e (2) as sessões fixadas
@@ -1715,6 +1807,63 @@ export default function App() {
         </div>
       </div>
 
+      {/* Modal de horas previstas da UC (aberto pelo ícone na carta do horário) */}
+      {horasUcModal && (() => {
+        const u = horasUcModal;
+        const tc = u.turmasConfig || [];
+        const agendadas = (activeVersao?.sessoes || []).filter(s => s.ucSigla === u.sigla || s.ucNome === u.nome);
+        const horasAgendadas = (tipo: string, turma: string) => agendadas.filter(s => s.tipoAula === tipo && s.turma === turma).length * 2;
+        const nomesPorTipo = (tipoConfig: string, fallback: string[]) => {
+          const ns = tc.filter(t => t.tipo === tipoConfig).map(t => t.nome);
+          return ns.length ? ns : fallback;
+        };
+        const grupos = [
+          { tipo: "T", rotulo: "Teórica (T)", porTurma: u.cargaHorariaTeorica || 0, cor: "stone", turmas: nomesPorTipo("Teórica", ["Turma A", "Turma B"]) },
+          { tipo: "TP", rotulo: "Teórico-Prática (TP)", porTurma: u.cargaHorariaTP || 0, cor: "blue", turmas: nomesPorTipo("TeoricoPratica", Array.from({ length: 8 }, (_, i) => `TP${i + 1}`)) },
+          { tipo: "PL", rotulo: "Prática Lab. (PL)", porTurma: u.cargaHorariaPratica || 0, cor: "rose", turmas: nomesPorTipo("Prática", Array.from({ length: 24 }, (_, i) => `PL${i + 1}`)) },
+          { tipo: "S", rotulo: "Seminário (S)", porTurma: u.cargaHorariaS || 0, cor: "violet", turmas: nomesPorTipo("Seminário", []) },
+        ].filter(g => g.porTurma > 0 && g.turmas.length > 0);
+        const corChip: Record<string, string> = {
+          stone: "border-stone-200 bg-stone-50", blue: "border-blue-200 bg-blue-50",
+          rose: "border-rose-200 bg-rose-50", violet: "border-violet-200 bg-violet-50",
+        };
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setHorasUcModal(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-5 space-y-4 max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[9px] uppercase font-black text-teal-700 tracking-wide font-mono">Carga horária prevista por turma</span>
+                  <h3 className="font-serif font-bold text-stone-900 text-lg leading-tight">{u.nome} ({u.sigla})</h3>
+                  <p className="text-[10px] text-stone-500">{u.anoCurricular}.º ano · {u.semestre}.º semestre · {u.ects} ECTS</p>
+                </div>
+                <button onClick={() => setHorasUcModal(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
+              </div>
+              {grupos.map(g => (
+                <div key={g.tipo} className="space-y-1.5">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-bold text-stone-800">{g.rotulo}</span>
+                    <span className="text-[9.5px] font-mono text-stone-500">{g.porTurma}h previstas por turma · {g.turmas.length} turmas · total {g.porTurma * g.turmas.length}h</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                    {g.turmas.map(nome => {
+                      const feito = horasAgendadas(g.tipo, nome);
+                      const ok = feito >= g.porTurma;
+                      return (
+                        <div key={nome} className={`flex items-center justify-between rounded-md border px-2 py-1 text-[9.5px] ${corChip[g.cor]}`}>
+                          <span className="font-mono font-bold text-stone-700 truncate">{nome}</span>
+                          <span className={`font-mono font-bold ${ok ? "text-emerald-600" : "text-amber-600"}`}>{feito}/{g.porTurma}h</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <p className="text-[9px] text-stone-400 leading-snug">Cada chip mostra <strong>horas agendadas / horas previstas</strong> dessa turma. Verde = carga cumprida; âmbar = ainda em falta. As horas previstas por turma vêm da definição da UC.</p>
+            </div>
+          </div>
+        );
+      })()}
+
        {/* Active UC Editing modal */}
       {editingUcId && (() => {
         const activeEditingUc = ucs.find(u => u.id === editingUcId);
@@ -1926,6 +2075,15 @@ export default function App() {
                   </div>
 
                   {renderEstruturaEstudantes(activeEditingUc.turmasConfig)}
+
+                  {activeEditingUc.cargaHorariaPratica && activeEditingUc.cargaHorariaPratica > 0
+                    ? renderSeletorSemanasPL(
+                        activeEditingUc.semanasPL,
+                        activeEditingUc.numSemanas,
+                        activeEditingUc.semestre,
+                        (sel) => setUcs(ucs.map(u => u.id === editingUcId ? { ...u, semanasPL: sel } : u))
+                      )
+                    : null}
 
                   <div className="space-y-2.5">
                     {/* Teóricas (T) */}
@@ -3422,6 +3580,43 @@ export default function App() {
                 </div>
               </div>
 
+              {/* PREFERÊNCIA MANHÃ/TARDE DA TURMA TEÓRICA, POR ANO E SEMESTRE */}
+              <div className="bg-indigo-50/50 border border-indigo-200/70 p-4 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
+                    Preferência da turma teórica (manhã / tarde) por ano do CLE
+                  </span>
+                  <span className="text-[9px] text-indigo-500/80 font-mono">Turma A = período indicado · Turma B = oposto</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[1, 2, 3, 4].map(ano => (
+                    <div key={ano} className="flex items-center gap-2 bg-white/70 border border-indigo-100 rounded-lg px-2.5 py-1.5">
+                      <span className="text-[10px] font-bold text-stone-700 w-12">{ano}.º ano</span>
+                      {[1, 2].map(sem => (
+                        <div key={sem} className="flex items-center gap-1">
+                          <span className="text-[8.5px] text-stone-400 font-mono">S{sem}</span>
+                          <div className="flex rounded-md overflow-hidden border border-indigo-200">
+                            {(["manha", "tarde"] as const).map(p => {
+                              const ativa = prefManhaDe(ano, sem) === (p === "manha");
+                              return (
+                                <button
+                                  key={p}
+                                  onClick={() => setPrefManha(ano, sem, p === "manha")}
+                                  className={`px-2 py-0.5 text-[9px] font-bold cursor-pointer transition-colors ${ativa ? "bg-indigo-600 text-white" : "bg-white text-indigo-500 hover:bg-indigo-50"}`}
+                                >
+                                  {p === "manha" ? "Manhã" : "Tarde"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-indigo-700/70 leading-tight">Aplica-se na próxima geração da distribuição. Define se a turma teórica (Turma A) desse ano arranca de manhã ou de tarde nesse semestre.</p>
+              </div>
+
               {/* 3rd YEAR SPECIAL CASE NOTE */}
               {selectedYearFilter === 3 && (
                 <div className="bg-amber-50/60 border border-amber-200 text-amber-800 p-5 rounded-2xl space-y-2 animate-fade-in">
@@ -3512,9 +3707,21 @@ export default function App() {
                                           <span>{sessao.ucSigla}</span>
                                           <span className="opacity-75 font-sans font-medium text-[8px] whitespace-nowrap">({sessao.tipoAula})</span>
                                         </div>
-                                        <button onClick={() => toggleSessionBlock(sessao.id)} className="cursor-pointer" title={sessao.bloqueado ? "Desbloquear" : "Bloquear"}>
-                                          {sessao.bloqueado ? <Lock className="w-2.5 h-2.5 text-amber-500" /> : <Unlock className="w-2.5 h-2.5 opacity-40 hover:opacity-100" />}
-                                        </button>
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                          <button
+                                            onClick={() => {
+                                              const ucObj = ucs.find(u => u.sigla === sessao.ucSigla || u.nome === sessao.ucNome);
+                                              if (ucObj) setHorasUcModal(ucObj);
+                                            }}
+                                            className="cursor-pointer"
+                                            title="Ver total de horas da UC"
+                                          >
+                                            <Info className="w-2.5 h-2.5 opacity-40 hover:opacity-100" />
+                                          </button>
+                                          <button onClick={() => toggleSessionBlock(sessao.id)} className="cursor-pointer" title={sessao.bloqueado ? "Desbloquear" : "Bloquear"}>
+                                            {sessao.bloqueado ? <Lock className="w-2.5 h-2.5 text-amber-500" /> : <Unlock className="w-2.5 h-2.5 opacity-40 hover:opacity-100" />}
+                                          </button>
+                                        </div>
                                       </div>
 
                                       <div className="text-[9px] font-bold leading-none truncate mt-0.5 text-black">
@@ -4363,6 +4570,14 @@ export default function App() {
                     {/* Turmas Selection Field within adding UC */}
                     <div className="space-y-1.5 pt-1">
                       {renderEstruturaEstudantes(newUc.turmasConfig)}
+                      {newUc.cargaHorariaPratica && newUc.cargaHorariaPratica > 0
+                        ? renderSeletorSemanasPL(
+                            newUc.semanasPL,
+                            newUc.numSemanas,
+                            newUc.semestre,
+                            (sel) => setNewUc({ ...newUc, semanasPL: sel })
+                          )
+                        : null}
                       <label className="block text-[9.5px] uppercase font-bold text-stone-600 font-mono">Disciplinas / Turmas Atribuídas ({newUc.turmasConfig?.length || 0})</label>
                       <span className="text-[8px] text-stone-450 block leading-tight">
                         {newUc.cargaHorariaPratica && newUc.cargaHorariaPratica > 0 

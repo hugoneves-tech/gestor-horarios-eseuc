@@ -46,6 +46,7 @@ create table if not exists ucs (
   data_fim                date,
   periodo                 text,
   observacoes             text,
+  semanas_pl              jsonb,
   turmas_config           jsonb default '[]'::jsonb,
   created_at              timestamptz default now()
 );

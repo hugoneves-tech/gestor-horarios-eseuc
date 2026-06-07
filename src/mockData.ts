@@ -225,6 +225,16 @@ export const regrasIniciais: RegraHorario[] = [
     ativa: true
   },
   {
+    id: "h_pl_dias_4a_6a",
+    nome: "PL apenas de 4.ª a 6.ª feira (quarta a sexta)",
+    tipo: "soft",
+    categoria: "Calendário",
+    descricao: "Quando ativa, as Práticas de Laboratório (PL) só podem ser marcadas de quarta a sexta-feira (4.ª, 5.ª e 6.ª feira). Desative para permitir as PL em qualquer dia útil e comparar os dois cenários.",
+    config: { traducaoSimples: "PL só de quarta a sexta.", diasPermitidos: ["Quarta", "Quinta", "Sexta"] },
+    peso: 6,
+    ativa: false
+  },
+  {
     id: "h2",
     nome: "Evitar ocupação dupla de salas de práticas simuladas ou anfiteatros",
     tipo: "hard",

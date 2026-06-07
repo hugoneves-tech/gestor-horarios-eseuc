@@ -32,3 +32,16 @@ values (
   9, true
 )
 on conflict (id) do nothing;
+
+-- Regra (ligável/desligável): PL apenas de 4.ª a 6.ª feira (quarta a sexta).
+insert into regras (id, nome, tipo, categoria, descricao, escopo, ano_curricular, config, peso, ativa)
+values (
+  'h_pl_dias_4a_6a',
+  'PL apenas de 4.ª a 6.ª feira (quarta a sexta)',
+  'soft', 'Calendário',
+  'Quando ativa, as Práticas de Laboratório (PL) só podem ser marcadas de quarta a sexta-feira (4.ª, 5.ª e 6.ª feira). Desative para permitir as PL em qualquer dia útil e comparar os dois cenários.',
+  'transversal', 'todos',
+  '{"traducaoSimples":"PL só de quarta a sexta.","diasPermitidos":["Quarta","Quinta","Sexta"]}'::jsonb,
+  6, false
+)
+on conflict (id) do nothing;
