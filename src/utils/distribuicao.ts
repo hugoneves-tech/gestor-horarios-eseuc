@@ -591,8 +591,6 @@ export function gerarSessoesConjunto(
     flexivel: boolean;    // PL de MI: qualquer dia/período (tapa-buracos)
     exemptaGate: boolean; // MI: não está sujeita ao gate rígido T→TP→PL
     rotaBase: number;     // deslocamento de período por UC (rotação semanal ESDAC@08/MI@10/FT@12)
-    maxSemana: number;    // máx. blocos desta turma por semana (~1: distribui pelas semanas)
-    porSemana: Map<number, number>; // blocos já colocados por semana
     weeks: WeekRef[]; total: number; placed: number;
   }
 
@@ -643,8 +641,7 @@ export function gerarSessoesConjunto(
       const salaPool: SalaPool = tipo === "PL" && usaComputador ? "comp" : "lab";
       const flexivel = ehFlexivel && tipo === "PL";
       const wks = tipo === "PL" ? weeksPL : weeks;
-      const maxSemana = Math.max(1, Math.ceil(total / Math.max(1, wks.length)));
-      tasks.push({ ano, ucNome: uc.nome, ucSigla: uc.sigla, ucKey: uc.id, family, turmaNome, tipo, salaTipo, manha, salaPool, flexivel, exemptaGate: ehFlexivel, rotaBase, maxSemana, porSemana: new Map(), weeks: wks, total, placed: 0 });
+      tasks.push({ ano, ucNome: uc.nome, ucSigla: uc.sigla, ucKey: uc.id, family, turmaNome, tipo, salaTipo, manha, salaPool, flexivel, exemptaGate: ehFlexivel, rotaBase, weeks: wks, total, placed: 0 });
       const s = getStat(`${uc.id}|${family}`);
       if (tipo === "T") s.totalT += total; else if (tipo === "TP") s.totalTP += total; else if (tipo === "PL") s.totalPL += total;
     };
@@ -685,6 +682,10 @@ export function gerarSessoesConjunto(
   const diaKey = (ano: number, week: number, dia: string, g: string) => `${ano}|${week}|${dia}|${g}`;
   const quatroDia = new Map<string, string>(); // `${ano}|${week}|${plGroup}` → o único dia de 8h
   const qKey = (ano: number, week: number, g: string) => `${ano}|${week}|${g}`;
+  // Cap por DIA: a mesma turma (ex.: MI-TP1) no máx. 1 bloco por dia (sem 4h seguidas
+  // da mesma TP). Pode ter vários blocos na semana, mas em dias diferentes.
+  const turmaDia = new Map<string, number>(); // `${ano}|${week}|${dia}|${turma}` → blocos
+  const tdKey = (ano: number, week: number, dia: string, turma: string) => `${ano}|${week}|${dia}|${turma}`;
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
     // Rotação por UC, ESTÁVEL de semana para semana (horário-tipo previsível): cada UC
@@ -717,6 +718,8 @@ export function gerarSessoesConjunto(
         pool = [...comTP, ...resto]; // só promove pares DENTRO do dia-casa
       }
     }
+    // Cap por dia: a mesma turma não repete no mesmo dia (evita 4h seguidas da mesma TP).
+    pool = pool.filter(s => (turmaDia.get(tdKey(t.ano, wk.semanaGlobal, s.dia, t.turmaNome)) || 0) < 1);
     // Carga diária: máx. 8h e só um dia a 8h por turma; os restantes ficam-se pelas 6h.
     const folhas = gruposAlunoFolha(t.turmaNome);
     pool = pool.filter(s => folhas.every(g => {
@@ -731,7 +734,7 @@ export function gerarSessoesConjunto(
     const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
     registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
-    t.porSemana.set(wk.semanaGlobal, (t.porSemana.get(wk.semanaGlobal) || 0) + 1);
+    turmaDia.set(tdKey(t.ano, wk.semanaGlobal, slot.dia, t.turmaNome), 1);
     for (const g of folhas) {
       const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
       const nv = (diaCount.get(dk) || 0) + 1;
