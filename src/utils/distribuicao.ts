@@ -665,6 +665,11 @@ export function gerarSessoesConjunto(
   // prefere mancha com TP1+TP2 (A1), seja da mesma UC ou de outra.
   const tpCohortMancha = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${hora}` → {A1,A2,B1,B2}
   const tpUCs = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${hora}` → {ucKey...} (agrupar TP por UC)
+  const tpUCCohort = new Map<string, Set<string>>(); // mancha → {`${ucKey}|${meioCohort}`...}
+  // Semanas em que cada (UC, família) tem PL → nessas semanas parte-se a TP em 2+2 para
+  // emparelhar com as 6 PL (bloco cheio 2TP+6PL). Fora delas, agrupam-se as 4 TP.
+  const plSemanas = new Set<string>(); // `${ucKey}|${family}|${week}`
+  for (const t of tasks) if (t.tipo === "PL") for (const w of t.weeks) plSemanas.add(`${t.ucKey}|${t.family}|${w.semanaGlobal}`);
   // Limite de TP em simultâneo por mancha = nº de salas de TP. Com 2 salas, as 4 TP
   // de uma família partem-se por 2 manchas e sobram slots para as 6 PL desdobradas
   // das outras 2 TP. Sem limite definido, 4 TP podem coexistir (não se descarta).
@@ -693,17 +698,22 @@ export function gerarSessoesConjunto(
     // Limite de 2 TP por mancha (salas de TP): não juntar as 4 TP no mesmo slot.
     if (t.tipo === "TP") {
       pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
-      // Agrupar as 4 TP da MESMA UC (de UMA família) na mesma mancha — só DENTRO da
-      // metade do dia da turma (TP1-4 de manhã, TP5-8 à tarde): nunca juntar as 8.
-      // O bloco da metade oposta (overflow / "8h") fica no fim e NÃO agrupa a mesma UC
-      // (para não exigir 8 TPs e docentes a mais em simultâneo).
+      // Agrupar TP da MESMA UC, dentro da metade do dia (manhã/tarde). Em semanas com PL
+      // desta UC, PARTE-SE em 2+2 (TP1,2 numa mancha; TP3,4 noutra) para caber o par
+      // 2TP+6PL (bloco cheio 180); fora dessas semanas, agrupam-se as 4. Nunca outra UC
+      // na mesma mancha; o overflow (metade oposta) fica no fim.
       const prefHoras = new Set<string>(t.manha ? PERIODOS_MANHA : PERIODOS_TARDE);
+      const split = plSemanas.has(`${t.ucKey}|${t.family}|${wk.semanaGlobal}`);
+      const sc = meioCohort(t.turmaNome);
+      const compSc = sc ? COMPLEMENTO_COHORT[sc] : null;
       const bucket = (s: Slot) => {
-        if (!prefHoras.has(s.hora)) return -1;                // metade oposta: último, sem agrupar
-        const set = tpUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
+        if (!prefHoras.has(s.hora)) return -1;                // metade oposta: último
+        const set = tpUCCohort.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
         if (!set || set.size === 0) return 1;                 // vazia: ok
-        if (set.has(t.ucKey) && set.size === 1) return 2;     // só esta UC: completa o conjunto
-        return 0;                                             // tem outra UC: evitar
+        const soEstaUC = [...set].every(k => k.startsWith(t.ucKey + "|"));
+        if (!soEstaUC) return 0;                              // tem outra UC: evitar
+        if (split && compSc && set.has(`${t.ucKey}|${compSc}`)) return 0; // não juntar os 2 meios-cohorts (deixa lugar à PL)
+        return 2;                                             // mesma UC (e meio-cohort compatível): agrupar
       };
       const b2 = pool.filter(s => bucket(s) === 2);
       const b1 = pool.filter(s => bucket(s) === 1);
@@ -718,11 +728,13 @@ export function gerarSessoesConjunto(
       const sc = meioCohort(t.turmaNome);
       const comp = sc ? COMPLEMENTO_COHORT[sc] : null;
       if (comp && pool.length) {
-        const temComp = (s: Slot) =>
-          tpCohortMancha.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora))?.has(comp);
-        const comTP = pool.filter(temComp);
-        const resto = pool.filter(s => !temComp(s));
-        pool = [...comTP, ...resto];
+        const mk = (s: Slot) => tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora);
+        const mesmoUC = (s: Slot) => tpUCCohort.get(mk(s))?.has(`${t.ucKey}|${comp}`);   // TP complementar DESTA UC
+        const qualquer = (s: Slot) => tpCohortMancha.get(mk(s))?.has(comp);              // TP complementar de qualquer UC
+        const b2 = pool.filter(mesmoUC);
+        const b1 = pool.filter(s => !mesmoUC(s) && qualquer(s));
+        const b0 = pool.filter(s => !mesmoUC(s) && !qualquer(s));
+        pool = [...b2, ...b1, ...b0];
       }
     }
     // Carga diária: teto absoluto de 8h/dia (4 blocos). Vários dias podem chegar às 8h
@@ -750,6 +762,9 @@ export function gerarSessoesConjunto(
         let set = tpCohortMancha.get(mk);
         if (!set) { set = new Set(); tpCohortMancha.set(mk, set); }
         set.add(sc);
+        let uccoh = tpUCCohort.get(mk);
+        if (!uccoh) { uccoh = new Set(); tpUCCohort.set(mk, uccoh); }
+        uccoh.add(`${t.ucKey}|${sc}`);
       }
       let ucs = tpUCs.get(mk);
       if (!ucs) { ucs = new Set(); tpUCs.set(mk, ucs); }
