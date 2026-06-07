@@ -183,11 +183,12 @@ function poolDoTipo(
   // Período preferido DEPENDE DO DIA (rotação dia-a-dia): cada UC avança um período de
   // um dia para o outro. Ex.: FT quinta@08 → sexta@10. (rotacao = base da UC + semana.)
   const periodosPrefDia = (dia: string) => rotN(baseMetade, rotacao + WEEKDAYS.indexOf(dia));
-  // Overflow para a metade oposta do dia:
-  //  - T/TP: só o BLOCO DE AJUSTE (manhã→16h-18h, tarde→10h-12h), preservando o almoço.
-  //  - PL: pode usar TODA a metade oposta (mais manchas → cabe a carga alta de PL).
+  // Overflow para a metade oposta do dia, SEMPRE encostado ao almoço (sem dispersar):
+  //  - T/TP: só o bloco de ajuste (manhã→16h, tarde→10h).
+  //  - PL: até 2 blocos adjacentes ao almoço (manhã→14h,16h; tarde→10h,08h), para a
+  //    carga alta de PL caber SEM esticar o dia até às 18h/12h distantes.
   const periodosOver = tipo === "PL"
-    ? (manha ? PERIODOS_TARDE : PERIODOS_MANHA)
+    ? (manha ? ["14:00", "16:00", "18:00"] : ["10:00", "08:00", "12:00"])
     : (manha ? ["16:00"] : ["10:00"]);
   const avail = WEEKDAYS.filter(d => !diasBloqueados.includes(d));
   if (!avail.length) return [];
