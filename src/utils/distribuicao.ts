@@ -178,13 +178,10 @@ function poolDoTipo(
   rotacao: number = 0,   // roda a ordem dos períodos por semana (Regra B: não estar sempre cedo/tarde)
   flexivel: boolean = false // PL de MI: qualquer dia, no período da família (tapa-buracos)
 ): Slot[] {
-  const rotN = (a: string[], off: number) => { const n = ((off % a.length) + a.length) % a.length; return a.slice(n).concat(a.slice(0, n)); };
-  const baseMetade = manha ? PERIODOS_MANHA : PERIODOS_TARDE;
-  // Período preferido DEPENDE DO DIA: cada UC avança um período por dia (rotação
-  // dia-a-dia). Ex.: MI base 0 → Quinta(idx3)=08h, Sexta(idx4)=10h; EIG base 1 →
-  // Quinta=10h, Sexta=12h; FT base 2 → Quinta=12h, Sexta=08h. (rotacao já inclui a
-  // base da UC + a rotação semanal.)
-  const periodosPrefDia = (dia: string) => rotN(baseMetade, rotacao + WEEKDAYS.indexOf(dia));
+  const rot = (a: string[]) => { const n = ((rotacao % a.length) + a.length) % a.length; return a.slice(n).concat(a.slice(0, n)); };
+  // Período preferido da metade do dia, com rotação por semana (Regra B: não estar
+  // sempre cedo/tarde). Igual para todos os dias da semana.
+  const periodosPref = rot(manha ? PERIODOS_MANHA : PERIODOS_TARDE);
   // Overflow para a metade oposta do dia ENCOSTADO ao almoço (sem o eliminar),
   // para o grupo não ficar com buracos:
   //  - família da manhã transborda para 14:00→16:00→18:00 (14:00 cola-se ao almoço);
@@ -199,7 +196,7 @@ function poolDoTipo(
   // da família. Serve de "cola" para compactar o dia (tapar buracos).
   if (flexivel) {
     const slotsF: Slot[] = [];
-    for (const dia of avail) for (const hora of periodosPrefDia(dia)) slotsF.push({ dia, hora });
+    for (const dia of avail) for (const hora of periodosPref) slotsF.push({ dia, hora });
     return slotsF;
   }
 
@@ -213,7 +210,7 @@ function poolDoTipo(
       ? avail.slice(0, 1)                        // T on the first available day (Thu)
       : avail.slice(1);                          // TP/S on the following day(s) (Fri)
     const slotsP: Slot[] = [];
-    for (const dia of diasPartial) for (const hora of periodosPrefDia(dia)) slotsP.push({ dia, hora });
+    for (const dia of diasPartial) for (const hora of periodosPref) slotsP.push({ dia, hora });
     return slotsP;
   }
 
@@ -229,12 +226,12 @@ function poolDoTipo(
     // Teóricas no INÍCIO da semana (Seg/Ter) — a teoria (conteúdo) vem primeiro.
     const pref = ["Segunda", "Terça"].filter(d => avail.includes(d));
     ordemDias = pref.length ? pref : avail.slice(0, 2);
-  } else if (tipo === "TP" || tipo === "PL") {
-    // TP e PL da MESMA UC partilham a "casa": mesmos dias (prática a meio/fim da
-    // semana, Qua–Sex, a rodar por UC) e o mesmo período (rotação dia-a-dia). Assim
-    // o slot é estável e ALTERNA TP↔PL conforme a semana (PL nas semanas da UC).
-    const pratica = rotN(["Quarta", "Quinta", "Sexta"], rotacao);
-    ordemDias = [...pratica, "Terça", "Segunda"]; // Ter/Seg só em último recurso
+  } else if (tipo === "TP") {
+    // TP a meio da semana (Qua/Qui), transborda para Ter/Sex (depois da teoria).
+    ordemDias = ["Quarta", "Quinta", "Terça", "Sexta"];
+  } else if (tipo === "PL") {
+    // PL no fim da semana (Qui/Sex/Qua); só em último recurso Ter/Seg, para encher.
+    ordemDias = ["Quinta", "Sexta", "Quarta", "Terça", "Segunda"];
   } else {
     ordemDias = ["Terça", "Sexta"];
   }
@@ -243,7 +240,7 @@ function poolDoTipo(
 
   const slots: Slot[] = [];
   // Preferred half (own period) across the preferred days, rotação por dia …
-  for (const dia of dias) for (const hora of periodosPrefDia(dia)) slots.push({ dia, hora });
+  for (const dia of dias) for (const hora of periodosPref) slots.push({ dia, hora });
   // … then the other half como ÚLTIMO RECURSO — para PL e TP (ex.: TP da Turma B
   // no bloco 10h-12h). Só a Teórica (T, 180 alunos no anfiteatro) fica na sua metade.
   if (tipo === "PL" || tipo === "TP") {
@@ -682,17 +679,10 @@ export function gerarSessoesConjunto(
   const diaKey = (ano: number, week: number, dia: string, g: string) => `${ano}|${week}|${dia}|${g}`;
   const quatroDia = new Map<string, string>(); // `${ano}|${week}|${plGroup}` → o único dia de 8h
   const qKey = (ano: number, week: number, g: string) => `${ano}|${week}|${g}`;
-  // Cap por DIA: a mesma turma (ex.: MI-TP1) no máx. 1 bloco por dia (sem 4h seguidas
-  // da mesma TP). Pode ter vários blocos na semana, mas em dias diferentes.
-  const turmaDia = new Map<string, number>(); // `${ano}|${week}|${dia}|${turma}` → blocos
-  const tdKey = (ano: number, week: number, dia: string, turma: string) => `${ano}|${week}|${dia}|${turma}`;
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
-    // Rotação por UC, ESTÁVEL de semana para semana (horário-tipo previsível): cada UC
-    // arranca num período fixo e roda dia-a-dia DENTRO da semana (em poolDoTipo soma-se
-    // o índice do dia). Assim o aluno tem sempre o mesmo padrão semanal e o docente de
-    // cada UC varia de hora ao longo da semana (sem ficar sempre cedo/tarde → sem sobrecarga).
-    const rotacao = t.rotaBase;
+    // Roda os períodos por semana (Regra B: a mesma UC não fica sempre cedo/tarde).
+    const rotacao = wk.semanaGlobal - 1;
     let pool = poolDoTipo(t.tipo, wk.diasBloqueados, t.manha, rotacao, t.flexivel);
     // Regra opcional: PL apenas em certos dias da semana (ex.: 4.ª a 6.ª feira).
     if (t.tipo === "PL" && opts.plDiasPermitidos && opts.plDiasPermitidos.length) {
@@ -718,8 +708,6 @@ export function gerarSessoesConjunto(
         pool = [...comTP, ...resto]; // só promove pares DENTRO do dia-casa
       }
     }
-    // Cap por dia: a mesma turma não repete no mesmo dia (evita 4h seguidas da mesma TP).
-    pool = pool.filter(s => (turmaDia.get(tdKey(t.ano, wk.semanaGlobal, s.dia, t.turmaNome)) || 0) < 1);
     // Carga diária: máx. 8h e só um dia a 8h por turma; os restantes ficam-se pelas 6h.
     const folhas = gruposAlunoFolha(t.turmaNome);
     pool = pool.filter(s => folhas.every(g => {
@@ -734,7 +722,6 @@ export function gerarSessoesConjunto(
     const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
     registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
-    turmaDia.set(tdKey(t.ano, wk.semanaGlobal, slot.dia, t.turmaNome), 1);
     for (const g of folhas) {
       const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
       const nv = (diaCount.get(dk) || 0) + 1;
