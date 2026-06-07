@@ -178,10 +178,11 @@ function poolDoTipo(
   rotacao: number = 0,   // roda a ordem dos períodos por semana (Regra B: não estar sempre cedo/tarde)
   flexivel: boolean = false // PL de MI: qualquer dia, no período da família (tapa-buracos)
 ): Slot[] {
-  const rot = (a: string[]) => { const n = ((rotacao % a.length) + a.length) % a.length; return a.slice(n).concat(a.slice(0, n)); };
-  // Período preferido da metade do dia, com rotação por semana (Regra B: não estar
-  // sempre cedo/tarde). Igual para todos os dias da semana.
-  const periodosPref = rot(manha ? PERIODOS_MANHA : PERIODOS_TARDE);
+  const rotN = (a: string[], off: number) => { const n = ((off % a.length) + a.length) % a.length; return a.slice(n).concat(a.slice(0, n)); };
+  const baseMetade = manha ? PERIODOS_MANHA : PERIODOS_TARDE;
+  // Período preferido DEPENDE DO DIA (rotação dia-a-dia): cada UC avança um período de
+  // um dia para o outro. Ex.: FT quinta@08 → sexta@10. (rotacao = base da UC + semana.)
+  const periodosPrefDia = (dia: string) => rotN(baseMetade, rotacao + WEEKDAYS.indexOf(dia));
   // Overflow para a metade oposta do dia ENCOSTADO ao almoço (sem o eliminar),
   // para o grupo não ficar com buracos:
   //  - família da manhã transborda para 14:00→16:00→18:00 (14:00 cola-se ao almoço);
@@ -196,7 +197,7 @@ function poolDoTipo(
   // da família. Serve de "cola" para compactar o dia (tapar buracos).
   if (flexivel) {
     const slotsF: Slot[] = [];
-    for (const dia of avail) for (const hora of periodosPref) slotsF.push({ dia, hora });
+    for (const dia of avail) for (const hora of periodosPrefDia(dia)) slotsF.push({ dia, hora });
     return slotsF;
   }
 
@@ -210,7 +211,7 @@ function poolDoTipo(
       ? avail.slice(0, 1)                        // T on the first available day (Thu)
       : avail.slice(1);                          // TP/S on the following day(s) (Fri)
     const slotsP: Slot[] = [];
-    for (const dia of diasPartial) for (const hora of periodosPref) slotsP.push({ dia, hora });
+    for (const dia of diasPartial) for (const hora of periodosPrefDia(dia)) slotsP.push({ dia, hora });
     return slotsP;
   }
 
@@ -240,7 +241,7 @@ function poolDoTipo(
 
   const slots: Slot[] = [];
   // Preferred half (own period) across the preferred days, rotação por dia …
-  for (const dia of dias) for (const hora of periodosPref) slots.push({ dia, hora });
+  for (const dia of dias) for (const hora of periodosPrefDia(dia)) slots.push({ dia, hora });
   // … then the other half como ÚLTIMO RECURSO — para PL e TP (ex.: TP da Turma B
   // no bloco 10h-12h). Só a Teórica (T, 180 alunos no anfiteatro) fica na sua metade.
   if (tipo === "PL" || tipo === "TP") {
@@ -681,8 +682,9 @@ export function gerarSessoesConjunto(
   const qKey = (ano: number, week: number, g: string) => `${ano}|${week}|${g}`;
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
-    // Roda os períodos por semana (Regra B: a mesma UC não fica sempre cedo/tarde).
-    const rotacao = wk.semanaGlobal - 1;
+    // Rotação por UC: base distinta por UC (período de arranque) + variação por semana.
+    // Em poolDoTipo soma-se ainda o índice do dia → rotação dia-a-dia (FT qui@08→sex@10).
+    const rotacao = t.rotaBase + wk.semanaGlobal - 1;
     let pool = poolDoTipo(t.tipo, wk.diasBloqueados, t.manha, rotacao, t.flexivel);
     // Regra opcional: PL apenas em certos dias da semana (ex.: 4.ª a 6.ª feira).
     if (t.tipo === "PL" && opts.plDiasPermitidos && opts.plDiasPermitidos.length) {
