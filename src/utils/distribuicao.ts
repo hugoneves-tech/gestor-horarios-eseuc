@@ -183,13 +183,11 @@ function poolDoTipo(
   // Período preferido DEPENDE DO DIA (rotação dia-a-dia): cada UC avança um período de
   // um dia para o outro. Ex.: FT quinta@08 → sexta@10. (rotacao = base da UC + semana.)
   const periodosPrefDia = (dia: string) => rotN(baseMetade, rotacao + WEEKDAYS.indexOf(dia));
-  // Overflow para a metade oposta do dia ENCOSTADO ao almoço (sem o eliminar),
-  // para o grupo não ficar com buracos:
-  //  - família da manhã transborda para 14:00→16:00→18:00 (14:00 cola-se ao almoço);
-  //  - família da tarde transborda para 10:00→08:00→12:00. O 10:00 (10:00-12:00) deixa
-  //    o almoço (12:00-14:00) livre e cola-se à tarde; o 12:00 fica em último porque
-  //    encostaria à tarde sem almoço.
-  const periodosOver = manha ? PERIODOS_TARDE : ["10:00", "08:00", "12:00"];
+  // Bloco de AJUSTE na metade oposta — UM único bloco, sempre o mesmo, preservando o
+  // almoço: a turma da manhã só usa as 16h-18h; a turma da tarde só usa as 10h-12h.
+  //  - manhã: 08-14 (3 blocos) + almoço 14-16 + ajuste 16-18.
+  //  - tarde: ajuste 10-12 + almoço 12-14 + 14-20 (3 blocos).
+  const periodosOver = manha ? ["16:00"] : ["10:00"];
   const avail = WEEKDAYS.filter(d => !diasBloqueados.includes(d));
   if (!avail.length) return [];
 
@@ -678,12 +676,9 @@ export function gerarSessoesConjunto(
   const tpManchaKey = (ano: number, week: number, dia: string, hora: string) => `${ano}|${week}|${dia}|${hora}`;
   // Carga diária por aluno (grupo-folha PL): base de 6h (3 blocos) numa só metade do dia
   // e, no MÁXIMO, UM dia por semana a 8h (4 blocos). Nunca mais de 8h.
-  const MAX_BLOCOS_DIA = 4;     // teto absoluto = 8h
-  const MAX_BLOCOS_NORMAL = 3;  // dias normais = 6h
+  const MAX_BLOCOS_DIA = 4;     // teto absoluto = 8h/dia
   const diaCount = new Map<string, number>(); // `${ano}|${week}|${dia}|${plGroup}` → nº de blocos
   const diaKey = (ano: number, week: number, dia: string, g: string) => `${ano}|${week}|${dia}|${g}`;
-  const quatroDia = new Map<string, string>(); // `${ano}|${week}|${plGroup}` → o único dia de 8h
-  const qKey = (ano: number, week: number, g: string) => `${ano}|${week}|${g}`;
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
     // Rotação por UC: base distinta por UC (período de arranque) + variação por semana.
@@ -716,40 +711,31 @@ export function gerarSessoesConjunto(
       const bover = pool.filter(s => bucket(s) === -1);
       pool = [...b2, ...b1, ...b0, ...bover];
     }
-    // HÍBRIDO: a PL segue a CASA da própria UC (toggle previsível TP↔PL). O
-    // emparelhamento cruzado entra só como DESEMPATE, e nunca a saltar de dia:
-    // dentro do dia-casa da PL, prefere o período que já tem a TP complementar.
+    // Emparelhamento TP∥PL: a PL prefere QUALQUER mancha que já tenha a TP do
+    // meio-cohort COMPLEMENTAR (ex.: PL7-12 ∥ TP1+TP2), formando o bloco cheio de 180
+    // com alunos disjuntos. Maximiza a colocação das PL (para completarem).
     if (t.tipo === "PL") {
       const sc = meioCohort(t.turmaNome);
       const comp = sc ? COMPLEMENTO_COHORT[sc] : null;
       if (comp && pool.length) {
-        const diaCasa = pool[0].dia; // 1.º dia do pool = casa da UC (poolDoTipo)
-        const temComp = (s: Slot) => s.dia === diaCasa &&
+        const temComp = (s: Slot) =>
           tpCohortMancha.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora))?.has(comp);
         const comTP = pool.filter(temComp);
         const resto = pool.filter(s => !temComp(s));
-        pool = [...comTP, ...resto]; // só promove pares DENTRO do dia-casa
+        pool = [...comTP, ...resto];
       }
     }
-    // Carga diária: máx. 8h e só um dia a 8h por turma; os restantes ficam-se pelas 6h.
+    // Carga diária: teto absoluto de 8h/dia (4 blocos). Vários dias podem chegar às 8h
+    // (o bloco de ajuste extra), para caberem todas as PLs — só não se passa das 8h.
     const folhas = gruposAlunoFolha(t.turmaNome);
-    pool = pool.filter(s => folhas.every(g => {
-      const cur = diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0;
-      if (cur >= MAX_BLOCOS_DIA) return false;        // teto absoluto de 8h
-      if (cur >= MAX_BLOCOS_NORMAL) {                  // este bloco levaria o dia a 8h
-        const q = quatroDia.get(qKey(t.ano, wk.semanaGlobal, g));
-        return q === undefined || q === s.dia;         // só no único dia de 8h do grupo
-      }
-      return true;                                     // até 6h: sempre permitido
-    }));
+    pool = pool.filter(s => folhas.every(g =>
+      (diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0) < MAX_BLOCOS_DIA));
     const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
     registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
     for (const g of folhas) {
       const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
-      const nv = (diaCount.get(dk) || 0) + 1;
-      diaCount.set(dk, nv);
-      if (nv >= MAX_BLOCOS_DIA) quatroDia.set(qKey(t.ano, wk.semanaGlobal, g), slot.dia);
+      diaCount.set(dk, (diaCount.get(dk) || 0) + 1);
     }
     if (t.tipo === "PL") {
       const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora, t.salaPool);
