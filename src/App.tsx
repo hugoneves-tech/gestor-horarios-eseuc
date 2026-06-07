@@ -1504,6 +1504,32 @@ export default function App() {
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updatedSessoes } : v));
   };
 
+  // Eliminar uma aula do horário (edição manual para reajustar).
+  const deleteSession = (sessionId: number) => {
+    if (!activeVersao) return;
+    const updated = activeVersao.sessoes.filter(s => s.id !== sessionId);
+    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
+  };
+
+  // Estado do mini-formulário de "adicionar aula" a um slot (dia/hora/semana).
+  const [addAulaCtx, setAddAulaCtx] = useState<{ dia: string; horaInicio: string; horaFim: string; semana: number } | null>(null);
+  // Adicionar uma aula nova no slot indicado.
+  const addSessionAt = (ucId: string, tipo: SessaoHorario["tipoAula"], turma: string) => {
+    if (!activeVersao || !addAulaCtx) return;
+    const uc = ucs.find(u => u.id === ucId);
+    if (!uc) return;
+    const tipoSala = tipo === "PL" ? "Laboratório de Simulação PL" : tipo === "TP" ? "Sala Comum TP" : tipo === "S" ? "Sala Comum TP" : "Anfiteatro (Teórica T)";
+    const novaId = Math.max(0, ...activeVersao.sessoes.map(s => s.id)) + 1;
+    const nova: SessaoHorario = {
+      id: novaId, ucNome: uc.nome, ucSigla: uc.sigla, tipoAula: tipo,
+      docente: "", sala: "", salaTipo: tipoSala, turma,
+      diaSemana: addAulaCtx.dia, horaInicio: addAulaCtx.horaInicio, horaFim: addAulaCtx.horaFim,
+      bloqueado: true, semana: addAulaCtx.semana,
+    };
+    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: [...v.sessoes, nova] } : v));
+    setAddAulaCtx(null);
+  };
+
   const handleDragStart = (e: React.DragEvent, id: number) => {
     setDraggedSessionId(id);
   };
@@ -1806,6 +1832,53 @@ export default function App() {
           })}
         </div>
       </div>
+
+      {/* Modal: adicionar aula manualmente a um slot do horário */}
+      {addAulaCtx && (() => {
+        const ucsDisponiveis = ucs.filter(u => (u.turmasConfig?.length || 0) > 0);
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddAulaCtx(null)}>
+            <form
+              onClick={e => e.stopPropagation()}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget as HTMLFormElement);
+                const ucId = String(fd.get("uc") || "");
+                const tipo = String(fd.get("tipo") || "TP") as SessaoHorario["tipoAula"];
+                const turma = String(fd.get("turma") || "").trim();
+                if (ucId && turma) addSessionAt(ucId, tipo, turma);
+              }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[9px] uppercase font-black text-teal-700 tracking-wide font-mono">Adicionar aula</span>
+                  <h3 className="font-serif font-bold text-stone-900 text-base leading-tight">{addAulaCtx.dia}, {addAulaCtx.horaInicio}–{addAulaCtx.horaFim}</h3>
+                  <p className="text-[10px] text-stone-500">{getWeekLabel(addAulaCtx.semana)}</p>
+                </div>
+                <button type="button" onClick={() => setAddAulaCtx(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
+              </div>
+              <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">UC
+                <select name="uc" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]" defaultValue={ucsDisponiveis[0]?.id}>
+                  {ucsDisponiveis.map(u => <option key={u.id} value={u.id}>{u.sigla} — {u.nome}</option>)}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">Tipologia
+                  <select name="tipo" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]" defaultValue="TP">
+                    <option value="T">T</option><option value="TP">TP</option><option value="PL">PL</option><option value="S">S</option>
+                  </select>
+                </label>
+                <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">Turma
+                  <input name="turma" placeholder="ex.: TP1 / PL7 / Turma A" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]" />
+                </label>
+              </div>
+              <p className="text-[9px] text-stone-400 leading-tight">A aula é adicionada bloqueada (fixa) para não ser removida ao regenerar. Podes desbloqueá-la depois.</p>
+              <button type="submit" className="w-full bg-[#1E1C19] text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-stone-800">Adicionar</button>
+            </form>
+          </div>
+        );
+      })()}
 
       {/* Modal de horas previstas da UC (aberto pelo ícone na carta do horário) */}
       {horasUcModal && (() => {
@@ -3009,6 +3082,9 @@ export default function App() {
                     <p className="text-xs text-stone-500">Cruza as restrições ativas, docentes e adequações de tipologia de salas antes de distribuir.</p>
                   </div>
                   
+                  {selectedYearFilter === "todos" ? (
+                    <span className="text-[10px] text-stone-400 italic max-w-[180px] text-right">Escolhe um ano curricular para validar e gerar.</span>
+                  ) : (
                   <button
                     id="btn-trigger-solver"
                     onClick={handleTriggerSolver}
@@ -3027,6 +3103,7 @@ export default function App() {
                       </>
                     )}
                   </button>
+                  )}
                 </div>
 
                 {/* 3-Part Validator Checklist */}
@@ -3721,6 +3798,9 @@ export default function App() {
                                           <button onClick={() => toggleSessionBlock(sessao.id)} className="cursor-pointer" title={sessao.bloqueado ? "Desbloquear" : "Bloquear"}>
                                             {sessao.bloqueado ? <Lock className="w-2.5 h-2.5 text-amber-500" /> : <Unlock className="w-2.5 h-2.5 opacity-40 hover:opacity-100" />}
                                           </button>
+                                          <button onClick={() => deleteSession(sessao.id)} className="cursor-pointer" title="Eliminar aula">
+                                            <Trash2 className="w-2.5 h-2.5 text-rose-400 hover:text-rose-600" />
+                                          </button>
                                         </div>
                                       </div>
 
@@ -3749,6 +3829,13 @@ export default function App() {
                                   </div>
                                 )}
                               </div>
+                              <button
+                                onClick={() => setAddAulaCtx({ dia, horaInicio: slot.start, horaFim: slot.end, semana: Number(selectedWeekFilter) })}
+                                title="Adicionar aula neste bloco"
+                                className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-[#148A96] text-white rounded-full w-4 h-4 flex items-center justify-center cursor-pointer shadow-sm"
+                              >
+                                <Plus className="w-2.5 h-2.5" />
+                              </button>
                             </td>
                           );
                         })}
