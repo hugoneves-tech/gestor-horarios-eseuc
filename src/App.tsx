@@ -1513,16 +1513,23 @@ export default function App() {
 
   // Estado do mini-formulário de "adicionar aula" a um slot (dia/hora/semana).
   const [addAulaCtx, setAddAulaCtx] = useState<{ dia: string; horaInicio: string; horaFim: string; semana: number } | null>(null);
-  // Adicionar uma aula nova no slot indicado.
-  const addSessionAt = (ucId: string, tipo: SessaoHorario["tipoAula"], turma: string) => {
+  const [addUcId, setAddUcId] = useState<string>("");
+  const TIPO_CONFIG_PARA_AULA: Record<string, SessaoHorario["tipoAula"]> = {
+    "Teórica": "T", "TeoricoPratica": "TP", "Prática": "PL", "Seminário": "S",
+  };
+  // Adicionar uma aula nova no slot indicado, escolhendo uma turma EXISTENTE da UC.
+  const addSessionAt = (ucId: string, turmaNome: string) => {
     if (!activeVersao || !addAulaCtx) return;
     const uc = ucs.find(u => u.id === ucId);
-    if (!uc) return;
+    const tc = uc?.turmasConfig?.find(t => t.nome === turmaNome);
+    if (!uc || !tc) return;
+    const tipo = TIPO_CONFIG_PARA_AULA[tc.tipo] || "TP";
     const tipoSala = tipo === "PL" ? "Laboratório de Simulação PL" : tipo === "TP" ? "Sala Comum TP" : tipo === "S" ? "Sala Comum TP" : "Anfiteatro (Teórica T)";
     const novaId = Math.max(0, ...activeVersao.sessoes.map(s => s.id)) + 1;
     const nova: SessaoHorario = {
       id: novaId, ucNome: uc.nome, ucSigla: uc.sigla, tipoAula: tipo,
-      docente: "", sala: "", salaTipo: tipoSala, turma,
+      docente: tc.docenteId ? (docentes.find(d => d.id === tc.docenteId)?.nome || "") : "",
+      sala: "", salaTipo: tipoSala, turma: turmaNome,
       diaSemana: addAulaCtx.dia, horaInicio: addAulaCtx.horaInicio, horaFim: addAulaCtx.horaFim,
       bloqueado: true, semana: addAulaCtx.semana,
     };
@@ -1835,7 +1842,12 @@ export default function App() {
 
       {/* Modal: adicionar aula manualmente a um slot do horário */}
       {addAulaCtx && (() => {
-        const ucsDisponiveis = ucs.filter(u => (u.turmasConfig?.length || 0) > 0);
+        const ucsDisponiveis = ucs.filter(u =>
+          (u.turmasConfig?.length || 0) > 0 &&
+          (selectedYearFilter === "todos" || Number(u.anoCurricular) === Number(selectedYearFilter))
+        );
+        const ucSel = ucsDisponiveis.find(u => u.id === addUcId) || ucsDisponiveis[0];
+        const turmas = ucSel?.turmasConfig || [];
         return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddAulaCtx(null)}>
             <form
@@ -1843,10 +1855,8 @@ export default function App() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget as HTMLFormElement);
-                const ucId = String(fd.get("uc") || "");
-                const tipo = String(fd.get("tipo") || "TP") as SessaoHorario["tipoAula"];
-                const turma = String(fd.get("turma") || "").trim();
-                if (ucId && turma) addSessionAt(ucId, tipo, turma);
+                const turma = String(fd.get("turma") || "");
+                if (ucSel && turma) addSessionAt(ucSel.id, turma);
               }}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3"
             >
@@ -1858,23 +1868,31 @@ export default function App() {
                 </div>
                 <button type="button" onClick={() => setAddAulaCtx(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
               </div>
-              <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">UC
-                <select name="uc" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]" defaultValue={ucsDisponiveis[0]?.id}>
-                  {ucsDisponiveis.map(u => <option key={u.id} value={u.id}>{u.sigla} — {u.nome}</option>)}
-                </select>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">Tipologia
-                  <select name="tipo" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]" defaultValue="TP">
-                    <option value="T">T</option><option value="TP">TP</option><option value="PL">PL</option><option value="S">S</option>
-                  </select>
-                </label>
-                <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">Turma
-                  <input name="turma" placeholder="ex.: TP1 / PL7 / Turma A" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]" />
-                </label>
-              </div>
-              <p className="text-[9px] text-stone-400 leading-tight">A aula é adicionada bloqueada (fixa) para não ser removida ao regenerar. Podes desbloqueá-la depois.</p>
-              <button type="submit" className="w-full bg-[#1E1C19] text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-stone-800">Adicionar</button>
+              {ucsDisponiveis.length === 0 ? (
+                <p className="text-[11px] text-stone-500">Não há UCs com turmas para o ano selecionado.</p>
+              ) : (
+                <>
+                  <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">UC
+                    <select
+                      value={ucSel?.id}
+                      onChange={(e) => setAddUcId(e.target.value)}
+                      className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]"
+                    >
+                      {ucsDisponiveis.map(u => <option key={u.id} value={u.id}>{u.sigla} — {u.nome}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-[10px] font-bold text-stone-600 uppercase font-mono">Turma (disponíveis da UC)
+                    <select name="turma" className="w-full mt-1 bg-white border border-stone-200 rounded px-2 py-1.5 text-[12px]">
+                      {turmas.map(t => {
+                        const tipo = TIPO_CONFIG_PARA_AULA[t.tipo] || "";
+                        return <option key={t.id} value={t.nome}>{t.nome} ({tipo})</option>;
+                      })}
+                    </select>
+                  </label>
+                  <p className="text-[9px] text-stone-400 leading-tight">A aula é adicionada bloqueada (fixa) para não ser removida ao regenerar. Podes desbloqueá-la depois.</p>
+                  <button type="submit" className="w-full bg-[#1E1C19] text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-stone-800">Adicionar</button>
+                </>
+              )}
             </form>
           </div>
         );
