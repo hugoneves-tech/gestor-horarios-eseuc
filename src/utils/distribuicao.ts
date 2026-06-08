@@ -665,6 +665,7 @@ export function gerarSessoesConjunto(
   const tpCohortMancha = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${hora}` → {A1,A2,B1,B2}
   const tpUCs = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${hora}` → {ucKey...} (agrupar TP por UC)
   const tpUCCohort = new Map<string, Set<string>>(); // mancha → {`${ucKey}|${meioCohort}`...}
+  const plUCs = new Map<string, Set<string>>(); // mancha → {ucKey...} com PL (não misturar PL de UCs diferentes)
   // Semanas em que cada (UC, família) tem PL → nessas semanas parte-se a TP em 2+2 para
   // emparelhar com as 6 PL (bloco cheio 2TP+6PL). Fora delas, agrupam-se as 4 TP.
   const plSemanas = new Set<string>(); // `${ucKey}|${family}|${week}`
@@ -697,6 +698,12 @@ export function gerarSessoesConjunto(
     // Limite de 2 TP por mancha (salas de TP): não juntar as 4 TP no mesmo slot.
     if (t.tipo === "TP") {
       pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
+      // RÍGIDO: nunca TPs de UCs DIFERENTES no mesmo bloco (proibido 1 TP de uma + 1 de
+      // outra). Só se permite a mancha vazia de TP ou já com TP da MESMA UC.
+      pool = pool.filter(s => {
+        const set = tpUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
+        return !set || set.size === 0 || (set.size === 1 && set.has(t.ucKey));
+      });
       // Agrupar TP da MESMA UC, dentro da metade do dia (manhã/tarde). Em semanas com PL
       // desta UC, PARTE-SE em 2+2 (TP1,2 numa mancha; TP3,4 noutra) para caber o par
       // 2TP+6PL (bloco cheio 180); fora dessas semanas, agrupam-se as 4. Nunca outra UC
@@ -724,6 +731,15 @@ export function gerarSessoesConjunto(
     // meio-cohort COMPLEMENTAR (ex.: PL7-12 ∥ TP1+TP2), formando o bloco cheio de 180
     // com alunos disjuntos. Maximiza a colocação das PL (para completarem).
     if (t.tipo === "PL") {
+      // RÍGIDO: nunca PLs de UCs DIFERENTES no mesmo bloco (proibido 1 PL de uma + 5 de
+      // outra). Só mancha sem PL ou já com PL da MESMA UC. (MI usa salas de computadores
+      // — pool próprio — e está isenta desta regra.)
+      if (t.salaPool !== "comp") {
+        pool = pool.filter(s => {
+          const set = plUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
+          return !set || set.size === 0 || (set.size === 1 && set.has(t.ucKey));
+        });
+      }
       const sc = meioCohort(t.turmaNome);
       const comp = sc ? COMPLEMENTO_COHORT[sc] : null;
       if (comp && pool.length) {
@@ -751,6 +767,13 @@ export function gerarSessoesConjunto(
     if (t.tipo === "PL") {
       const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora, t.salaPool);
       plCount.set(k, (plCount.get(k) || 0) + 1);
+      // MI (salas de computadores) é exceção e não conta para a regra de "uma só UC de PL".
+      if (t.salaPool !== "comp") {
+        const mk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
+        let set = plUCs.get(mk);
+        if (!set) { set = new Set(); plUCs.set(mk, set); }
+        set.add(t.ucKey);
+      }
     }
     if (t.tipo === "TP") {
       const mk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
