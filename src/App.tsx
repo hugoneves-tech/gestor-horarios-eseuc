@@ -1537,6 +1537,30 @@ export default function App() {
     setAddAulaCtx(null);
   };
 
+  // Tutor IA por regra: abrir modal e pedir ao Gemini para melhorar/validar a regra.
+  const [tutorRegra, setTutorRegra] = useState<RegraHorario | null>(null);
+  const [tutorPrompt, setTutorPrompt] = useState("");
+  const [tutorResposta, setTutorResposta] = useState("");
+  const [tutorLoading, setTutorLoading] = useState(false);
+  const askTutor = async (pedido: string) => {
+    if (!tutorRegra) return;
+    setTutorLoading(true);
+    setTutorResposta("");
+    try {
+      const prompt = `Regra atual (JSON): ${JSON.stringify({ nome: tutorRegra.nome, tipo: tutorRegra.tipo, categoria: tutorRegra.categoria, escopo: tutorRegra.escopo, anoCurricular: tutorRegra.anoCurricular, descricao: tutorRegra.descricao, peso: tutorRegra.peso })}.\nPedido do utilizador: ${pedido}\nValida e/ou melhora esta regra de horário académico, de forma clara e sucinta. Se sugerires uma nova versão da regra, devolve-a no bloco [REGRA_DETETADA]...[FIM_REGRA].`;
+      const resp = await fetch("/api/gemini/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, chatHistory: [], regras, ucs, docentes, salas }),
+      });
+      const data = await resp.json();
+      setTutorResposta(data.text || data.error || "Sem resposta do tutor.");
+    } catch (e: any) {
+      setTutorResposta("Erro ao contactar o tutor IA: " + (e?.message || e));
+    } finally {
+      setTutorLoading(false);
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, id: number) => {
     setDraggedSessionId(id);
   };
@@ -1839,6 +1863,62 @@ export default function App() {
           })}
         </div>
       </div>
+
+      {/* Modal: Tutor IA por regra (melhorar/validar) */}
+      {tutorRegra && (() => {
+        const aplicarSugestao = () => {
+          if (!tutorResposta.includes("[REGRA_DETETADA]")) return;
+          try {
+            const jsonStr = tutorResposta.split("[REGRA_DETETADA]")[1].split("[FIM_REGRA]")[0].trim();
+            const nova = JSON.parse(jsonStr);
+            setRegras(regras.map(r => r.id === tutorRegra.id ? {
+              ...r,
+              nome: nova.nome || r.nome,
+              descricao: nova.descricao || r.descricao,
+              tipo: (nova.tipo === "hard" || nova.tipo === "soft") ? nova.tipo : r.tipo,
+              peso: typeof nova.peso === "number" ? nova.peso : r.peso,
+              config: { ...r.config, ...(nova.config || {}) },
+            } : r));
+            showToast("Regra atualizada com a sugestão do tutor IA.");
+            setTutorRegra(null);
+          } catch { showToast("Não consegui interpretar a sugestão."); }
+        };
+        const respostaLimpa = tutorResposta.replace(/\[REGRA_DETETADA\][\s\S]*?\[FIM_REGRA\]/g, "").trim();
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setTutorRegra(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-3 max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[9px] uppercase font-black text-indigo-700 tracking-wide font-mono flex items-center gap-1"><Sparkles className="w-3 h-3" /> Tutor IA · melhorar / validar regra</span>
+                  <h3 className="font-serif font-bold text-stone-900 text-base leading-tight">{tutorRegra.nome}</h3>
+                  <p className="text-[10px] text-stone-500">{tutorRegra.escopo === "ano" ? `${tutorRegra.anoCurricular}.º ano` : "Transversal"} · {tutorRegra.categoria}</p>
+                </div>
+                <button onClick={() => setTutorRegra(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-[11px] text-stone-600 bg-stone-50 border border-stone-150 rounded-lg p-2">{tutorRegra.descricao}</p>
+              <div className="flex gap-2">
+                <button onClick={() => askTutor("Valida esta regra: está clara, é coerente e não conflitua com boas práticas de horários?")} disabled={tutorLoading} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer disabled:opacity-40">Validar</button>
+                <button onClick={() => askTutor("Melhora a redação e a configuração desta regra, devolvendo uma versão melhorada.")} disabled={tutorLoading} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 cursor-pointer disabled:opacity-40">Melhorar</button>
+              </div>
+              <textarea
+                value={tutorPrompt}
+                onChange={(e) => setTutorPrompt(e.target.value)}
+                placeholder="Ou escreve um pedido específico ao tutor (ex.: 'torna-a mais restritiva às sextas')…"
+                className="w-full bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-[11px] min-h-[54px]"
+              />
+              <button onClick={() => askTutor(tutorPrompt || "Valida e melhora esta regra.")} disabled={tutorLoading} className="w-full bg-[#1E1C19] text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-stone-800 disabled:opacity-40">
+                {tutorLoading ? "A pensar…" : "Pedir ao tutor IA"}
+              </button>
+              {respostaLimpa && (
+                <div className="bg-indigo-50/50 border border-indigo-150 rounded-lg p-3 text-[11px] text-stone-700 whitespace-pre-wrap leading-relaxed">{respostaLimpa}</div>
+              )}
+              {tutorResposta.includes("[REGRA_DETETADA]") && regraEditavel(tutorRegra) && (
+                <button onClick={aplicarSugestao} className="w-full bg-emerald-600 text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-emerald-700">Aplicar sugestão à regra</button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal: adicionar aula manualmente a um slot do horário */}
       {addAulaCtx && (() => {
@@ -4085,6 +4165,13 @@ export default function App() {
                             </button>
                             <button onClick={() => removeRegra(reg.id)} className="text-stone-400 hover:text-rose-600 transition-colors">
                               <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { setTutorRegra(reg); setTutorPrompt(""); setTutorResposta(""); }}
+                              className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1"
+                              title="Melhorar ou validar esta regra com o tutor IA"
+                            >
+                              <Sparkles className="w-3 h-3" /> Tutor IA
                             </button>
                           </>
                         ) : (
