@@ -1512,7 +1512,7 @@ export default function App() {
   };
 
   // Estado do mini-formulário de "adicionar aula" a um slot (dia/hora/semana).
-  const [addAulaCtx, setAddAulaCtx] = useState<{ dia: string; horaInicio: string; horaFim: string; semana: number } | null>(null);
+  const [addAulaCtx, setAddAulaCtx] = useState<{ dia: string; horaInicio: string; horaFim: string; semana: number; editId?: number } | null>(null);
   const [addUcId, setAddUcId] = useState<string>("");
   const TIPO_CONFIG_PARA_AULA: Record<string, SessaoHorario["tipoAula"]> = {
     "Teórica": "T", "TeoricoPratica": "TP", "Prática": "PL", "Seminário": "S",
@@ -1525,11 +1525,20 @@ export default function App() {
     if (!uc || !tc) return;
     const tipo = TIPO_CONFIG_PARA_AULA[tc.tipo] || "TP";
     const tipoSala = tipo === "PL" ? "Laboratório de Simulação PL" : tipo === "TP" ? "Sala Comum TP" : tipo === "S" ? "Sala Comum TP" : "Anfiteatro (Teórica T)";
+    const docente = tc.docenteId ? (docentes.find(d => d.id === tc.docenteId)?.nome || "") : "";
+    if (addAulaCtx.editId != null) {
+      // EDITAR: troca a UC/tipologia/turma da aula existente, mantendo o slot.
+      const upd = activeVersao.sessoes.map(s => s.id === addAulaCtx.editId
+        ? { ...s, ucNome: uc.nome, ucSigla: uc.sigla, tipoAula: tipo, salaTipo: tipoSala, turma: turmaNome, docente, bloqueado: true }
+        : s);
+      setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: upd } : v));
+      setAddAulaCtx(null);
+      return;
+    }
     const novaId = Math.max(0, ...activeVersao.sessoes.map(s => s.id)) + 1;
     const nova: SessaoHorario = {
       id: novaId, ucNome: uc.nome, ucSigla: uc.sigla, tipoAula: tipo,
-      docente: tc.docenteId ? (docentes.find(d => d.id === tc.docenteId)?.nome || "") : "",
-      sala: "", salaTipo: tipoSala, turma: turmaNome,
+      docente, sala: "", salaTipo: tipoSala, turma: turmaNome,
       diaSemana: addAulaCtx.dia, horaInicio: addAulaCtx.horaInicio, horaFim: addAulaCtx.horaFim,
       bloqueado: true, semana: addAulaCtx.semana,
     };
@@ -1835,8 +1844,8 @@ export default function App() {
       </header>
 
 
-      {/* Main Tab Nav bar */}
-      <div className={`${themeStyles.panelColor} border-b ${themeStyles.borderColor} py-3 px-6 shrink-0 shadow-2xs`}>
+      {/* Main Tab Nav bar — fixo no topo (sticky) para não saltar ao mudar de separador */}
+      <div className={`${themeStyles.panelColor} border-b ${themeStyles.borderColor} py-3 px-6 shrink-0 shadow-2xs sticky top-0 z-40`}>
         <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
           {[
             { id: "horario", label: "Planeamento de Horário", icon: Calendar },
@@ -1942,7 +1951,7 @@ export default function App() {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-[9px] uppercase font-black text-teal-700 tracking-wide font-mono">Adicionar aula</span>
+                  <span className="text-[9px] uppercase font-black text-teal-700 tracking-wide font-mono">{addAulaCtx.editId != null ? "Editar aula" : "Adicionar aula"}</span>
                   <h3 className="font-serif font-bold text-stone-900 text-base leading-tight">{addAulaCtx.dia}, {addAulaCtx.horaInicio}–{addAulaCtx.horaFim}</h3>
                   <p className="text-[10px] text-stone-500">{getWeekLabel(addAulaCtx.semana)}</p>
                 </div>
@@ -1970,7 +1979,7 @@ export default function App() {
                     </select>
                   </label>
                   <p className="text-[9px] text-stone-400 leading-tight">A aula é adicionada bloqueada (fixa) para não ser removida ao regenerar. Podes desbloqueá-la depois.</p>
-                  <button type="submit" className="w-full bg-[#1E1C19] text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-stone-800">Adicionar</button>
+                  <button type="submit" className="w-full bg-[#1E1C19] text-white font-bold rounded-xl py-2 text-xs cursor-pointer hover:bg-stone-800">{addAulaCtx.editId != null ? "Guardar alterações" : "Adicionar"}</button>
                 </>
               )}
             </form>
@@ -3586,6 +3595,14 @@ export default function App() {
                   {!perfilAtivo.startsWith("diretor") && (
                     <p className="text-[9px] text-stone-400 italic">Acesso restrito ao {parseInt(perfilAtivo.replace(/\D/g, "")) || ""}º ano — perfil {getPerfilLabel(perfilAtivo)}.</p>
                   )}
+                  {selectedYearFilter === "todos" ? (
+                    <p className="text-[9px] text-stone-400 italic">Escolhe um ano para validar e gerar.</p>
+                  ) : (
+                    <button onClick={handleTriggerSolver} disabled={isSolving}
+                      className="mt-1 px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
+                      {isSolving ? (<><RefreshCw className="w-3 h-3 animate-spin" /> A Gerar...</>) : (<><Zap className="w-3 h-3 text-amber-300" /> Validar e Gerar Distribuição</>)}
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
@@ -3598,6 +3615,40 @@ export default function App() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* PREFERÊNCIA MANHÃ/TARDE — entre o Ano Curricular e o explorador */}
+              <div className="bg-indigo-50/50 border border-indigo-200/70 p-4 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
+                    Preferência da turma teórica (manhã / tarde) por ano do CLE
+                  </span>
+                  <span className="text-[9px] text-indigo-500/80 font-mono">Turma A = período indicado · Turma B = oposto</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[1, 2, 3, 4].map(ano => (
+                    <div key={ano} className="flex items-center gap-2 bg-white/70 border border-indigo-100 rounded-lg px-2.5 py-1.5">
+                      <span className="text-[10px] font-bold text-stone-700 w-12">{ano}.º ano</span>
+                      {[1, 2].map(sem => (
+                        <div key={sem} className="flex items-center gap-1">
+                          <span className="text-[8.5px] text-stone-400 font-mono">S{sem}</span>
+                          <div className="flex rounded-md overflow-hidden border border-indigo-200">
+                            {(["manha", "tarde"] as const).map(p => {
+                              const ativa = prefManhaDe(ano, sem) === (p === "manha");
+                              return (
+                                <button key={p} onClick={() => setPrefManha(ano, sem, p === "manha")}
+                                  className={`px-2 py-0.5 text-[9px] font-bold cursor-pointer transition-colors ${ativa ? "bg-indigo-600 text-white" : "bg-white text-indigo-500 hover:bg-indigo-50"}`}>
+                                  {p === "manha" ? "Manhã" : "Tarde"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-indigo-700/70 leading-tight">Aplica-se na próxima geração. Define se a Turma A desse ano arranca de manhã ou de tarde nesse semestre.</p>
               </div>
 
               {/* DYNAMIC WEEK TIMELINE SELECTOR */}
@@ -3727,43 +3778,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* PREFERÊNCIA MANHÃ/TARDE DA TURMA TEÓRICA, POR ANO E SEMESTRE */}
-              <div className="bg-indigo-50/50 border border-indigo-200/70 p-4 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
-                    Preferência da turma teórica (manhã / tarde) por ano do CLE
-                  </span>
-                  <span className="text-[9px] text-indigo-500/80 font-mono">Turma A = período indicado · Turma B = oposto</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[1, 2, 3, 4].map(ano => (
-                    <div key={ano} className="flex items-center gap-2 bg-white/70 border border-indigo-100 rounded-lg px-2.5 py-1.5">
-                      <span className="text-[10px] font-bold text-stone-700 w-12">{ano}.º ano</span>
-                      {[1, 2].map(sem => (
-                        <div key={sem} className="flex items-center gap-1">
-                          <span className="text-[8.5px] text-stone-400 font-mono">S{sem}</span>
-                          <div className="flex rounded-md overflow-hidden border border-indigo-200">
-                            {(["manha", "tarde"] as const).map(p => {
-                              const ativa = prefManhaDe(ano, sem) === (p === "manha");
-                              return (
-                                <button
-                                  key={p}
-                                  onClick={() => setPrefManha(ano, sem, p === "manha")}
-                                  className={`px-2 py-0.5 text-[9px] font-bold cursor-pointer transition-colors ${ativa ? "bg-indigo-600 text-white" : "bg-white text-indigo-500 hover:bg-indigo-50"}`}
-                                >
-                                  {p === "manha" ? "Manhã" : "Tarde"}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[9px] text-indigo-700/70 leading-tight">Aplica-se na próxima geração da distribuição. Define se a turma teórica (Turma A) desse ano arranca de manhã ou de tarde nesse semestre.</p>
-              </div>
-
               {/* 3rd YEAR SPECIAL CASE NOTE */}
               {selectedYearFilter === 3 && (
                 <div className="bg-amber-50/60 border border-amber-200 text-amber-800 p-5 rounded-2xl space-y-2 animate-fade-in">
@@ -3868,6 +3882,16 @@ export default function App() {
                                           <button onClick={() => toggleSessionBlock(sessao.id)} className="cursor-pointer" title={sessao.bloqueado ? "Desbloquear" : "Bloquear"}>
                                             {sessao.bloqueado ? <Lock className="w-2.5 h-2.5 text-amber-500" /> : <Unlock className="w-2.5 h-2.5 opacity-40 hover:opacity-100" />}
                                           </button>
+                                          <button
+                                            onClick={() => {
+                                              const ucObj = ucs.find(u => u.sigla === sessao.ucSigla || u.nome === sessao.ucNome);
+                                              if (ucObj) setAddUcId(ucObj.id);
+                                              setAddAulaCtx({ dia: sessao.diaSemana, horaInicio: sessao.horaInicio, horaFim: sessao.horaFim, semana: sessao.semana ?? Number(selectedWeekFilter), editId: sessao.id });
+                                            }}
+                                            className="cursor-pointer" title="Editar aula (trocar UC/turma)"
+                                          >
+                                            <Edit2 className="w-2.5 h-2.5 text-stone-400 hover:text-[#148A96]" />
+                                          </button>
                                           <button onClick={() => deleteSession(sessao.id)} className="cursor-pointer" title="Eliminar aula">
                                             <Trash2 className="w-2.5 h-2.5 text-rose-400 hover:text-rose-600" />
                                           </button>
@@ -3913,6 +3937,29 @@ export default function App() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* REGRAS CUMPRIDAS NA SEMANA SELECIONADA */}
+              <div className="bg-emerald-50/40 border border-emerald-150 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Regras cumpridas — {getWeekLabel(selectedWeekFilter as number)}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {regras.filter(regraVisivel).filter(r => r.ativa).map(r => (
+                    <div key={r.id} className="flex items-start gap-1.5 bg-white/70 border border-emerald-100 rounded-lg px-2.5 py-1.5">
+                      <CheckCircle className="w-3 h-3 text-emerald-600 mt-0.5 shrink-0" />
+                      <div className="leading-tight">
+                        <span className="text-[10.5px] font-semibold text-stone-800">{r.nome}</span>
+                        <span className="text-[8.5px] text-stone-400 ml-1">({r.escopo === "ano" ? `${r.anoCurricular}.º ano` : "transversal"})</span>
+                      </div>
+                    </div>
+                  ))}
+                  {regras.filter(regraVisivel).filter(r => r.ativa).length === 0 && (
+                    <span className="text-[10px] text-stone-400 italic">Sem regras ativas para este âmbito.</span>
+                  )}
+                </div>
+                <p className="text-[9px] text-emerald-700/70 leading-tight">As regras invioláveis são garantidas por construção pelo motor (a distribuição não as viola). As preferenciais são otimizadas conforme o peso.</p>
               </div>
             </div>
           </div>

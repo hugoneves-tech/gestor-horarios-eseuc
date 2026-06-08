@@ -684,12 +684,28 @@ export function gerarSessoesConjunto(
   const MAX_BLOCOS_DIA = 4;     // teto absoluto = 8h/dia
   const diaCount = new Map<string, number>(); // `${ano}|${week}|${dia}|${plGroup}` → nº de blocos
   const diaKey = (ano: number, week: number, dia: string, g: string) => `${ano}|${week}|${dia}|${g}`;
+  // Evitar 2 blocos CONSECUTIVOS da mesma (UC,turma,tipo) no mesmo dia (sem 4h seguidas
+  // da mesma UC). Não é cap por dia (que partia a completude) — só proíbe a adjacência.
+  const TODOS_PERIODOS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
+  const turmaPeriodos = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${turma}|${tipo}` → horas
+  const ttKey = (ano: number, week: number, dia: string, turma: string, tipo: string) => `${ano}|${week}|${dia}|${turma}|${tipo}`;
+  const adjacenteOcupado = (ano: number, week: number, dia: string, turma: string, tipo: string, hora: string) => {
+    const set = turmaPeriodos.get(ttKey(ano, week, dia, turma, tipo));
+    if (!set) return false;
+    const i = TODOS_PERIODOS.indexOf(hora);
+    return (i > 0 && set.has(TODOS_PERIODOS[i - 1])) || (i < 5 && set.has(TODOS_PERIODOS[i + 1]));
+  };
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
     // Rotação por UC: base distinta por UC (período de arranque) + variação por semana.
     // Em poolDoTipo soma-se ainda o índice do dia → rotação dia-a-dia (FT qui@08→sex@10).
     const rotacao = t.rotaBase + wk.semanaGlobal - 1;
     let pool = poolDoTipo(t.tipo, wk.diasBloqueados, t.manha, rotacao, t.flexivel);
+    // Sem 2 blocos CONSECUTIVOS da mesma Teórica no dia (sem 4h seguidas de T da mesma UC,
+    // ex.: MI-T 10h+12h). Só T (esparsa); TP/PL ficam livres para completar a carga.
+    if (t.tipo === "T") {
+      pool = pool.filter(s => !adjacenteOcupado(t.ano, wk.semanaGlobal, s.dia, t.turmaNome, t.tipo, s.hora));
+    }
     // Regra opcional: PL apenas em certos dias da semana (ex.: 4.ª a 6.ª feira).
     if (t.tipo === "PL" && opts.plDiasPermitidos && opts.plDiasPermitidos.length) {
       const permitidos = new Set(opts.plDiasPermitidos);
@@ -760,6 +776,11 @@ export function gerarSessoesConjunto(
     const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
     registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
+    if (t.tipo === "T") {
+      const tk = ttKey(t.ano, wk.semanaGlobal, slot.dia, t.turmaNome, t.tipo);
+      let set = turmaPeriodos.get(tk); if (!set) { set = new Set(); turmaPeriodos.set(tk, set); }
+      set.add(slot.hora);
+    }
     for (const g of folhas) {
       const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
       diaCount.set(dk, (diaCount.get(dk) || 0) + 1);
