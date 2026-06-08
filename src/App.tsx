@@ -3481,6 +3481,45 @@ export default function App() {
                 </div>
               </div>
 
+              {/* FILTRO DE ANO/SEMESTRE — acima do explorador semanal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/75 p-4 rounded-xl border border-stone-150">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Ano Curricular (CLE)</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(() => {
+                      const isDirector = perfilAtivo.startsWith("diretor");
+                      const coordYear = !isDirector ? (parseInt(perfilAtivo.replace(/\D/g, "")) || null) : null;
+                      const allYearBtns = [
+                        { id: "todos", label: "Todos os Anos" },
+                        { id: 1, label: "1.º Ano" }, { id: 2, label: "2.º Ano" },
+                        { id: 3, label: "3.º Ano" }, { id: 4, label: "4.º Ano" }
+                      ];
+                      const visibleBtns = isDirector ? allYearBtns : allYearBtns.filter(b => b.id === coordYear);
+                      return visibleBtns.map(btn => (
+                        <button key={btn.id} onClick={() => setSelectedYearFilter(btn.id as any)}
+                          className={`px-3 py-1.5 rounded-lg text-2xs font-semibold cursor-pointer transition-all ${selectedYearFilter === btn.id ? "bg-stone-900 text-white shadow-3xs" : "bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100"}`}>
+                          {btn.label}
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                  {!perfilAtivo.startsWith("diretor") && (
+                    <p className="text-[9px] text-stone-400 italic">Acesso restrito ao {parseInt(perfilAtivo.replace(/\D/g, "")) || ""}º ano — perfil {getPerfilLabel(perfilAtivo)}.</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[{ id: "todos", label: "Ambos Semestres" }, { id: 1, label: "1.º Semestre" }, { id: 2, label: "2.º Semestre" }].map(btn => (
+                      <button key={btn.id} onClick={() => setSelectedSemesterFilter(btn.id as any)}
+                        className={`px-3 py-1.5 rounded-lg text-2xs font-semibold cursor-pointer transition-all ${selectedSemesterFilter === btn.id ? "bg-stone-900 text-white shadow-3xs" : "bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100"}`}>
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* DYNAMIC WEEK TIMELINE SELECTOR */}
               <div className="bg-stone-50/70 p-4 rounded-xl border border-stone-150 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -3605,73 +3644,6 @@ export default function App() {
                   }).length === 0 && (
                     <span className="text-stone-400 italic">Nenhuma Unidade Curricular planeada para esta semana.</span>
                   )}
-                </div>
-              </div>
-
-              {/* FILTERS CARD FOR YEAR AND SEMESTER */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/75 p-4 rounded-xl border border-stone-150">
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Ano Curricular (CLE)</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(() => {
-                      // Directors see all years + "Todos"; coordinators/vice only their year
-                      const isDirector = perfilAtivo.startsWith("diretor");
-                      const coordYear = !isDirector
-                        ? parseInt(perfilAtivo.replace(/\D/g, "")) || null
-                        : null;
-                      const allYearBtns = [
-                        { id: "todos", label: "Todos os Anos" },
-                        { id: 1, label: "1.º Ano" },
-                        { id: 2, label: "2.º Ano" },
-                        { id: 3, label: "3.º Ano" },
-                        { id: 4, label: "4.º Ano" }
-                      ];
-                      const visibleBtns = isDirector
-                        ? allYearBtns
-                        : allYearBtns.filter(b => b.id === coordYear);
-                      return visibleBtns.map(btn => (
-                        <button
-                          key={btn.id}
-                          onClick={() => setSelectedYearFilter(btn.id as any)}
-                          className={`px-3 py-1.5 rounded-lg text-2xs font-semibold cursor-pointer transition-all ${
-                            selectedYearFilter === btn.id
-                              ? "bg-stone-900 text-white shadow-3xs"
-                              : "bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100"
-                          }`}
-                        >
-                          {btn.label}
-                        </button>
-                      ));
-                    })()}
-                  </div>
-                  {!perfilAtivo.startsWith("diretor") && (
-                    <p className="text-[9px] text-stone-400 italic">
-                      Acesso restrito ao {parseInt(perfilAtivo.replace(/\D/g, "")) || ""}º ano — perfil {getPerfilLabel(perfilAtivo)}.
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { id: "todos", label: "Ambos Semestres" },
-                      { id: 1, label: "1.º Semestre" },
-                      { id: 2, label: "2.º Semestre" }
-                    ].map(btn => (
-                      <button
-                        key={btn.id}
-                        onClick={() => setSelectedSemesterFilter(btn.id as any)}
-                        className={`px-3 py-1.5 rounded-lg text-2xs font-semibold cursor-pointer transition-all ${
-                          selectedSemesterFilter === btn.id
-                            ? "bg-stone-900 text-white shadow-3xs"
-                            : "bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100"
-                        }`}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 
