@@ -1291,7 +1291,7 @@ export default function App() {
 
   // Distribuição local pelas 30 semanas letivas usando o motor de distribuição (distribuicao.ts).
   // S1 = semanas 1-15; S2 = semanas 16-30 (offset +15 aplicado automaticamente).
-  const handleTriggerSolver = () => {
+  const handleTriggerSolver = (semRegras = false) => {
     setIsSolving(true);
     setLastSolverVerdict(null);
 
@@ -1331,6 +1331,18 @@ export default function App() {
       // Preferência manhã/tarde da Turma A por ano+semestre (do painel de configuração).
       const prefTurmaAManha: Record<string, boolean> = {};
       for (let ano = 1; ano <= 4; ano++) for (const sem of [1, 2]) prefTurmaAManha[`${ano}|${sem}`] = prefManhaDe(ano, sem);
+      // Conflitos entre UCs (não podem estar na mesma mancha por partilharem docentes).
+      // ESDAC ∦ EIG (indicado), + pares derivados de docentes partilhados (quando atribuídos).
+      const ucConflitos: string[][] = [["ESDAC", "EIG"]];
+      const docPorUC: Record<string, Set<string>> = {};
+      for (const u of ucs) {
+        const ds = new Set((u.turmasConfig || []).map(t => t.docenteId).filter(Boolean) as string[]);
+        if (ds.size) docPorUC[u.sigla] = ds;
+      }
+      const sigs = Object.keys(docPorUC);
+      for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++) {
+        if ([...docPorUC[sigs[i]]].some(d => docPorUC[sigs[j]].has(d))) ucConflitos.push([sigs[i], sigs[j]]);
+      }
       const opcoes = {
         plDiasPermitidos: regraPLDias
           ? (regraPLDias.config?.diasPermitidos ?? ["Quarta", "Quinta", "Sexta"])
@@ -1338,6 +1350,13 @@ export default function App() {
         // Sem limite de TP por mancha nesta fase: 4 TP podem coexistir.
         maxTPporMancha: null,
         prefTurmaAManha,
+        ucConflitos,
+        // Estrutura ESEUC: 8-15 só Turma B (Turma A em estágio); 16-23 só Turma A. Tudo de manhã.
+        semanasSoTurmaB: Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
+        semanasSoTurmaA: Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
+        // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
+        // tarde e o espaço para almoço (e o teto de 8h). Para comparar cenários.
+        semRegras,
       };
 
       // Schedule each semester fairly across its UCs (round-robin per week).
@@ -1358,7 +1377,7 @@ export default function App() {
           !ehBloqueada(s) &&              // descarta as novas das semanas congeladas
           !fixadas.some(p => p.ucSigla === s.ucSigla && p.turma === s.turma && p.semana === s.semana)
         ),
-      ];
+      ].map((s, i) => ({ ...s, id: i + 1 }));  // IDs ÚNICOS (evita colisões: eliminar/desbloquear afetava o registo errado, ex.: semana 1)
 
       const durationMs = Math.round(performance.now() - t0);
       const score = Math.min(100, Math.max(60, 100 - Math.round(allSessoes.length / 50)));
@@ -1544,6 +1563,26 @@ export default function App() {
     };
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: [...v.sessoes, nova] } : v));
     setAddAulaCtx(null);
+  };
+
+  // Índice de cada bloco (dado/total) por (UC, turma, tipo), em ordem cronológica.
+  const blocoIndexMap = (() => {
+    const m = new Map<number, number>();
+    const sess = activeVersao?.sessoes || [];
+    const diaOrd: Record<string, number> = { Segunda: 0, "Terça": 1, Quarta: 2, Quinta: 3, Sexta: 4 };
+    const sorted = [...sess].sort((a, b) =>
+      ((a.semana ?? 0) - (b.semana ?? 0)) ||
+      ((diaOrd[a.diaSemana] ?? 9) - (diaOrd[b.diaSemana] ?? 9)) ||
+      a.horaInicio.localeCompare(b.horaInicio));
+    const cnt: Record<string, number> = {};
+    for (const s of sorted) { const k = `${s.ucSigla}|${s.turma}|${s.tipoAula}`; cnt[k] = (cnt[k] || 0) + 1; m.set(s.id, cnt[k]); }
+    return m;
+  })();
+  const totalBlocosDe = (sessao: SessaoHorario): number => {
+    const uc = ucs.find(u => u.sigla === sessao.ucSigla || u.nome === sessao.ucNome);
+    if (!uc) return 0;
+    const h = sessao.tipoAula === "T" ? uc.cargaHorariaTeorica : sessao.tipoAula === "TP" ? uc.cargaHorariaTP : sessao.tipoAula === "PL" ? uc.cargaHorariaPratica : (uc.cargaHorariaS || 0);
+    return Math.floor((h || 0) / 2);
   };
 
   // Tutor IA por regra: abrir modal e pedir ao Gemini para melhorar/validar a regra.
@@ -3194,7 +3233,7 @@ export default function App() {
                   ) : (
                   <button
                     id="btn-trigger-solver"
-                    onClick={handleTriggerSolver}
+                    onClick={() => handleTriggerSolver(false)}
                     disabled={isSolving}
                     className="px-4 py-2 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 text-2xs"
                   >
@@ -3535,6 +3574,7 @@ export default function App() {
                         .card { margin: 1px 0; padding: 2px 3px; border-radius: 3px; border: 1px solid #ccc; font-size: 7.5px; }
                         .card-t { background: #f9f9f9; } .card-tp { background: #EEF4FA; border-color: #B9CDEC; }
                         .card-pl { background: #FAF1EE; border-color: #ECC4B9; } .card-s { background: #F3EEFA; border-color: #D6CBE8; }
+                        @page { size: A4 landscape; margin: 8mm; }
                         @media print { body { -webkit-print-color-adjust: exact; } }
                       </style></head><body>`);
                       weeksWithData.forEach(w => {
@@ -3598,10 +3638,16 @@ export default function App() {
                   {selectedYearFilter === "todos" ? (
                     <p className="text-[9px] text-stone-400 italic">Escolhe um ano para validar e gerar.</p>
                   ) : (
-                    <button onClick={handleTriggerSolver} disabled={isSolving}
-                      className="mt-1 px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
-                      {isSolving ? (<><RefreshCw className="w-3 h-3 animate-spin" /> A Gerar...</>) : (<><Zap className="w-3 h-3 text-amber-300" /> Validar e Gerar Distribuição</>)}
-                    </button>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <button onClick={() => handleTriggerSolver(false)} disabled={isSolving}
+                        className="px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
+                        {isSolving ? (<><RefreshCw className="w-3 h-3 animate-spin" /> A Gerar...</>) : (<><Zap className="w-3 h-3 text-amber-300" /> Validar e Gerar Distribuição</>)}
+                      </button>
+                      <button onClick={() => handleTriggerSolver(true)} disabled={isSolving} title="Distribui sem nenhuma regra pedagógica — mantém apenas os turnos da tarde e o espaço para almoço. Para comparar cenários."
+                        className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
+                        <Zap className="w-3 h-3 text-stone-400" /> Gerar sem regras
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="space-y-1.5">
@@ -3827,9 +3873,10 @@ export default function App() {
                                 if (selectedYearFilter !== "todos" && Number(matchingUc.anoCurricular) !== Number(selectedYearFilter)) {
                                   return false;
                                 }
-                                if (selectedSemesterFilter !== "todos" && Number(matchingUc.semestre) !== Number(selectedSemesterFilter)) {
-                                  return false;
-                                }
+                                // NB: NÃO se filtra por selectedSemesterFilter — a semana selecionada
+                                // (global 1-30) já determina o semestre. Filtrar por semestre podia
+                                // esconder semanas válidas (ex.: a 8-15 ficava vazia se o filtro
+                                // estivesse preso no 2.º semestre).
 
                                 // Filter by the session's exact week (not a range)
                                 if (s.semana !== Number(selectedWeekFilter)) return false;
@@ -3867,6 +3914,9 @@ export default function App() {
                                         <div className="flex items-center gap-1 font-mono font-bold text-[9px] tracking-wide uppercase truncate">
                                           <span>{sessao.ucSigla}</span>
                                           <span className="opacity-75 font-sans font-medium text-[8px] whitespace-nowrap">({sessao.tipoAula})</span>
+                                          {totalBlocosDe(sessao) > 0 && (
+                                            <span className="font-sans font-bold text-[8px] text-stone-500 whitespace-nowrap">{blocoIndexMap.get(sessao.id) ?? "?"}/{totalBlocosDe(sessao)}</span>
+                                          )}
                                         </div>
                                         <div className="flex items-center gap-0.5 shrink-0">
                                           <button
@@ -3938,6 +3988,73 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+
+              {/* INDICADOR DE COMPLETUDE (blocos colocados / carga total) */}
+              {(() => {
+                const ucsAno = ucs.filter(u => (selectedYearFilter === "todos" || Number(u.anoCurricular) === Number(selectedYearFilter)) && u.turmasConfig?.length && Number(u.anoCurricular) !== 3);
+                let alvo = 0;
+                for (const u of ucsAno) {
+                  const tc = u.turmasConfig || [];
+                  const nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length, nS = tc.filter(t => t.tipo === "Seminário").length;
+                  alvo += Math.floor((u.cargaHorariaTeorica || 0) / 2) * nT + Math.floor((u.cargaHorariaTP || 0) / 2) * nTP + Math.floor((u.cargaHorariaPratica || 0) / 2) * nPL + Math.floor((u.cargaHorariaS || 0) / 2) * nS;
+                }
+                const sigSet = new Set(ucsAno.map(u => u.sigla));
+                const colocados = (activeVersao?.sessoes || []).filter(s => sigSet.has(s.ucSigla)).length;
+                const pct = alvo ? Math.round((colocados / alvo) * 100) : 0;
+                const cor = pct >= 95 ? "text-emerald-600" : pct >= 80 ? "text-amber-600" : "text-rose-600";
+                return (
+                  <div className="bg-white border border-stone-200 rounded-xl p-3 flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-stone-600 tracking-wider flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-[#148A96]" /> Completude da distribuição{selectedYearFilter !== "todos" ? ` — ${selectedYearFilter}.º ano` : ""}</span>
+                    <span className="text-sm font-mono font-bold"><span className={cor}>{pct}%</span> <span className="text-stone-400 text-[10px]">({colocados}/{alvo} blocos)</span></span>
+                  </div>
+                );
+              })()}
+
+              {/* CONTADOR DE HORAS POR TURMA POR DIA (da semana selecionada) */}
+              {(() => {
+                const folhasDe = (t: string): string[] => {
+                  if (t === "Turma A") return Array.from({ length: 12 }, (_, i) => "PL" + (i + 1));
+                  if (t === "Turma B") return Array.from({ length: 12 }, (_, i) => "PL" + (i + 13));
+                  const m = t.match(/^TP(\d+)$/); if (m) { const n = +m[1]; const s = (n - 1) * 3 + 1; return [s, s + 1, s + 2].map(i => "PL" + i); }
+                  if (/^PL\d+$/.test(t)) return [t];
+                  return [];
+                };
+                const dias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
+                const wkSess = (activeVersao?.sessoes || []).filter(s => {
+                  if (s.semana !== Number(selectedWeekFilter)) return false;
+                  if (selectedYearFilter === "todos") return true;
+                  const uc = ucs.find(u => u.sigla === s.ucSigla); return uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
+                });
+                const horasTurmaDia = (grupos: string[], dia: string) => {
+                  const cnt: Record<string, number> = {};
+                  for (const s of wkSess) { if (s.diaSemana !== dia) continue; for (const g of folhasDe(s.turma)) if (grupos.includes(g)) cnt[g] = (cnt[g] || 0) + 1; }
+                  const max = Math.max(0, ...Object.values(cnt));
+                  return max * 2;
+                };
+                const gruposA = Array.from({ length: 12 }, (_, i) => "PL" + (i + 1));
+                const gruposB = Array.from({ length: 12 }, (_, i) => "PL" + (i + 13));
+                const corH = (h: number) => h > 8 ? "text-rose-600 font-bold" : h === 8 ? "text-amber-600" : "text-stone-700";
+                return (
+                  <div className="bg-stone-50/70 border border-stone-200 rounded-xl p-3 space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-stone-600 tracking-wider flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#148A96]" /> Horas por turma por dia (máx. 8h/aluno) — {getWeekLabel(selectedWeekFilter as number)}</span>
+                    <table className="w-full text-[10px]">
+                      <thead><tr className="text-stone-400 font-mono uppercase text-[8.5px]"><th className="text-left py-1">Turma</th>{dias.map(d => <th key={d} className="text-center">{d.slice(0, 3)}</th>)}<th className="text-center">Total</th></tr></thead>
+                      <tbody>
+                        {[{ n: "Turma A", g: gruposA }, { n: "Turma B", g: gruposB }].map(row => {
+                          const horas = dias.map(d => horasTurmaDia(row.g, d));
+                          return (
+                            <tr key={row.n} className="border-t border-stone-150">
+                              <td className="py-1 font-bold text-stone-700">{row.n}</td>
+                              {horas.map((h, i) => <td key={i} className={`text-center font-mono ${corH(h)}`}>{h ? h + "h" : "·"}</td>)}
+                              <td className="text-center font-mono font-bold text-stone-800">{horas.reduce((a, b) => a + b, 0)}h</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
 
               {/* REGRAS CUMPRIDAS NA SEMANA SELECIONADA */}
               <div className="bg-emerald-50/40 border border-emerald-150 rounded-xl p-4 space-y-2">
@@ -4257,7 +4374,7 @@ export default function App() {
                 </div>
                 
                 <button
-                  onClick={handleTriggerSolver}
+                  onClick={() => handleTriggerSolver(false)}
                   disabled={isSolving}
                   className="px-5 py-2.5 bg-stone-900 text-white hover:bg-stone-850 font-bold rounded-xl flex items-center gap-2 transition-all cursor-pointer disabled:opacity-40 shadow-xs text-xs"
                 >

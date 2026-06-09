@@ -194,55 +194,59 @@ function poolDoTipo(
   // da família. Serve de "cola" para compactar o dia (tapar buracos).
   if (flexivel) {
     const slotsF: Slot[] = [];
-    for (const dia of avail) for (const hora of periodosPrefDia(dia)) slotsF.push({ dia, hora });
+    // 6ª é prioritariamente das Teóricas → a MI usa-a só em ÚLTIMO recurso (fim do pool),
+    // para tapar buracos das sextas que sobram livres depois de esgotadas as T.
+    const ordem = avail.filter(d => d !== "Sexta").concat(avail.includes("Sexta") ? ["Sexta"] : []);
+    for (const dia of ordem) for (const hora of periodosPrefDia(dia)) slotsF.push({ dia, hora });
     return slotsF;
   }
 
-  // Partial start week — when the Mon/Tue theory days are unavailable (e.g. a
-  // Thursday semester start, leaving only Thu/Fri). The week must follow T → TP
-  // on SEPARATE days, with NO PL at all (practicals only begin in a full week):
-  //   1.ª 5ª-feira = Teórica,  6ª-feira = TP (opcional).
+  // Períodos da T: na 6ª-feira é SEMPRE de manhã, em ORDEM FIXA [08,10,12] (sem rotação)
+  // para que o modelo de conflitos (Turma A não repete) empurre cada UC para o período
+  // seguinte e a 6ª encha sequencialmente (08→10→12), ambas as turmas no mesmo período.
+  // Nos outros dias de T (2ª/4ª) usa a metade da família (com rotação).
+  const periodosTDia = (dia: string) =>
+    dia === "Sexta" ? PERIODOS_MANHA : periodosPrefDia(dia);
+
+  // SEMANA PARCIAL (ex.: 2.º ano começa quinta) → 6ª de manhã T (ambas as turmas) e TODAS
+  // as TP no bloco 16-18 (admitindo 2 UCs diferentes nesse bloco). Sem quinta, sem PL.
   if (!avail.includes("Segunda") && !avail.includes("Terça")) {
-    if (tipo === "PL") return [];               // never any PL in this week
-    const diasPartial = tipo === "T"
-      ? avail.slice(0, 1)                        // T on the first available day (Thu)
-      : avail.slice(1);                          // TP/S on the following day(s) (Fri)
-    const slotsP: Slot[] = [];
-    for (const dia of diasPartial) for (const hora of periodosPrefDia(dia)) slotsP.push({ dia, hora });
-    return slotsP;
+    if (!avail.includes("Sexta")) return [];
+    if (tipo === "T") {
+      const slotsP: Slot[] = [];
+      for (const hora of periodosTDia("Sexta")) slotsP.push({ dia: "Sexta", hora });
+      return slotsP;
+    }
+    if (tipo === "TP") return [{ dia: "Sexta", hora: "16:00" }]; // todas as TP no bloco 16-18
+    return [];
   }
 
-  // Preferred days first, then overflow days appended (used only when the
-  // preferred days are full). Overflow preserves the T→TP→PL tendency:
-  //   T  → Seg/Ter, overflow to later days
-  //   TP → Qua/Qui, overflow to Ter then Sex (adjacent, still after T)
-  //   PL → Qui/Sex/Qua, overflow to Ter then Seg (latest first)
-  // This lets the week fill densely when the volume is high, instead of
-  // starving later UCs, while normal (low-pressure) weeks keep the clean mapping.
+  // Dias permitidos por tipo (regra ESEUC):
+  //   T       → só 2ª e 4ª (todo o dia) e 6ª (só de manhã). T enche a 6ª primeiro.
+  //   TP/PL/S → 2ª–5ª; a 6ª entra em ÚLTIMO recurso (só quando as T já esgotaram a 6ª e
+  //             os outros dias estão cheios → aproveita as 6ªs livres para TP/PL).
   let ordemDias: string[];
   if (tipo === "T") {
-    // Teóricas no INÍCIO da semana (Seg/Ter) — a teoria (conteúdo) vem primeiro.
-    const pref = ["Segunda", "Terça"].filter(d => avail.includes(d));
-    ordemDias = pref.length ? pref : avail.slice(0, 2);
+    ordemDias = ["Sexta", "Segunda", "Quarta"].filter(d => avail.includes(d));
   } else if (tipo === "TP") {
-    // TP a meio da semana (Qua/Qui), transborda para Ter/Sex (depois da teoria).
-    ordemDias = ["Quarta", "Quinta", "Terça", "Sexta"];
+    // TP nunca na 6ª (a 6ª de tarde, quando livre, é só para PL em falta).
+    ordemDias = ["Quarta", "Quinta", "Terça", "Segunda"].filter(d => avail.includes(d));
   } else if (tipo === "PL") {
-    // PL no fim da semana (Qui/Sex/Qua); só em último recurso Ter/Seg, para encher.
-    ordemDias = ["Quinta", "Sexta", "Quarta", "Terça", "Segunda"];
+    // PL pode usar a 6ª em ÚLTIMO recurso (tarde livre → PL em falta).
+    ordemDias = ["Quinta", "Quarta", "Terça", "Segunda", "Sexta"].filter(d => avail.includes(d));
   } else {
-    ordemDias = ["Terça", "Sexta"];
+    ordemDias = ["Terça", "Quinta"].filter(d => avail.includes(d));
   }
-  const dias = ordemDias.filter(d => avail.includes(d));
-  if (!dias.length) return [];
+  if (!ordemDias.length) return [];
 
   const slots: Slot[] = [];
-  // Preferred half (own period) across the preferred days, rotação por dia …
-  for (const dia of dias) for (const hora of periodosPrefDia(dia)) slots.push({ dia, hora });
-  // … then the other half como ÚLTIMO RECURSO — para PL e TP (ex.: TP da Turma B
-  // no bloco 10h-12h). Só a Teórica (T, 180 alunos no anfiteatro) fica na sua metade.
+  for (const dia of ordemDias) {
+    const periodos = tipo === "T" ? periodosTDia(dia) : periodosPrefDia(dia);
+    for (const hora of periodos) slots.push({ dia, hora });
+  }
+  // Bloco de ajuste (metade oposta) — só para PL e TP, nunca para T.
   if (tipo === "PL" || tipo === "TP") {
-    for (const dia of dias) for (const hora of periodosOver) slots.push({ dia, hora });
+    for (const dia of ordemDias) for (const hora of periodosOver) slots.push({ dia, hora });
   }
   return slots;
 }
@@ -562,6 +566,17 @@ export interface OpcoesDistribuicao {
   // Preferência manhã/tarde da turma teórica (Turma A) por ano+semestre.
   // Chave `${ano}|${semestre}` → true = manhã, false = tarde. Sem entrada = manhã no S1.
   prefTurmaAManha?: Record<string, boolean>;
+  // Pares de SIGLAS de UC que NÃO podem estar na mesma mancha (ex.: docentes partilhados):
+  // [["ESDAC","EIG"]]. Bidirecional.
+  ucConflitos?: string[][];
+  // Semanas (globais) em que SÓ uma turma tem aulas (a outra está em estágio) → tudo de
+  // manhã. Ex.: 8-15 só Turma B (família A em estágio); 16-23 só Turma A.
+  semanasSoTurmaA?: number[];
+  semanasSoTurmaB?: number[];
+  // Modo "sem regras": ignora TODAS as regras pedagógicas (ordem T→TP→PL, agrupamentos,
+  // conflitos de UC, T só em certos dias, etc.). Mantém APENAS a distribuição pelos turnos
+  // da tarde e o espaço para almoço (mais o teto de 8h e não duplicar a mesma turma).
+  semRegras?: boolean;
 }
 
 export function gerarSessoesConjunto(
@@ -577,6 +592,10 @@ export function gerarSessoesConjunto(
   // Preferência manhã/tarde da Turma A por ano (e semestre desta chamada).
   const turmaAManhaDe = (ano: number): boolean =>
     opts.prefTurmaAManha?.[`${ano}|${semestre}`] ?? (semestre === 1);
+  // Semanas em que só uma turma tem aulas (a outra em estágio) → tudo de manhã.
+  const soTurmaA = new Set(opts.semanasSoTurmaA || []); // só família A (8-... não; 16-23)
+  const soTurmaB = new Set(opts.semanasSoTurmaB || []); // só família B (8-15)
+  const soUmaTurma = (week: number) => soTurmaA.has(week) || soTurmaB.has(week);
 
   interface WeekRef { semanaGlobal: number; diasBloqueados: string[]; }
   interface Task {
@@ -635,7 +654,9 @@ export function gerarSessoesConjunto(
       if (total <= 0) return;
       const salaPool: SalaPool = tipo === "PL" && usaComputador ? "comp" : "lab";
       const flexivel = ehFlexivel && tipo === "PL";
-      const wks = tipo === "PL" ? weeksPL : weeks;
+      let wks = tipo === "PL" ? weeksPL : weeks;
+      // Família A não tem aulas nas semanas "só Turma B" (está em estágio), e vice-versa.
+      wks = wks.filter(w => family === "A" ? !soTurmaB.has(w.semanaGlobal) : !soTurmaA.has(w.semanaGlobal));
       tasks.push({ ano, ucNome: uc.nome, ucSigla: uc.sigla, ucKey: uc.id, family, turmaNome, tipo, salaTipo, manha, salaPool, flexivel, exemptaGate: ehFlexivel, rotaBase, weeks: wks, total, placed: 0 });
       const s = getStat(`${uc.id}|${family}`);
       if (tipo === "T") s.totalT += total; else if (tipo === "TP") s.totalTP += total; else if (tipo === "PL") s.totalPL += total;
@@ -666,6 +687,13 @@ export function gerarSessoesConjunto(
   const tpUCs = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${hora}` → {ucKey...} (agrupar TP por UC)
   const tpUCCohort = new Map<string, Set<string>>(); // mancha → {`${ucKey}|${meioCohort}`...}
   const plUCs = new Map<string, Set<string>>(); // mancha → {ucKey...} com PL (não misturar PL de UCs diferentes)
+  // Conflito entre UCs (docentes partilhados): não podem estar na mesma mancha.
+  const conflitoUC = new Map<string, Set<string>>(); // sigla → {siglas em conflito}
+  for (const [a, b] of (opts.ucConflitos || [])) {
+    if (!conflitoUC.has(a)) conflitoUC.set(a, new Set()); conflitoUC.get(a)!.add(b);
+    if (!conflitoUC.has(b)) conflitoUC.set(b, new Set()); conflitoUC.get(b)!.add(a);
+  }
+  const siglaMancha = new Map<string, Set<string>>(); // mancha → {siglas de UC} (qualquer tipo)
   // Semanas em que cada (UC, família) tem PL → nessas semanas parte-se a TP em 2+2 para
   // emparelhar com as 6 PL (bloco cheio 2TP+6PL). Fora delas, agrupam-se as 4 TP.
   const plSemanas = new Set<string>(); // `${ucKey}|${family}|${week}`
@@ -687,24 +715,120 @@ export function gerarSessoesConjunto(
   // Evitar 2 blocos CONSECUTIVOS da mesma (UC,turma,tipo) no mesmo dia (sem 4h seguidas
   // da mesma UC). Não é cap por dia (que partia a completude) — só proíbe a adjacência.
   const TODOS_PERIODOS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
-  const turmaPeriodos = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${turma}|${tipo}` → horas
-  const ttKey = (ano: number, week: number, dia: string, turma: string, tipo: string) => `${ano}|${week}|${dia}|${turma}|${tipo}`;
-  const adjacenteOcupado = (ano: number, week: number, dia: string, turma: string, tipo: string, hora: string) => {
-    const set = turmaPeriodos.get(ttKey(ano, week, dia, turma, tipo));
+  const turmaPeriodos = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${ucKey}|${turma}|${tipo}` → horas
+  const ttKey = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string) => `${ano}|${week}|${dia}|${ucKey}|${turma}|${tipo}`;
+  const adjacenteOcupado = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string, hora: string) => {
+    const set = turmaPeriodos.get(ttKey(ano, week, dia, ucKey, turma, tipo));
     if (!set) return false;
     const i = TODOS_PERIODOS.indexOf(hora);
     return (i > 0 && set.has(TODOS_PERIODOS[i - 1])) || (i < 5 && set.has(TODOS_PERIODOS[i + 1]));
+  };
+
+  // Regista efetivamente uma sessão num slot (toda a contabilidade do motor).
+  const commit = (t: Task, wk: WeekRef, slot: Slot) => {
+    registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
+    const smk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
+    let sset = siglaMancha.get(smk); if (!sset) { sset = new Set(); siglaMancha.set(smk, sset); }
+    sset.add(t.ucSigla);
+    if (t.tipo === "T") {
+      const tk = ttKey(t.ano, wk.semanaGlobal, slot.dia, t.ucKey, t.turmaNome, t.tipo);
+      let set = turmaPeriodos.get(tk); if (!set) { set = new Set(); turmaPeriodos.set(tk, set); }
+      set.add(slot.hora);
+    }
+    for (const g of gruposAlunoFolha(t.turmaNome)) {
+      const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
+      diaCount.set(dk, (diaCount.get(dk) || 0) + 1);
+    }
+    if (t.tipo === "PL") {
+      const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora, t.salaPool);
+      plCount.set(k, (plCount.get(k) || 0) + 1);
+      if (t.salaPool !== "comp") {
+        let set = plUCs.get(smk); if (!set) { set = new Set(); plUCs.set(smk, set); }
+        set.add(t.ucKey);
+      }
+    }
+    if (t.tipo === "TP") {
+      tpCount.set(smk + "|" + t.ucKey, (tpCount.get(smk + "|" + t.ucKey) || 0) + 1);
+      const sc = meioCohort(t.turmaNome);
+      if (sc) {
+        let set = tpCohortMancha.get(smk); if (!set) { set = new Set(); tpCohortMancha.set(smk, set); }
+        set.add(sc);
+        let uccoh = tpUCCohort.get(smk); if (!uccoh) { uccoh = new Set(); tpUCCohort.set(smk, uccoh); }
+        uccoh.add(`${t.ucKey}|${sc}`);
+      }
+      let ucsS = tpUCs.get(smk); if (!ucsS) { ucsS = new Set(); tpUCs.set(smk, ucsS); }
+      ucsS.add(t.ucKey);
+    }
+    t.placed++;
+    const s = getStat(statKeyOf(t));
+    if (t.tipo === "T") s.placedT++; else if (t.tipo === "TP") s.placedTP++; else if (t.tipo === "PL") s.placedPL++;
+    sessoes.push({
+      id: ++id, ucNome: t.ucNome, ucSigla: t.ucSigla, tipoAula: t.tipo,
+      docente: "", sala: "", salaTipo: t.salaTipo,
+      turma: t.turmaNome, diaSemana: slot.dia, horaInicio: slot.hora,
+      horaFim: addHours(slot.hora, 2), bloqueado: false, semana: wk.semanaGlobal,
+    });
+  };
+
+  // Colocação FORÇADA num slot específico (para a passagem de "encher blocos extra"),
+  // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
+  const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
+    if (t.placed >= t.total) return false;
+    if (ocupacao.has(slotKey(t.ano, wk.semanaGlobal, t.turmaNome, dia, hora))) return false;
+    const smk = tpManchaKey(t.ano, wk.semanaGlobal, dia, hora);
+    const emConflito = conflitoUC.get(t.ucSigla);
+    if (emConflito) { const set = siglaMancha.get(smk); if (set) for (const sig of set) if (emConflito.has(sig)) return false; }
+    if (gruposAlunoFolha(t.turmaNome).some(g => (diaCount.get(diaKey(t.ano, wk.semanaGlobal, dia, g)) || 0) >= MAX_BLOCOS_DIA)) return false;
+    if (t.tipo === "TP") {
+      const set = tpUCs.get(smk);
+      if (set && !(set.size === 1 && set.has(t.ucKey))) return false; // só a mesma UC nas TP
+      if ((tpCount.get(smk + "|" + t.ucKey) || 0) >= MAX_TP_POR_UC_MANCHA) return false;
+      if (plUCs.get(smk)?.has(t.ucKey)) return false; // docente partilhado: não com PL da mesma UC
+    }
+    if (t.tipo === "PL") {
+      if ((plCount.get(manchaKey(t.ano, wk.semanaGlobal, dia, hora, t.salaPool)) || 0) >= MAX_PL_POR_POOL[t.salaPool]) return false;
+      // relaxPLuc: bloco de recuperação da 6ª admite PL de UCs diferentes (3 ESDAC + 3 FT).
+      if (!relaxPLuc && t.salaPool !== "comp") { const set = plUCs.get(smk); if (set && !(set.size === 1 && set.has(t.ucKey))) return false; }
+      if (tpUCs.get(smk)?.has(t.ucKey)) return false; // docente partilhado: não com TP da mesma UC
+    }
+    commit(t, wk, { dia, hora });
+    return true;
   };
 
   const tryPlace = (t: Task, wk: WeekRef): boolean => {
     // Rotação por UC: base distinta por UC (período de arranque) + variação por semana.
     // Em poolDoTipo soma-se ainda o índice do dia → rotação dia-a-dia (FT qui@08→sex@10).
     const rotacao = t.rotaBase + wk.semanaGlobal - 1;
-    let pool = poolDoTipo(t.tipo, wk.diasBloqueados, t.manha, rotacao, t.flexivel);
+    // Semanas de uma só turma → essa turma arranca de manhã (não há a outra na tarde),
+    // com a tarde disponível em ajuste para a carga alta destas semanas (bloco 2/4).
+    // Semana PARCIAL (1.ª semana do 2.º ano): permite 2 UCs no bloco de TP (16-18 da 6ª).
+    const ehParcial = !!(wk.diasBloqueados?.includes("Segunda") && wk.diasBloqueados?.includes("Terça"));
+    const manhaEf = soUmaTurma(wk.semanaGlobal) ? true : t.manha;
+    let pool = poolDoTipo(t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel);
+    // MODO SEM REGRAS: SEM nenhuma regra — todos os dias úteis e TODOS os períodos (08-18),
+    // sem turnos, sem almoço, sem teto de 8h. Só não duplica a mesma turma. Para comparar.
+    if (opts.semRegras) {
+      const bloq = new Set(wk.diasBloqueados || []);
+      pool = DIAS_SEMANA.filter(d => !bloq.has(d)).flatMap(d => TODOS_PERIODOS.map(hora => ({ dia: d, hora })));
+    }
+    // 2.º ano, semanas de turma única (8-15 só B, 16-23 só A): SÓ período da manhã.
+    if (!opts.semRegras && t.ano === 2 && soUmaTurma(wk.semanaGlobal)) {
+      pool = pool.filter(s => PERIODOS_MANHA.includes(s.hora));
+    }
+    // Conflito de UCs (docentes partilhados): nunca na mesma mancha (ex.: ESDAC ∦ EIG).
+    const emConflito = conflitoUC.get(t.ucSigla);
+    if (!opts.semRegras && emConflito && emConflito.size) {
+      pool = pool.filter(s => {
+        const set = siglaMancha.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
+        if (!set) return true;
+        for (const sig of set) if (emConflito.has(sig)) return false;
+        return true;
+      });
+    }
     // Sem 2 blocos CONSECUTIVOS da mesma Teórica no dia (sem 4h seguidas de T da mesma UC,
     // ex.: MI-T 10h+12h). Só T (esparsa); TP/PL ficam livres para completar a carga.
-    if (t.tipo === "T") {
-      pool = pool.filter(s => !adjacenteOcupado(t.ano, wk.semanaGlobal, s.dia, t.turmaNome, t.tipo, s.hora));
+    if (t.tipo === "T" && !opts.semRegras) {
+      pool = pool.filter(s => !adjacenteOcupado(t.ano, wk.semanaGlobal, s.dia, t.ucKey, t.turmaNome, t.tipo, s.hora));
     }
     // Regra opcional: PL apenas em certos dias da semana (ex.: 4.ª a 6.ª feira).
     if (t.tipo === "PL" && opts.plDiasPermitidos && opts.plDiasPermitidos.length) {
@@ -712,14 +836,16 @@ export function gerarSessoesConjunto(
       pool = pool.filter(s => permitidos.has(s.dia));
     }
     // Limite de 2 TP por mancha (salas de TP): não juntar as 4 TP no mesmo slot.
-    if (t.tipo === "TP") {
+    if (t.tipo === "TP" && !opts.semRegras) {
       pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
-      // RÍGIDO: nunca TPs de UCs DIFERENTES no mesmo bloco (proibido 1 TP de uma + 1 de
-      // outra). Só se permite a mancha vazia de TP ou já com TP da MESMA UC.
-      pool = pool.filter(s => {
+      // RÍGIDO: nunca TPs de UCs DIFERENTES no mesmo bloco — EXCETO na semana parcial
+      // (1.ª semana), onde o bloco 16-18 leva TODAS as TP, admitindo 2 UCs diferentes.
+      if (!ehParcial) pool = pool.filter(s => {
         const set = tpUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
         return !set || set.size === 0 || (set.size === 1 && set.has(t.ucKey));
       });
+      // Docente partilhado TP↔PL: a TP NÃO pode estar na mancha que já tem PL da MESMA UC.
+      pool = pool.filter(s => !plUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora))?.has(t.ucKey));
       // Agrupar TP da MESMA UC, dentro da metade do dia (manhã/tarde). Em semanas com PL
       // desta UC, PARTE-SE em 2+2 (TP1,2 numa mancha; TP3,4 noutra) para caber o par
       // 2TP+6PL (bloco cheio 180); fora dessas semanas, agrupam-se as 4. Nunca outra UC
@@ -746,7 +872,7 @@ export function gerarSessoesConjunto(
     // Emparelhamento TP∥PL: a PL prefere QUALQUER mancha que já tenha a TP do
     // meio-cohort COMPLEMENTAR (ex.: PL7-12 ∥ TP1+TP2), formando o bloco cheio de 180
     // com alunos disjuntos. Maximiza a colocação das PL (para completarem).
-    if (t.tipo === "PL") {
+    if (t.tipo === "PL" && !opts.semRegras) {
       // RÍGIDO: nunca PLs de UCs DIFERENTES no mesmo bloco (proibido 1 PL de uma + 5 de
       // outra). Só mancha sem PL ou já com PL da MESMA UC. (MI usa salas de computadores
       // — pool próprio — e está isenta desta regra.)
@@ -756,6 +882,8 @@ export function gerarSessoesConjunto(
           return !set || set.size === 0 || (set.size === 1 && set.has(t.ucKey));
         });
       }
+      // Docente partilhado TP↔PL: a PL NÃO pode estar na mancha que já tem TP da MESMA UC.
+      pool = pool.filter(s => !tpUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora))?.has(t.ucKey));
       const sc = meioCohort(t.turmaNome);
       const comp = sc ? COMPLEMENTO_COHORT[sc] : null;
       if (comp && pool.length) {
@@ -768,60 +896,13 @@ export function gerarSessoesConjunto(
         pool = [...b2, ...b1, ...b0];
       }
     }
-    // Carga diária: teto absoluto de 8h/dia (4 blocos). Vários dias podem chegar às 8h
-    // (o bloco de ajuste extra), para caberem todas as PLs — só não se passa das 8h.
+    // Carga diária: teto absoluto de 8h/dia (4 blocos). No modo SEM REGRAS não se aplica.
     const folhas = gruposAlunoFolha(t.turmaNome);
-    pool = pool.filter(s => folhas.every(g =>
+    if (!opts.semRegras) pool = pool.filter(s => folhas.every(g =>
       (diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0) < MAX_BLOCOS_DIA));
     const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
-    registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
-    if (t.tipo === "T") {
-      const tk = ttKey(t.ano, wk.semanaGlobal, slot.dia, t.turmaNome, t.tipo);
-      let set = turmaPeriodos.get(tk); if (!set) { set = new Set(); turmaPeriodos.set(tk, set); }
-      set.add(slot.hora);
-    }
-    for (const g of folhas) {
-      const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
-      diaCount.set(dk, (diaCount.get(dk) || 0) + 1);
-    }
-    if (t.tipo === "PL") {
-      const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora, t.salaPool);
-      plCount.set(k, (plCount.get(k) || 0) + 1);
-      // MI (salas de computadores) é exceção e não conta para a regra de "uma só UC de PL".
-      if (t.salaPool !== "comp") {
-        const mk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
-        let set = plUCs.get(mk);
-        if (!set) { set = new Set(); plUCs.set(mk, set); }
-        set.add(t.ucKey);
-      }
-    }
-    if (t.tipo === "TP") {
-      const mk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
-      const ck = mk + "|" + t.ucKey;
-      tpCount.set(ck, (tpCount.get(ck) || 0) + 1);
-      const sc = meioCohort(t.turmaNome);
-      if (sc) {
-        let set = tpCohortMancha.get(mk);
-        if (!set) { set = new Set(); tpCohortMancha.set(mk, set); }
-        set.add(sc);
-        let uccoh = tpUCCohort.get(mk);
-        if (!uccoh) { uccoh = new Set(); tpUCCohort.set(mk, uccoh); }
-        uccoh.add(`${t.ucKey}|${sc}`);
-      }
-      let ucs = tpUCs.get(mk);
-      if (!ucs) { ucs = new Set(); tpUCs.set(mk, ucs); }
-      ucs.add(t.ucKey);
-    }
-    t.placed++;
-    const s = getStat(statKeyOf(t));
-    if (t.tipo === "T") s.placedT++; else if (t.tipo === "TP") s.placedTP++; else if (t.tipo === "PL") s.placedPL++;
-    sessoes.push({
-      id: ++id, ucNome: t.ucNome, ucSigla: t.ucSigla, tipoAula: t.tipo,
-      docente: "", sala: "", salaTipo: t.salaTipo,
-      turma: t.turmaNome, diaSemana: slot.dia, horaInicio: slot.hora,
-      horaFim: addHours(slot.hora, 2), bloqueado: false, semana: wk.semanaGlobal,
-    });
+    commit(t, wk, slot);
     return true;
   };
 
@@ -890,17 +971,74 @@ export function gerarSessoesConjunto(
 
   const allWeeks = [...new Set(tasks.flatMap(t => t.weeks.map(w => w.semanaGlobal)))].sort((a, b) => a - b);
   // Chronological: each week lays T, then the gated TP, then the gated PL.
+  const gTP = opts.semRegras ? null : canTP;   // sem regras: ignora a ordem T→TP→PL
+  const gPL = opts.semRegras ? null : canPL;
+  const primeiraSemana = allWeeks[0];
   for (const W of allWeeks) {
     placeWeek(tTasks,  W, null);
-    placeWeek(tpTasks, W, canTP);
-    placeWeek(plTasks, W, canPL);
+    // 1.ª semana (parcial): ignora a ordem T→TP→PL → TP enche a quinta livremente.
+    placeWeek(tpTasks, W, W === primeiraSemana ? null : gTP);
+    placeWeek(plTasks, W, gPL);
     placeWeek(sTasks,  W, null);
   }
   // Finish anything left, respecting the same gates.
   cram(tTasks, null);
-  cram(tpTasks, canTP);
-  cram(plTasks, canPL);
+  cram(tpTasks, gTP);
+  cram(plTasks, gPL);
   cram(sTasks, null);
+
+  // Passagem (a): blocos com 6 PL de um meio-cohort C1 → juntar as 2 TP do meio-cohort
+  // COMPLEMENTAR C2 (alunos disjuntos), formando 2TP+6PL = 180 e ocupando o cohort idle.
+  // Coloca TP de C2 que ainda tenham blocos por dar (sobe também a completude das TP).
+  const TP_DO_COHORT: Record<string, string[]> = {
+    A1: ["TP1", "TP2"], A2: ["TP3", "TP4"], B1: ["TP5", "TP6"], B2: ["TP7", "TP8"],
+  };
+  const anoDeSigla = new Map<string, number>();
+  for (const t of tasks) anoDeSigla.set(t.ucSigla, t.ano);
+  const wkByGlobal = new Map<number, WeekRef>();
+  for (const t of tasks) for (const w of t.weeks) if (!wkByGlobal.has(w.semanaGlobal)) wkByGlobal.set(w.semanaGlobal, w);
+  const plDaMancha = new Map<string, { ano: number; week: number; dia: string; hora: string; cohorts: Set<string>; n: number; plUCs: Set<string> }>();
+  for (const s of sessoes) {
+    if (s.tipoAula !== "PL") continue;
+    const sc = meioCohort(s.turma); if (!sc) continue;
+    const ano = anoDeSigla.get(s.ucSigla) ?? 0;
+    const k = `${ano}|${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+    let e = plDaMancha.get(k);
+    if (!e) { e = { ano, week: s.semana ?? 0, dia: s.diaSemana, hora: s.horaInicio, cohorts: new Set(), n: 0, plUCs: new Set() }; plDaMancha.set(k, e); }
+    e.cohorts.add(sc); e.n++; e.plUCs.add(s.ucSigla);
+  }
+  const tpTasksAll = tasks.filter(t => t.tipo === "TP");
+  const siglaDeUC = new Map<string, string>(); for (const t of tasks) siglaDeUC.set(t.ucKey, t.ucSigla);
+  for (const e of plDaMancha.values()) {
+    if (e.dia === "Sexta") continue;                   // a 6ª de tarde é só PL (sem TP)
+    if (e.n < 6 || e.cohorts.size !== 1) continue;     // só blocos cheios (6 PL) de um só meio-cohort
+    const c2 = COMPLEMENTO_COHORT[[...e.cohorts][0]];
+    const alvo = new Set(TP_DO_COHORT[c2] || []);
+    const wk = wkByGlobal.get(e.week); if (!wk) continue;
+    // escolher UMA UC, DIFERENTE da UC da PL (docente partilhado TP↔PL), cujas duas TP de C2 ainda tenham blocos.
+    const ucCand = [...new Set(tpTasksAll.filter(t => t.ano === e.ano && alvo.has(t.turmaNome) && t.placed < t.total && !e.plUCs.has(siglaDeUC.get(t.ucKey) || "")).map(t => t.ucKey))][0];
+    if (!ucCand) continue;
+    for (const turmaTP of TP_DO_COHORT[c2]) {
+      const cand = tpTasksAll.find(t => t.ucKey === ucCand && t.turmaNome === turmaTP && t.placed < t.total);
+      if (cand) tryPlaceAt(cand, wk, e.dia, e.hora);
+    }
+  }
+
+  // Passagem (b): recuperação das PL em atraso. Nas 6ªs das semanas de AMBAS as turmas,
+  // UM bloco após o almoço (16:00) para CADA turma (A e B, todas as 6ªs), só com as PL em
+  // falta. Admite mistura de UCs no bloco (ex.: 3 ESDAC + 3 FT) — exceção pedida para
+  // recuperar a carga de PL atrasada (FT/ESDAC). O cap do pool (6) limita cada bloco.
+  const plTasksRec = tasks.filter(t => t.tipo === "PL" && t.salaPool !== "comp");
+  for (const [wg, wk] of wkByGlobal) {
+    if (soUmaTurma(wg)) continue;                              // semanas de uma só turma já enchem o dia todo
+    if (wk.diasBloqueados?.includes("Sexta")) continue;        // 6ª feriado
+    for (const fam of ["A", "B"] as const) {                   // ambas as turmas, todas as 6ªs
+      const cand = plTasksRec
+        .filter(t => t.family === fam && t.placed < t.total && t.weeks.some(w => w.semanaGlobal === wg))
+        .sort((a, b) => (b.total - b.placed) - (a.total - a.placed)); // maior atraso primeiro
+      for (const t of cand) tryPlaceAt(t, wk, "Sexta", "16:00", true);
+    }
+  }
 
   return sessoes;
 }
