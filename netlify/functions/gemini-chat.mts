@@ -29,8 +29,17 @@ Contexto atual:
 
 Formato da regra (só quando aplicável):
 [REGRA_DETETADA]
-{"id":"temp","nome":"Nome curto","tipo":"hard","descricao":"...","escopo":"transversal","anoCurricular":"todos","config":{},"peso":5,"ativa":true}
+{"id":"temp","nome":"Nome curto","tipo":"hard","descricao":"...","escopo":"transversal","anoCurricular":"todos","config":{"traducaoSimples":"...","motor":{}},"peso":5,"ativa":true}
 [FIM_REGRA]
+
+O campo config.motor é o que APLICA a regra ao motor de distribuição. Parâmetros suportados
+(inclui SÓ os que o pedido implicar; omite os restantes):
+- "plDiasPermitidos": ["Quarta","Quinta","Sexta"] — PL apenas nestes dias da semana.
+- "ucConflitos": [["SIGLA1","SIGLA2"]] — pares de UCs que NÃO podem estar no mesmo bloco (ex.: docentes partilhados).
+- "maxTPporMancha": 2 — máximo de turmas TP da mesma UC em simultâneo no mesmo bloco (n.º de salas).
+- "semanasSoTurmaA": [16,17] — semanas globais (1-30) em que só a Turma A tem aulas.
+- "semanasSoTurmaB": [8,9] — semanas globais em que só a Turma B tem aulas.
+Se o pedido NÃO for traduzível nestes parâmetros, devolve a regra com "motor": {} e explica que ficará apenas documental (o motor ainda não suporta esse tipo de restrição).
 `;
 
   const contents: any[] = [];

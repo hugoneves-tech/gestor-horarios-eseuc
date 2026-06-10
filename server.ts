@@ -130,6 +130,15 @@ IMPORTANTE: Se o utilizador desejar traduzir regras em JSON estruturado, voc? po
 }
 [FIM_REGRA]
 Se não for relevante detetar uma regra nova, não coloque estes blocos especiais.
+
+O campo config.motor é o que APLICA a regra ao motor de distribuição. Parâmetros suportados
+(inclui SÓ os que o pedido implicar, dentro de "config": {"traducaoSimples":"...","motor":{...}}):
+- "plDiasPermitidos": ["Quarta","Quinta","Sexta"] — PL apenas nestes dias da semana.
+- "ucConflitos": [["SIGLA1","SIGLA2"]] — pares de UCs que NÃO podem estar no mesmo bloco.
+- "maxTPporMancha": 2 — máximo de TPs da mesma UC em simultâneo no mesmo bloco.
+- "semanasSoTurmaA": [16,17] — semanas globais (1-30) em que só a Turma A tem aulas.
+- "semanasSoTurmaB": [8,9] — semanas globais em que só a Turma B tem aulas.
+Se o pedido NÃO for traduzível nestes parâmetros, devolve "motor": {} e explica que a regra fica documental.
 `;
 
     // Map conversation pattern compatible with GoogleGenAI TS SDK chat pattern

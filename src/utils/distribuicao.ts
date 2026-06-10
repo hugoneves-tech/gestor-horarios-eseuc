@@ -243,6 +243,8 @@ function poolDoTipo(
   for (const dia of ordemDias) {
     let periodos = tipo === "T" ? periodosTDia(dia) : (dia === "Sexta" ? PERIODOS_MANHA : periodosPrefDia(dia));
     if (dia === "Quarta" && !avail.includes("Segunda") && !avail.includes("Terça")) {
+        // Semana parcial (arranque à 4ª): a 4ª é EXCLUSIVA das Teóricas, só de manhã.
+        if (tipo !== "T") continue;
         periodos = periodos.filter(p => PERIODOS_MANHA.includes(p));
     }
     for (const hora of periodos) slots.push({ dia, hora });
@@ -583,14 +585,6 @@ export interface OpcoesDistribuicao {
   // conflitos de UC, T só em certos dias, etc.). Mantém APENAS a distribuição pelos turnos
   // da tarde e o espaço para almoço (mais o teto de 8h e não duplicar a mesma turma).
   semRegras?: boolean;
-  // Dias bloqueados (feriados) por semana GLOBAL, para o ano inteiro. Permite à passagem
-  // de recuperação transbordar para semanas fora da chamada atual (ex.: PL da família A
-  // nas semanas 16-23, que pertencem ao 2.º semestre) sem cair em feriados.
-  diasBloqueadosPorSemana?: Record<number, string[]>;
-  // Pendências de PL transportadas ENTRE chamadas (semestres): o S1 deposita aqui as PL
-  // que não couberam; o S2, NO FIM (depois das suas UCs), recupera-as nas semanas de
-  // turma única (B→8-15 não aplicável; A→16-23), de manhã. Partilhar o MESMO array.
-  plPendentesEntreSemestres?: { ano: number; ucNome: string; ucSigla: string; ucKey: string; family: "A" | "B"; turmaNome: string; salaTipo: string; salaPool: SalaPool; total: number; placed: number }[];
 }
 
 export function gerarSessoesConjunto(
@@ -900,20 +894,35 @@ export function gerarSessoesConjunto(
     }
     // Carga diária: teto absoluto de 8h/dia (4 blocos). No modo SEM REGRAS não se aplica.
     const folhas = gruposAlunoFolha(t.turmaNome);
-    if (!opts.semRegras) pool = pool.filter(s => folhas.every(g =>
-      (diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0) < MAX_BLOCOS_DIA));
-    let sibling: Task | null = null;
+    if (!opts.semRegras) {
+      pool = pool.filter(s => folhas.every(g =>
+        (diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0) < MAX_BLOCOS_DIA));
+      // ALVO 6h/dia: preferir dias em que os alunos ainda têm <3 blocos; o 4.º bloco
+      // (8h) só em último recurso. Partição ESTÁVEL — preserva a ordem dos
+      // emparelhamentos (TP agrupada, PL∥TP) dentro de cada nível de carga.
+      const cargaDia = (s: Slot) => Math.max(0, ...folhas.map(g => diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0));
+      const compoe = pool.filter(s => { const c = cargaDia(s); return c >= 1 && c <= 2; }); // compõe os 6h
+      const vazios = pool.filter(s => cargaDia(s) === 0);                                   // novo dia
+      const cheios = pool.filter(s => cargaDia(s) >= 3);                                    // 4.º bloco: último recurso
+      const completa6 = compoe.filter(s => cargaDia(s) === 2);  // 3.º bloco → fecha os 6h
+      const constroi = compoe.filter(s => cargaDia(s) === 1);   // 2.º bloco
+      pool = [...completa6, ...vazios, ...constroi, ...cheios];
+      // ÚLTIMA semana da UC: 6ª em último recurso (antecipa para 2ª-5ª; se possível a
+      // 6ª fica livre e os estudantes vão mais cedo para casa). Partição estável.
+      const ultima = t.weeks.length > 0 && wk.semanaGlobal === t.weeks[t.weeks.length - 1].semanaGlobal;
+      if (ultima) pool = [...pool.filter(s => s.dia !== "Sexta"), ...pool.filter(s => s.dia === "Sexta")];
+    }
+        let sibling = null;
     if (t.tipo === "TP") {
-      const TP_SIBLING: Record<string, string> = { TP1: "TP2", TP2: "TP1", TP3: "TP4", TP4: "TP3", TP5: "TP6", TP6: "TP5", TP7: "TP8", TP8: "TP7" };
+      const TP_SIBLING = { TP1: "TP2", TP2: "TP1", TP3: "TP4", TP4: "TP3", TP5: "TP6", TP6: "TP5", TP7: "TP8", TP8: "TP7" };
       const sibName = TP_SIBLING[t.turmaNome];
       sibling = tasks.find(x => x.tipo === "TP" && x.ucKey === t.ucKey && x.ano === t.ano && x.turmaNome === sibName && x.placed < x.total) || null;
       if (sibling) {
-         const sib = sibling;
          pool = pool.filter(s => {
-            if (ocupacao.has(slotKey(sib.ano, wk.semanaGlobal, sib.turmaNome, s.dia, s.hora))) return false;
+            if (ocupacao.has(slotKey(sibling.ano, wk.semanaGlobal, sibling.turmaNome, s.dia, s.hora))) return false;
             if ((tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) + 2 > MAX_TP_POR_UC_MANCHA) return false;
-            const sf = gruposAlunoFolha(sib.turmaNome);
-            if (!opts.semRegras && sf.some(g => (diaCount.get(diaKey(sib.ano, wk.semanaGlobal, s.dia, g)) || 0) >= MAX_BLOCOS_DIA)) return false;
+            const sf = gruposAlunoFolha(sibling.turmaNome);
+            if (!opts.semRegras && sf.some(g => (diaCount.get(diaKey(sibling.ano, wk.semanaGlobal, s.dia, g)) || 0) >= MAX_BLOCOS_DIA)) return false;
             return true;
          });
       }
@@ -934,6 +943,11 @@ export function gerarSessoesConjunto(
   };
   const canPL = (t: Task): boolean => {
     const s = getStat(statKeyOf(t));
+    // UCs com PL pesada (mais PL que TP, ex. FT/ESDAC): a PL acompanha a T — as poucas
+    // TP não seguram as muitas PL para o fim do bloco (3.º bloco de PL na 7.ª semana ✗).
+    if (s.totalTP > 0 && s.totalPL > s.totalTP) {
+      return s.totalT === 0 || (s.placedT / s.totalT) > (s.placedPL / s.totalPL);
+    }
     if (s.totalTP > 0) return (s.placedTP / s.totalTP) > (s.placedPL / s.totalPL);
     return s.totalT === 0 || (s.placedT / s.totalT) > (s.placedPL / s.totalPL);
   };
@@ -951,7 +965,20 @@ export function gerarSessoesConjunto(
     const active: Active[] = phaseTasks
       .map(t => ({ t, wk: t.weeks.find(w => w.semanaGlobal === W) }))
       .filter(a => a.wk && a.t.placed < a.t.total)
-      .map(a => { const maxCap = Math.max(1, Math.ceil(a.t.total / Math.max(1, a.t.weeks.length))); return { t: a.t, wk: a.wk!, cap: a.t.tipo === 'PL' ? maxCap : maxCap + 1 }; });
+      .map(a => {
+        const maxCap = Math.max(1, Math.ceil(a.t.total / Math.max(1, a.t.weeks.length)));
+        // PL com cap exato (espalha uniformemente até à ÚLTIMA semana, sem acabar cedo);
+        // restantes tipos com +1 de folga.
+        let cap = a.t.tipo === 'PL' ? maxCap : maxCap + 1;
+        // TP de UC SEM PL (ex.: EIG): intercalada — cap normal nas semanas iniciais e
+        // ligeira folga nas 2 finais (emparelha com as PL sem as expulsar).
+        if (a.t.tipo === 'TP' && !ucsComPL.has(a.t.ucSigla)) {
+          const idx = a.t.weeks.findIndex(w => w.semanaGlobal === W);
+          const ultimas2 = idx >= a.t.weeks.length - 2;
+          cap = ultimas2 ? maxCap + 1 : maxCap;
+        }
+        return { t: a.t, wk: a.wk!, cap };
+      });
     const done = new Map<Task, number>();
     const stuck = new Set<Task>();
     while (true) {
@@ -960,7 +987,7 @@ export function gerarSessoesConjunto(
       for (const a of active) {
         if (stuck.has(a.t) || (done.get(a.t) || 0) >= a.cap || a.t.placed >= a.t.total) continue;
         if (gate && !a.t.exemptaGate && !gate(a.t)) continue; // MI isenta do gate rígido
-        let ratio = a.t.placed / a.t.total; if (a.t.tipo === "TP" && !ucsComPL.has(a.t.ucSigla)) ratio += 2; if (W === primeiraSemana && ucsComPL.has(a.t.ucSigla)) ratio -= 2;
+        let ratio = a.t.placed / a.t.total; if (a.t.tipo === "TP" && !ucsComPL.has(a.t.ucSigla)) ratio += 0.3; if (W === primeiraSemana && ucsComPL.has(a.t.ucSigla)) ratio -= 2;
         if (ratio < bestRatio) { bestRatio = ratio; best = a; }
       }
       if (!best) break;
@@ -978,7 +1005,7 @@ export function gerarSessoesConjunto(
       for (const t of phaseTasks) {
         if (t.placed >= t.total || exhausted.has(t)) continue;
         if (gate && !t.exemptaGate && !gate(t)) continue; // MI isenta do gate rígido
-        let ratio = t.placed / t.total; if (t.tipo === "TP" && !ucsComPL.has(t.ucSigla)) ratio += 2;
+        let ratio = t.placed / t.total; if (t.tipo === "TP" && !ucsComPL.has(t.ucSigla)) ratio += 0.3;
         if (ratio < bestRatio) { bestRatio = ratio; best = t; }
       }
       if (!best) break;
@@ -995,9 +1022,12 @@ export function gerarSessoesConjunto(
   const primeiraSemana = allWeeks[0];
   for (const W of allWeeks) {
     placeWeek(tTasks,  W, null);
+    // PL ANTES da TP dentro da semana: as PL (FT/ESDAC, blocos exclusivos por UC) têm
+    // 1.ª escolha das manchas; a ordem pedagógica T→TP→PL mantém-se pelos gates por
+    // conteúdo (uma PL só entra quando a T/TP correspondente está à frente).
+    placeWeek(plTasks, W, gPL);
     // 1.ª semana (parcial): ignora a ordem T→TP→PL → TP enche a quinta livremente.
     placeWeek(tpTasks, W, W === primeiraSemana ? null : gTP);
-    placeWeek(plTasks, W, gPL);
     placeWeek(sTasks,  W, null);
   }
   // Finish anything left, respecting the same gates.
@@ -1034,6 +1064,8 @@ export function gerarSessoesConjunto(
     const wk = wkByGlobal.get(e.week); if (!wk) continue;
     // escolher UMA UC, DIFERENTE da UC da PL (docente partilhado TP↔PL), cujas duas TP de C2 ainda tenham blocos.
     // Damos prioridade a UCs que NÃO TÊM PL (ex: EIG) para que usem os seus blocos aqui.
+    // SÓ tarefas cuja UC decorre NESTA semana (sem antecipar UCs do bloco 8-15 para 1-7;
+    // a ordenação abaixo já prefere UCs sem PL, ex. EIG, para preencher estes blocos).
     const naSemana = (t: Task) => t.weeks.some(w => w.semanaGlobal === e.week);
     const tpsDispon = tpTasksAll.filter(t => t.ano === e.ano && alvo.has(t.turmaNome) && t.placed < t.total && naSemana(t) && !e.plUCs.has(siglaDeUC.get(t.ucKey) || ""));
     const ucsDisp = [...new Set(tpsDispon.map(t => t.ucKey))].filter(uc => [...alvo].every(tp => tpTasksAll.find(t => t.ucKey === uc && t.turmaNome === tp && t.placed < t.total && naSemana(t)))).sort((a, b) => {
@@ -1041,14 +1073,24 @@ export function gerarSessoesConjunto(
         const hB = ucsComPL.has(siglaDeUC.get(b) || "") ? 1 : 0;
         return hA - hB;
     });
-    const ucCand = ucsDisp[0];
-    if (!ucCand) continue;
-    const candsA = TP_DO_COHORT[c2].map(tp => tpTasksAll.find(t => t.ucKey === ucCand && t.turmaNome === tp && t.placed < t.total && naSemana(t)));
-    const allFitA = candsA.every(c => c && !ocupacao.has(slotKey(c.ano, wk.semanaGlobal, c.turmaNome, e.dia, e.hora)) && !gruposAlunoFolha(c.turmaNome).some(g => (diaCount.get(diaKey(c.ano, wk.semanaGlobal, e.dia, g)) || 0) >= MAX_BLOCOS_DIA));
-    if (allFitA) {
-      candsA.forEach(c => tryPlaceAt(c!, wk, e.dia, e.hora, true));
+    // Tentar os candidatos POR ORDEM (EIG primeiro por não ter PL), saltando UCs em
+    // conflito com as PL do bloco (ex.: EIG não entra num bloco de PL de ESDAC — usa-se
+    // então ES/MI/FT). Antes só se tentava o 1.º e falhava em silêncio.
+    const conflitaComBloco = (ucKey: string) => {
+      const sig = siglaDeUC.get(ucKey) || "";
+      const conj = conflitoUC.get(sig);
+      return !!conj && [...e.plUCs].some(p => conj.has(p));
+    };
+    for (const ucCand of ucsDisp) {
+      if (conflitaComBloco(ucCand)) continue;
+      const candsA = TP_DO_COHORT[c2].map(tp => tpTasksAll.find(t => t.ucKey === ucCand && t.turmaNome === tp && t.placed < t.total && naSemana(t)));
+      const allFitA = candsA.every(c => c && !ocupacao.has(slotKey(c.ano, wk.semanaGlobal, c.turmaNome, e.dia, e.hora)) && !gruposAlunoFolha(c.turmaNome).some(g => (diaCount.get(diaKey(c.ano, wk.semanaGlobal, e.dia, g)) || 0) >= MAX_BLOCOS_DIA));
+      if (allFitA) {
+        candsA.forEach(c => tryPlaceAt(c!, wk, e.dia, e.hora, true));
+        break;
+      }
     }
-
+    
     // Also try to place 4 TPs of the OTHER Turma to reach the 180 (6PL+2TP) + 90 (4TP) = 270 block
     const fam = [...e.cohorts][0].startsWith("A") ? "B" : "A";
     const tpOutros = [...(TP_DO_COHORT[fam + "1"] || []), ...(TP_DO_COHORT[fam + "2"] || [])];
@@ -1057,12 +1099,13 @@ export function gerarSessoesConjunto(
         const hB = ucsComPL.has(siglaDeUC.get(b) || "") ? 1 : 0;
         return hA - hB;
     });
-    const ucCandO = ucsDispOutra[0];
-    if (ucCandO) {
+    for (const ucCandO of ucsDispOutra) {
+      if (conflitaComBloco(ucCandO)) continue;
       const candsB = tpOutros.map(tp => tpTasksAll.find(t => t.ucKey === ucCandO && t.turmaNome === tp && t.placed < t.total && naSemana(t)));
       const allFitB = candsB.every(c => c && !ocupacao.has(slotKey(c.ano, wk.semanaGlobal, c.turmaNome, e.dia, e.hora)) && !gruposAlunoFolha(c.turmaNome).some(g => (diaCount.get(diaKey(c.ano, wk.semanaGlobal, e.dia, g)) || 0) >= MAX_BLOCOS_DIA));
       if (allFitB) {
         candsB.forEach(c => tryPlaceAt(c!, wk, e.dia, e.hora, true));
+        break;
       }
     }
   }
@@ -1083,98 +1126,6 @@ export function gerarSessoesConjunto(
         .filter(t => t.family === fam && t.placed < t.total && t.weeks.some(w => w.semanaGlobal === wg))
         .sort((a, b) => (b.total - b.placed) - (a.total - a.placed)); // maior atraso primeiro
       for (const t of cand) tryPlaceAt(t, wk, "Sexta", "16:00", true);
-    }
-  }
-
-  // Passagem (c): RECUPERAÇÃO FINAL das PL em falta (FT/ESDAC). Varre TODOS os slots de
-  // todas as semanas (qualquer dia/período), admitindo mistura de UCs no bloco, mas
-  // SEMPRE dentro das regras duras: teto de 8h/dia, espaço de almoço, cap de 6 PL/sala,
-  // sem TP da mesma UC na mancha. Só corre para o que sobrou — não mexe no que está bem.
-  const ORDEM_DIAS_REC = ["Quinta", "Quarta", "Terça", "Segunda", "Sexta"];
-  const plRestantes = tasks.filter(t => t.tipo === "PL" && t.placed < t.total);
-  if (plRestantes.length) {
-    const weeksOrd = [...wkByGlobal.keys()].sort((a, b) => a - b);
-    let progress = true;
-    while (progress) {
-      progress = false;
-      for (const t of tasks.filter(x => x.tipo === "PL" && x.placed < x.total)
-        .sort((a, b) => a.placed / a.total - b.placed / b.total)) {
-        let placedOne = false;
-        for (const wg of weeksOrd) {
-          if (placedOne) break;
-          const wk = wkByGlobal.get(wg)!;
-          // Semanas da própria UC, MAIS as semanas DESTE semestre em que só a turma desta
-          // task está na escola (ex.: família B nas 8-15): esta passagem corre no FIM,
-          // depois das UCs próprias dessas semanas, por isso só usa capacidade sobrante.
-          const semanaDaUC = t.weeks.some(w => w.semanaGlobal === wg);
-          const semanaSoMinha = t.family === "B" ? soTurmaB.has(wg) : soTurmaA.has(wg);
-          if (!semanaDaUC && !semanaSoMinha) continue;
-          const bloq = new Set(wk.diasBloqueados || []);
-          for (const dia of ORDEM_DIAS_REC) {
-            if (placedOne) break;
-            if (bloq.has(dia)) continue;
-            // semanas de turma única: só manhã (regra do 2.º ano)
-            const horas = (t.ano === 2 && soUmaTurma(wg)) ? PERIODOS_MANHA : TODOS_PERIODOS;
-            for (const hora of horas) {
-              if (tryPlaceAt(t, wk, dia, hora, true)) { placedOne = true; progress = true; break; }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Passagem (d): PENDÊNCIAS DO SEMESTRE ANTERIOR. As PL que o S1 não conseguiu colocar
-  // (depositadas em opts.plPendentesEntreSemestres) são recuperadas AQUI, nas semanas de
-  // turma única DESTA chamada (ex.: família A nas semanas 16-23), de manhã — DEPOIS das
-  // UCs próprias destas semanas estarem servidas (esta passagem corre no fim de tudo).
-  const pendentes = opts.plPendentesEntreSemestres;
-  if (pendentes?.length) {
-    const todasSemanas = [...wkByGlobal.keys()].sort((a, b) => a - b);
-    // 1.º as semanas de turma única da família; depois QUALQUER semana desta chamada
-    // (ex.: 24-30 com ambas as turmas), em qualquer período válido.
-    let progress = true;
-    while (progress) {
-      progress = false;
-      for (const p of pendentes.filter(x => x.placed < x.total)
-        .sort((a, b) => a.placed / a.total - b.placed / b.total)) {
-        let placedOne = false;
-        const minhasUnicas = todasSemanas.filter(w => p.family === "B" ? soTurmaB.has(w) : soTurmaA.has(w));
-        const restantes = todasSemanas.filter(w => !soUmaTurma(w));
-        for (const wg of [...minhasUnicas, ...restantes]) {
-          if (placedOne) break;
-          const wk = wkByGlobal.get(wg)!;
-          const bloq = new Set(wk.diasBloqueados || []);
-          const horas = soUmaTurma(wg) ? PERIODOS_MANHA : TODOS_PERIODOS;
-          for (const dia of ORDEM_DIAS_REC) {
-            if (placedOne) break;
-            if (bloq.has(dia)) continue;
-            for (const hora of horas) {
-              // tryPlaceAt exige uma Task; as pendências têm os campos necessários.
-              const tFake = { ...p, tipo: "PL", manha: true, flexivel: false, exemptaGate: true, rotaBase: 0, weeks: [wk] } as unknown as Task;
-              if (tryPlaceAt(tFake, wk, dia, hora, true)) {
-                p.placed++; // tFake.placed++ não reflete na pendência partilhada
-                placedOne = true; progress = true; break;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // No fim: depositar as PL que continuam por colocar, para o próximo semestre recuperar.
-  if (opts.plPendentesEntreSemestres) {
-    for (const t of tasks) {
-      if (t.tipo !== "PL" || t.placed >= t.total) continue;
-      // Tarefas sem semanas válidas (ex.: família A das UCs "-I", que faz a versão "-II")
-      // NÃO são pendências — não deviam ser dadas de todo.
-      if (!t.weeks.length) continue;
-      opts.plPendentesEntreSemestres.push({
-        ano: t.ano, ucNome: t.ucNome, ucSigla: t.ucSigla, ucKey: t.ucKey, family: t.family,
-        turmaNome: t.turmaNome, salaTipo: t.salaTipo, salaPool: t.salaPool,
-        total: t.total, placed: t.placed,
-      });
     }
   }
 

@@ -16,6 +16,9 @@ export function AdminConvites() {
   const [papel, setPapel] = useState("coordenador_1");
   const [isAdmin, setIsAdmin] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroDetalhe, setErroDetalhe] = useState<string | null>(null);
+  const [mostrarDetalhe, setMostrarDetalhe] = useState(false);
+  const [copiado, setCopiado] = useState(false);
   const [resultado, setResultado] = useState<{ email: string; pass: string } | null>(null);
   const [aEnviar, setAEnviar] = useState(false);
   const [utilizadores, setUtilizadores] = useState<UtilizadorRow[]>([]);
@@ -35,22 +38,47 @@ export function AdminConvites() {
 
   const convidar = async (e: FormEvent) => {
     e.preventDefault();
-    setErro(null); setResultado(null); setAEnviar(true);
+    setErro(null); setErroDetalhe(null); setResultado(null); setAEnviar(true);
+    const diag: string[] = [];
+    diag.push(`Data: ${new Date().toISOString()}`);
+    diag.push(`URL: POST /api/admin/convidar`);
+    diag.push(`Origem: ${window.location.origin}`);
+    diag.push(`Token presente: ${token ? "sim (" + String(token).slice(0, 12) + "…)" : "NÃO"}`);
+    diag.push(`Payload: ${JSON.stringify({ email: email.trim(), papel, isAdmin })}`);
     try {
       const r = await fetch("/api/admin/convidar", {
         method: "POST", headers,
         body: JSON.stringify({ email: email.trim(), papel, isAdmin }),
       });
-      const d = await r.json();
-      if (!r.ok) { setErro(d.error || "Falha ao convidar."); return; }
+      diag.push(`HTTP status: ${r.status} ${r.statusText}`);
+      diag.push(`Content-Type: ${r.headers.get("content-type") || "n/d"}`);
+      // Ler como TEXTO primeiro: se a função falhar, o Netlify devolve HTML/texto e o
+      // r.json() rebentava antes de conseguirmos ver o corpo do erro.
+      const raw = await r.text();
+      diag.push(`Corpo da resposta (bruto):\n${raw.slice(0, 2000) || "(vazio)"}`);
+      let d: any = null;
+      try { d = JSON.parse(raw); } catch { /* não-JSON: fica no bruto */ }
+      if (!r.ok || !d) {
+        setErro((d && d.error) || `Falha ao convidar (HTTP ${r.status}).`);
+        setErroDetalhe(diag.join("\n\n"));
+        return;
+      }
       setResultado({ email: d.email, pass: d.passwordTemporaria });
       setEmail("");
       carregar();
     } catch (err: any) {
-      setErro(err.message);
+      diag.push(`Exceção: ${err?.name || ""} ${err?.message || String(err)}`);
+      if (err?.stack) diag.push(`Stack:\n${String(err.stack).slice(0, 800)}`);
+      setErro(err.message || "Erro de rede.");
+      setErroDetalhe(diag.join("\n\n"));
     } finally {
       setAEnviar(false);
     }
+  };
+
+  const copiarDetalhe = async () => {
+    if (!erroDetalhe) return;
+    try { await navigator.clipboard.writeText(erroDetalhe); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { /* sem clipboard */ }
   };
 
   return (
@@ -94,7 +122,37 @@ export function AdminConvites() {
         </label>
       </form>
 
-      {erro && <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{erro}</p>}
+      {erro && (
+        <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+          <span>{erro}</span>
+          {erroDetalhe && (
+            <button type="button" onClick={() => setMostrarDetalhe(true)}
+              className="shrink-0 px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-[10px] font-bold cursor-pointer">
+              Ver detalhes do erro
+            </button>
+          )}
+        </div>
+      )}
+      {mostrarDetalhe && erroDetalhe && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setMostrarDetalhe(false)}>
+          <div className="bg-white rounded-2xl p-5 max-w-2xl w-full max-h-[80vh] flex flex-col gap-3 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h4 className="font-serif font-bold text-stone-900 text-sm">Diagnóstico do erro de convite</h4>
+              <button onClick={() => setMostrarDetalhe(false)} className="text-stone-400 hover:text-stone-700 text-lg leading-none cursor-pointer">×</button>
+            </div>
+            <p className="text-[10px] text-stone-500">Copia este relatório e cola-o no chat para diagnóstico. Não contém a tua palavra-passe (só o início do token de sessão).</p>
+            <pre className="flex-1 overflow-auto bg-stone-50 border border-stone-200 rounded-lg p-3 text-[10px] font-mono whitespace-pre-wrap text-stone-800">{erroDetalhe}</pre>
+            <div className="flex justify-end gap-2">
+              <button onClick={copiarDetalhe}
+                className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-[11px] font-bold cursor-pointer">
+                {copiado ? "Copiado ✓" : "Copiar relatório"}
+              </button>
+              <button onClick={() => setMostrarDetalhe(false)}
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-[11px] font-bold cursor-pointer">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {resultado && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-xs text-emerald-900 space-y-1">
           <p className="font-bold">Conta criada para {resultado.email}.</p>

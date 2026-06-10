@@ -1343,23 +1343,33 @@ export default function App() {
       for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++) {
         if ([...docPorUC[sigs[i]]].some(d => docPorUC[sigs[j]].has(d))) ucConflitos.push([sigs[i], sigs[j]]);
       }
+      // Regras criadas por IA (ou editadas) com config.motor → aplicam-se ao solver.
+      // Fundem-se TODAS as regras ativas: ucConflitos acumulam; os restantes parâmetros
+      // são substituídos pela última regra ativa que os defina.
+      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[] } = {};
+      for (const r of regras) {
+        const m = r.ativa && (r.config as any)?.motor;
+        if (!m || typeof m !== "object") continue;
+        if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
+        if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
+        if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
+        if (Array.isArray(m.semanasSoTurmaA) && m.semanasSoTurmaA.length) motorAI.semanasSoTurmaA = m.semanasSoTurmaA.map(Number);
+        if (Array.isArray(m.semanasSoTurmaB) && m.semanasSoTurmaB.length) motorAI.semanasSoTurmaB = m.semanasSoTurmaB.map(Number);
+      }
       const opcoes = {
-        plDiasPermitidos: regraPLDias
+        plDiasPermitidos: motorAI.plDiasPermitidos ?? (regraPLDias
           ? (regraPLDias.config?.diasPermitidos ?? ["Quarta", "Quinta", "Sexta"])
-          : null,
+          : null),
         // Sem limite de TP por mancha nesta fase: 4 TP podem coexistir.
-        maxTPporMancha: null,
+        maxTPporMancha: motorAI.maxTPporMancha ?? null,
         prefTurmaAManha,
-        ucConflitos,
+        ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
         // Estrutura ESEUC: 8-15 só Turma B (Turma A em estágio); 16-23 só Turma A. Tudo de manhã.
-        semanasSoTurmaB: Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
-        semanasSoTurmaA: Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
+        semanasSoTurmaB: motorAI.semanasSoTurmaB ?? Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
+        semanasSoTurmaA: motorAI.semanasSoTurmaA ?? Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
         // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
         // tarde e o espaço para almoço (e o teto de 8h). Para comparar cenários.
         semRegras,
-        // PL que não couberam no S1 são recuperadas pelo S2 (semanas 16-23/24-30) — o
-        // MESMO array é partilhado pelas duas chamadas (S1 deposita, S2 recupera).
-        plPendentesEntreSemestres: [],
       };
 
       // Schedule each semester fairly across its UCs (round-robin per week).
@@ -1462,9 +1472,10 @@ export default function App() {
           const jsonStr = subParts[0].trim();
           const parsedRule = JSON.parse(jsonStr);
           
-          // Inject user-friendly configuration translation
+          // Preservar a config da IA (inclui config.motor, que aplica a regra ao solver)
           parsedRule.config = {
-            traducaoSimples: `Traduzido em tempo real da análise inteligente: "${currentPrompt}"`
+            ...(parsedRule.config || {}),
+            traducaoSimples: parsedRule.config?.traducaoSimples || `Traduzido da análise inteligente: "${currentPrompt}"`,
           };
           setPendingAiRule(parsedRule);
         } catch (jsonErr) {
@@ -3998,7 +4009,11 @@ export default function App() {
                 let alvo = 0;
                 for (const u of ucsAno) {
                   const tc = u.turmasConfig || [];
-                  const nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length, nS = tc.filter(t => t.tipo === "Seminário").length;
+                  let nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length;
+                  const nS = tc.filter(t => t.tipo === "Seminário").length;
+                  // UCs de bloco do 2.º ano ("-I" só Turma B, "-II" só Turma A): apenas
+                  // metade das turmas frequenta — o alvo conta só a família presente.
+                  if (Number(u.anoCurricular) === 2 && /-(I|II)$/.test(u.sigla)) { nT = Math.ceil(nT / 2); nTP = nTP / 2; nPL = nPL / 2; }
                   alvo += Math.floor((u.cargaHorariaTeorica || 0) / 2) * nT + Math.floor((u.cargaHorariaTP || 0) / 2) * nTP + Math.floor((u.cargaHorariaPratica || 0) / 2) * nPL + Math.floor((u.cargaHorariaS || 0) / 2) * nS;
                 }
                 const sigSet = new Set(ucsAno.map(u => u.sigla));
