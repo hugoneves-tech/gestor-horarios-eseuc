@@ -1357,6 +1357,9 @@ export default function App() {
         // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
         // tarde e o espaço para almoço (e o teto de 8h). Para comparar cenários.
         semRegras,
+        // PL que não couberam no S1 são recuperadas pelo S2 (semanas 16-23/24-30) — o
+        // MESMO array é partilhado pelas duas chamadas (S1 deposita, S2 recupera).
+        plPendentesEntreSemestres: [],
       };
 
       // Schedule each semester fairly across its UCs (round-robin per week).
