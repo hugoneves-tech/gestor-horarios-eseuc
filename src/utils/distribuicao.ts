@@ -732,6 +732,10 @@ export function gerarSessoesConjunto(
   const ordSlot = (week: number, dia: string, hora: string) => week * 1000 + DIAS_SEMANA.indexOf(dia) * 10 + TODOS_PERIODOS.indexOf(hora);
   const tMinOrd = new Map<string, number>();  // `${ano}|${ucKey}|${family}` → ord da 1.ª T
   const tpMinOrd = new Map<string, number>(); // idem, 1.ª TP
+  // ESPELHO Turma A ↔ Turma B: slots já colocados por (UC, tipo, família) em cada semana,
+  // para a outra família preferir o slot espelhado (08↔14, 10↔16, 12↔18, mesmo dia).
+  const espelho = new Map<string, Set<string>>(); // `${ano}|${week}|${ucKey}|${tipo}|${family}` → {"dia|hora"}
+  const HORA_ESPELHO: Record<string, string> = { "08:00": "14:00", "10:00": "16:00", "12:00": "18:00", "14:00": "08:00", "16:00": "10:00", "18:00": "12:00" };
   const ttKey = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string) => `${ano}|${week}|${dia}|${ucKey}|${turma}|${tipo}`;
   const adjacenteOcupado = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string, hora: string) => {
     const set = turmaPeriodos.get(ttKey(ano, week, dia, ucKey, turma, tipo));
@@ -782,6 +786,11 @@ export function gerarSessoesConjunto(
       }
       let ucsS = tpUCs.get(smk); if (!ucsS) { ucsS = new Set(); tpUCs.set(smk, ucsS); }
       ucsS.add(t.ucKey);
+    }
+    {
+      const ek = `${t.ano}|${wk.semanaGlobal}|${t.ucKey}|${t.tipo}|${t.family}`;
+      let es = espelho.get(ek); if (!es) { es = new Set(); espelho.set(ek, es); }
+      es.add(`${slot.dia}|${slot.hora}`);
     }
     t.placed++;
     const s = getStat(statKeyOf(t));
@@ -947,6 +956,21 @@ export function gerarSessoesConjunto(
       // 6ª fica livre e os estudantes vão mais cedo para casa). Partição estável.
       const ultima = t.weeks.length > 0 && wk.semanaGlobal === t.weeks[t.weeks.length - 1].semanaGlobal;
       if (ultima) pool = [...pool.filter(s => s.dia !== "Sexta"), ...pool.filter(s => s.dia === "Sexta")];
+      // ESPELHO A↔B (preferência principal): se a OUTRA família já tem esta (UC, tipo)
+      // nesta semana, preferir o slot espelhado (mesmo dia, manhã↔tarde). Nas Teóricas
+      // o MESMO slot também conta (momento em comum: ambas as turmas no anfiteatro).
+      if (!soUmaTurma(wk.semanaGlobal)) {
+        const outro = espelho.get(`${t.ano}|${wk.semanaGlobal}|${t.ucKey}|${t.tipo}|${t.family === "A" ? "B" : "A"}`);
+        if (outro && outro.size) {
+          const alvos = new Set<string>();
+          for (const dh of outro) {
+            const [dia, hora] = dh.split("|");
+            const he = HORA_ESPELHO[hora]; if (he) alvos.add(`${dia}|${he}`);
+            if (t.tipo === "T") alvos.add(dh); // T: mesmo bloco = momento em comum
+          }
+          pool = [...pool.filter(s => alvos.has(`${s.dia}|${s.hora}`)), ...pool.filter(s => !alvos.has(`${s.dia}|${s.hora}`))];
+        }
+      }
     }
         let sibling = null;
     if (t.tipo === "TP") {
