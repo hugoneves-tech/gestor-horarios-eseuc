@@ -240,12 +240,15 @@ function poolDoTipo(
   if (!ordemDias.length) return [];
 
   const slots: Slot[] = [];
+  const parcialSem = !avail.includes("Segunda") && !avail.includes("Terça");
   for (const dia of ordemDias) {
     let periodos = tipo === "T" ? periodosTDia(dia) : (dia === "Sexta" ? PERIODOS_MANHA : periodosPrefDia(dia));
-    if (dia === "Quarta" && !avail.includes("Segunda") && !avail.includes("Terça")) {
-        // Semana parcial (arranque à 4ª): a 4ª é EXCLUSIVA das Teóricas, só de manhã.
+    if (dia === "Quarta" && parcialSem) {
+        // Semana parcial (arranque à 4ª): a 4ª é EXCLUSIVA das Teóricas, de manhã, com
+        // AMBAS as turmas no mesmo bloco (como a 6ª): ordem fixa [08,10,12], sem rotação
+        // nem metade de família — o anfiteatro leva as duas turmas em simultâneo.
         if (tipo !== "T") continue;
-        periodos = periodos.filter(p => PERIODOS_MANHA.includes(p));
+        periodos = PERIODOS_MANHA;
     }
     for (const hora of periodos) slots.push({ dia, hora });
   }
@@ -724,6 +727,11 @@ export function gerarSessoesConjunto(
   // da mesma UC). Não é cap por dia (que partia a completude) — só proíbe a adjacência.
   const TODOS_PERIODOS = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"];
   const turmaPeriodos = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${ucKey}|${turma}|${tipo}` → horas
+  // Momento (semana+dia+hora) da 1.ª T e da 1.ª TP de cada (UC, família) — cronologia
+  // GLOBAL: a 1.ª TP nunca antes da 1.ª T; a 1.ª PL nunca antes da 1.ª TP.
+  const ordSlot = (week: number, dia: string, hora: string) => week * 1000 + DIAS_SEMANA.indexOf(dia) * 10 + TODOS_PERIODOS.indexOf(hora);
+  const tMinOrd = new Map<string, number>();  // `${ano}|${ucKey}|${family}` → ord da 1.ª T
+  const tpMinOrd = new Map<string, number>(); // idem, 1.ª TP
   const ttKey = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string) => `${ano}|${week}|${dia}|${ucKey}|${turma}|${tipo}`;
   const adjacenteOcupado = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string, hora: string) => {
     const set = turmaPeriodos.get(ttKey(ano, week, dia, ucKey, turma, tipo));
@@ -742,6 +750,10 @@ export function gerarSessoesConjunto(
       const tk = ttKey(t.ano, wk.semanaGlobal, slot.dia, t.ucKey, t.turmaNome, t.tipo);
       let set = turmaPeriodos.get(tk); if (!set) { set = new Set(); turmaPeriodos.set(tk, set); }
       set.add(slot.hora);
+      const mk = `${t.ano}|${t.ucKey}|${t.family}`;
+      const o = ordSlot(wk.semanaGlobal, slot.dia, slot.hora);
+      const cur = tMinOrd.get(mk);
+      if (cur === undefined || o < cur) tMinOrd.set(mk, o);
     }
     for (const g of gruposAlunoFolha(t.turmaNome)) {
       const dk = diaKey(t.ano, wk.semanaGlobal, slot.dia, g);
@@ -757,6 +769,10 @@ export function gerarSessoesConjunto(
     }
     if (t.tipo === "TP") {
       tpCount.set(smk + "|" + t.ucKey, (tpCount.get(smk + "|" + t.ucKey) || 0) + 1);
+      const mkTP = `${t.ano}|${t.ucKey}|${t.family}`;
+      const oTP = ordSlot(wk.semanaGlobal, slot.dia, slot.hora);
+      const curTP = tpMinOrd.get(mkTP);
+      if (curTP === undefined || oTP < curTP) tpMinOrd.set(mkTP, oTP);
       const sc = meioCohort(t.turmaNome);
       if (sc) {
         let set = tpCohortMancha.get(smk); if (!set) { set = new Set(); tpCohortMancha.set(smk, set); }
@@ -782,6 +798,14 @@ export function gerarSessoesConjunto(
   // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
   const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
     if (dia === "Sexta" && hora === "18:00") return false;
+    // Cronologia GLOBAL T→TP→PL também nas passagens de recuperação.
+    if (t.tipo === "TP" || t.tipo === "PL") {
+      const st0 = getStat(statKeyOf(t));
+      const ref = t.tipo === "TP"
+        ? tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`)
+        : (st0.totalTP > 0 ? tpMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`) : tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`));
+      if (ref === undefined || ordSlot(wk.semanaGlobal, dia, hora) <= ref) return false;
+    }
     if (t.placed >= t.total) return false;
     if (ocupacao.has(slotKey(t.ano, wk.semanaGlobal, t.turmaNome, dia, hora))) return false;
     const smk = tpManchaKey(t.ano, wk.semanaGlobal, dia, hora);
@@ -846,6 +870,11 @@ export function gerarSessoesConjunto(
     }
     // Limite de 2 TP por mancha (salas de TP): não juntar as 4 TP no mesmo slot.
     if (t.tipo === "TP" && !opts.semRegras) {
+      // CRONOLOGIA GLOBAL: nenhuma TP antes do momento da 1.ª T da sua (UC, família).
+      {
+        const tMin = tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`);
+        pool = pool.filter(s => tMin !== undefined && ordSlot(wk.semanaGlobal, s.dia, s.hora) > tMin);
+      }
       pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
       // ALLOW DIFFERENT UCs IN TP BLOCK
       // Docente partilhado TP↔PL: a TP NÃO pode estar na mancha que já tem PL da MESMA UC.
@@ -869,6 +898,13 @@ export function gerarSessoesConjunto(
     // meio-cohort COMPLEMENTAR (ex.: PL7-12 ∥ TP1+TP2), formando o bloco cheio de 180
     // com alunos disjuntos. Maximiza a colocação das PL (para completarem).
     if (t.tipo === "PL" && !opts.semRegras) {
+      // CRONOLOGIA GLOBAL: nenhuma PL antes do momento da 1.ª TP da sua (UC, família)
+      // (se a UC não tiver TP de todo, vale a 1.ª T).
+      {
+        const st0 = getStat(statKeyOf(t));
+        const ref = st0.totalTP > 0 ? tpMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`) : tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`);
+        pool = pool.filter(s => ref !== undefined && ordSlot(wk.semanaGlobal, s.dia, s.hora) > ref);
+      }
       // RÍGIDO: nunca PLs de UCs DIFERENTES no mesmo bloco (proibido 1 PL de uma + 5 de
       // outra). Só mancha sem PL ou já com PL da MESMA UC. (MI usa salas de computadores
       // — pool próprio — e está isenta desta regra.)
@@ -943,11 +979,6 @@ export function gerarSessoesConjunto(
   };
   const canPL = (t: Task): boolean => {
     const s = getStat(statKeyOf(t));
-    // UCs com PL pesada (mais PL que TP, ex. FT/ESDAC): a PL acompanha a T — as poucas
-    // TP não seguram as muitas PL para o fim do bloco (3.º bloco de PL na 7.ª semana ✗).
-    if (s.totalTP > 0 && s.totalPL > s.totalTP) {
-      return s.totalT === 0 || (s.placedT / s.totalT) > (s.placedPL / s.totalPL);
-    }
     if (s.totalTP > 0) return (s.placedTP / s.totalTP) > (s.placedPL / s.totalPL);
     return s.totalT === 0 || (s.placedT / s.totalT) > (s.placedPL / s.totalPL);
   };
@@ -970,12 +1001,22 @@ export function gerarSessoesConjunto(
         // PL com cap exato (espalha uniformemente até à ÚLTIMA semana, sem acabar cedo);
         // restantes tipos com +1 de folga.
         let cap = a.t.tipo === 'PL' ? maxCap : maxCap + 1;
+
         // TP de UC SEM PL (ex.: EIG): intercalada — cap normal nas semanas iniciais e
         // ligeira folga nas 2 finais (emparelha com as PL sem as expulsar).
         if (a.t.tipo === 'TP' && !ucsComPL.has(a.t.ucSigla)) {
           const idx = a.t.weeks.findIndex(w => w.semanaGlobal === W);
           const ultimas2 = idx >= a.t.weeks.length - 2;
           cap = ultimas2 ? maxCap + 1 : maxCap;
+        }
+        // TP de UC com PL PESADA (ex.: ESDAC 24h PL vs 6h TP): adiantar as TPs nas 2
+        // primeiras semanas para o gate T→TP→PL libertar as muitas PL cedo.
+        if (a.t.tipo === 'TP') {
+          const st = getStat(statKeyOf(a.t));
+          if (st.totalPL > 2 * st.totalTP && st.totalTP > 0) {
+            const idx = a.t.weeks.findIndex(w => w.semanaGlobal === W);
+            if (idx <= 2) cap = maxCap + 4;
+          }
         }
         return { t: a.t, wk: a.wk!, cap };
       });
@@ -988,6 +1029,10 @@ export function gerarSessoesConjunto(
         if (stuck.has(a.t) || (done.get(a.t) || 0) >= a.cap || a.t.placed >= a.t.total) continue;
         if (gate && !a.t.exemptaGate && !gate(a.t)) continue; // MI isenta do gate rígido
         let ratio = a.t.placed / a.t.total; if (a.t.tipo === "TP" && !ucsComPL.has(a.t.ucSigla)) ratio += 0.3; if (W === primeiraSemana && ucsComPL.has(a.t.ucSigla)) ratio -= 2;
+        if (a.t.tipo === "TP") { const stR = getStat(statKeyOf(a.t)); if (stR.totalPL > 2 * stR.totalTP && stR.totalTP > 0) ratio -= 1.0; } // PL pesada: TP cedo
+        // 1.ª semana: a T das UCs com PL pesada vai PRIMEIRO (4ª de manhã) — destranca
+        // a cadeia T→TP→PL logo no arranque (ESDAC: T 4ª → TP 5ª → PL 6ª).
+        if (a.t.tipo === "T" && W === primeiraSemana) { const stT = getStat(statKeyOf(a.t)); if (stT.totalPL > 2 * stT.totalTP && stT.totalTP > 0) ratio -= 3; }
         if (ratio < bestRatio) { bestRatio = ratio; best = a; }
       }
       if (!best) break;
@@ -1026,8 +1071,7 @@ export function gerarSessoesConjunto(
     // 1.ª escolha das manchas; a ordem pedagógica T→TP→PL mantém-se pelos gates por
     // conteúdo (uma PL só entra quando a T/TP correspondente está à frente).
     placeWeek(plTasks, W, gPL);
-    // 1.ª semana (parcial): ignora a ordem T→TP→PL → TP enche a quinta livremente.
-    placeWeek(tpTasks, W, W === primeiraSemana ? null : gTP);
+    placeWeek(tpTasks, W, gTP); // gate T→TP→PL ativo em TODAS as semanas (incl. a 1.ª)
     placeWeek(sTasks,  W, null);
   }
   // Finish anything left, respecting the same gates.
