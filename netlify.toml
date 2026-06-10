@@ -11,6 +11,8 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Runtime das FUNCTIONS (o NODE_VERSION so afeta o build): Node 22 tem WebSocket nativo.
+  AWS_LAMBDA_JS_RUNTIME = "nodejs22.x"
 
 # Empacotar as dependencias das functions (ex.: @supabase/supabase-js) com esbuild —
 # sem isto o import pode falhar no arranque da lambda (502 "error decoding lambda response").

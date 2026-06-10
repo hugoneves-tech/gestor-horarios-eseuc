@@ -1,5 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
+// O supabase-js >= 2.107 exige WebSocket no arranque (realtime), que nao usamos.
+// Em runtimes sem WebSocket nativo (Node < 22), um stub minimo satisfaz a verificacao.
+if (typeof (globalThis as any).WebSocket === "undefined") {
+  (globalThis as any).WebSocket = class { close() {} send() {} } as any;
+}
+
+
 // Netlify Function: cria utilizadores convidados (@ese.uc.pt) — só admins.
 // Replica /api/admin/convidar do servidor Express, usando a service role key.
 const DOMINIO = "@ese.uc.pt";
