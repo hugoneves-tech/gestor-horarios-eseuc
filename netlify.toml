@@ -10,7 +10,7 @@
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 # Empacotar as dependencias das functions (ex.: @supabase/supabase-js) com esbuild —
 # sem isto o import pode falhar no arranque da lambda (502 "error decoding lambda response").
