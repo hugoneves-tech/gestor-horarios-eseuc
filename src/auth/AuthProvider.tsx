@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseConfigured } from "../data/supabaseClient";
 
@@ -36,6 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [perfilCarregado, setPerfilCarregado] = useState(false);
   const [loading, setLoading] = useState(true);
+  // UID do perfil já carregado. Evita recarregar (e re-montar a app) num refresh de token
+  // do MESMO utilizador, que o Supabase dispara sempre que o separador volta a ter foco.
+  const perfilUidRef = useRef<string | null>(null);
 
   const carregarPerfil = async (uid: string) => {
     setPerfilCarregado(false);
@@ -46,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", uid)
       .maybeSingle();
     setPerfil(data ? { id: data.id, email: data.email, papel: data.papel, isAdmin: !!data.is_admin } : null);
+    perfilUidRef.current = uid;
     setPerfilCarregado(true);
   };
 
@@ -58,9 +62,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
-      setSession(s);
-      if (s?.user) await carregarPerfil(s.user.id);
-      else { setPerfil(null); setPerfilCarregado(true); }
+      setSession(s);  // atualiza sempre o token (silencioso)
+      const uid = s?.user?.id ?? null;
+      if (!uid) { perfilUidRef.current = null; setPerfil(null); setPerfilCarregado(true); return; }
+      // Só recarrega o perfil se o utilizador MUDOU (login novo). Token refresh do mesmo
+      // utilizador (ao voltar ao separador) não mexe em perfilCarregado → app não remonta.
+      if (uid !== perfilUidRef.current) await carregarPerfil(uid);
     });
     return () => sub.subscription.unsubscribe();
   }, []);

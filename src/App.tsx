@@ -90,10 +90,19 @@ export default function App() {
   // - "eseuc_cardoso": Deep Academic Faculty Burgundy / Slate Red
   const [vibe, setVibe] = useState<"eseuc_ouro" | "eseuc_escola" | "eseuc_cardoso">("eseuc_ouro");
 
-  // Global Active Tab Navigation
+  // Global Active Tab Navigation — persistida no browser para manter o local ao recarregar.
   const [activeTab, setActiveTab ] = useState<
     "horario" | "config" | "regras" | "assistant"
-  >("horario");
+  >(() => {
+    try {
+      const v = localStorage.getItem("eseuc_active_tab");
+      if (v === "horario" || v === "config" || v === "regras" || v === "assistant") return v;
+    } catch { /* ignore */ }
+    return "horario";
+  });
+  useEffect(() => {
+    try { localStorage.setItem("eseuc_active_tab", activeTab); } catch { /* ignore */ }
+  }, [activeTab]);
 
   // Domain States (Representing PostgreSQL collections held in reactive memory)
   const [cursos, setCursos] = useState<Curso[]>(cursosIniciais);
