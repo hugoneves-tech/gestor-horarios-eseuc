@@ -698,6 +698,9 @@ export function gerarSessoesConjunto(
   const tpUCs = new Map<string, Set<string>>(); // `${ano}|${week}|${dia}|${hora}` → {ucKey...} (agrupar TP por UC)
   const tpUCCohort = new Map<string, Set<string>>(); // mancha → {`${ucKey}|${meioCohort}`...}
   const plUCs = new Map<string, Set<string>>(); // mancha → {ucKey...} com PL (não misturar PL de UCs diferentes)
+  // mancha → {ucKey...} com PL de QUALQUER pool (inclui salas de computador/MI). Serve só o
+  // conflito de docente partilhado TP↔PL da MESMA UC, que vale para todas as UCs (até MI).
+  const plUCsAll = new Map<string, Set<string>>();
   // Conflito entre UCs (docentes partilhados): não podem estar na mesma mancha.
   const conflitoUC = new Map<string, Set<string>>(); // sigla → {siglas em conflito}
   for (const [a, b] of (opts.ucConflitos || [])) {
@@ -766,6 +769,7 @@ export function gerarSessoesConjunto(
     if (t.tipo === "PL") {
       const k = manchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora, t.salaPool);
       plCount.set(k, (plCount.get(k) || 0) + 1);
+      { let set = plUCsAll.get(smk); if (!set) { set = new Set(); plUCsAll.set(smk, set); } set.add(t.ucKey); }
       if (t.salaPool !== "comp") {
         let set = plUCs.get(smk); if (!set) { set = new Set(); plUCs.set(smk, set); }
         set.add(t.ucKey);
@@ -825,7 +829,7 @@ export function gerarSessoesConjunto(
       const set = tpUCs.get(smk);
       if (!relaxPLuc && set && !(set.size === 1 && set.has(t.ucKey))) return false; // só a mesma UC nas TP
       if ((tpCount.get(smk + "|" + t.ucKey) || 0) >= MAX_TP_POR_UC_MANCHA) return false;
-      if (plUCs.get(smk)?.has(t.ucKey)) return false; // docente partilhado: não com PL da mesma UC
+      if (plUCsAll.get(smk)?.has(t.ucKey)) return false; // docente partilhado: não com PL da mesma UC (inclui MI)
     }
     if (t.tipo === "PL") {
       if ((plCount.get(manchaKey(t.ano, wk.semanaGlobal, dia, hora, t.salaPool)) || 0) >= MAX_PL_POR_POOL[t.salaPool]) return false;
@@ -886,8 +890,9 @@ export function gerarSessoesConjunto(
       }
       pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
       // ALLOW DIFFERENT UCs IN TP BLOCK
-      // Docente partilhado TP↔PL: a TP NÃO pode estar na mancha que já tem PL da MESMA UC.
-      pool = pool.filter(s => !plUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora))?.has(t.ucKey));
+      // Docente partilhado TP↔PL: a TP NÃO pode estar na mancha que já tem PL da MESMA UC
+      // (qualquer turma; inclui MI/salas de computador via plUCsAll).
+      pool = pool.filter(s => !plUCsAll.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora))?.has(t.ucKey));
       // Agrupar TP da MESMA UC, dentro da metade do dia (manhã/tarde). Em semanas com PL
       // desta UC, PARTE-SE em 2+2 (TP1,2 numa mancha; TP3,4 noutra) para caber o par
       // 2TP+6PL (bloco cheio 180); fora dessas semanas, agrupam-se as 4. Nunca outra UC

@@ -9,7 +9,7 @@ export default async (req: Request): Promise<Response> => {
 
   let body: any = {};
   try { body = await req.json(); } catch { /* corpo vazio */ }
-  const { prompt, chatHistory = [], regras = [], ucs = [], docentes = [], salas = [] } = body;
+  const { prompt, chatHistory = [], geminiApiKey = "", regras = [], ucs = [], docentes = [], salas = [] } = body;
 
   if (!prompt || String(prompt).trim() === "") {
     return Response.json({ error: "O campo de prompt é obrigatório." }, { status: 400 });
@@ -48,7 +48,8 @@ Se o pedido NÃO for traduzível nestes parâmetros, devolve a regra com "motor"
   });
   contents.push({ role: "user", parts: [{ text: prompt }] });
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Chave introduzida na app (corpo do pedido) tem prioridade; senão usa a env var do servidor.
+  const apiKey = (typeof geminiApiKey === "string" && geminiApiKey.trim()) || process.env.GEMINI_API_KEY;
   const configurada = apiKey && apiKey !== "MY_GEMINI_API_KEY";
 
   if (!configurada) {

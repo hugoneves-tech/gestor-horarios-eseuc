@@ -94,7 +94,9 @@ app.get("/api/admin/utilizadores", async (req, res) => {
 // Endpoint do assistente IA (Gemini). O motor de horários corre 100% no cliente
 // (src/utils/distribuicao.ts) — não há solver nem SQL no servidor.
 app.post("/api/gemini/chat", async (req, res) => {
-  const { prompt, chatHistory = [], regras = [], ucs = [], docentes = [], salas = [] } = req.body;
+  const { prompt, chatHistory = [], geminiApiKey = "", regras = [], ucs = [], docentes = [], salas = [] } = req.body;
+  // Chave introduzida na app (corpo do pedido) tem prioridade; senão usa a env var do servidor.
+  const reqKey = (typeof geminiApiKey === "string" && geminiApiKey.trim()) || process.env.GEMINI_API_KEY;
 
   if (!prompt || prompt.trim() === "") {
     return res.status(400).json({ error: "O campo de prompt é obrigatório." });
@@ -159,7 +161,7 @@ Se o pedido NÃO for traduzível nestes parâmetros, devolve "motor": {} e expli
       parts: [{ text: prompt }]
     });
 
-    const isApiKeyConfigured = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY";
+    const isApiKeyConfigured = reqKey && reqKey !== "MY_GEMINI_API_KEY";
 
     if (!isApiKeyConfigured) {
       // Graceful fallback description when key is not added
@@ -183,7 +185,9 @@ Pode clicar em "Adicionar Regra" no assistente acima para ativ?-la no motor de o
       return res.json({ text: mockResultText });
     }
 
-    const response = await ai.models.generateContent({
+    // Cliente com a chave efetiva do pedido (recai no cliente global se vier vazia).
+    const aiReq = reqKey ? new GoogleGenAI({ apiKey: reqKey, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } }) : ai;
+    const response = await aiReq.models.generateContent({
       model: "gemini-2.0-flash",
       contents: contents,
       config: {

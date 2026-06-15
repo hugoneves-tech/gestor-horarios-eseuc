@@ -100,3 +100,20 @@ const horasAluno: Record<string, Set<string>> = {};
 for (const s of all) { const ano = anoDe[s.ucSigla]; for (const g of folhas(s.turma)) { const k = `${ano}|${s.semana}|${s.diaSemana}|${g}`; (horasAluno[k] = horasAluno[k] || new Set()).add(s.horaInicio); } }
 for (const k of Object.keys(horasAluno)) if (horasAluno[k].has("12:00") && horasAluno[k].has("14:00")) almoco++;
 console.log(`Violações de almoço (12h+14h): ${almoco}`);
+
+// Regra: nunca TP e PL da MESMA UC (sigla) na mesma mancha (ano|semana|dia|hora),
+// mesmo entre turmas diferentes (docentes partilhados entre a TP e a PL da UC).
+const tipoNaMancha: Record<string, Set<string>> = {};
+for (const s of all) {
+  if (s.tipoAula !== "TP" && s.tipoAula !== "PL") continue;
+  const ano = anoDe[s.ucSigla];
+  const k = `${ano}|${s.semana}|${s.diaSemana}|${s.horaInicio}|${s.ucSigla}`;
+  (tipoNaMancha[k] = tipoNaMancha[k] || new Set()).add(s.tipoAula);
+}
+let tpPlMesmaUC = 0; const exTpPl: string[] = [];
+for (const k of Object.keys(tipoNaMancha)) {
+  const set = tipoNaMancha[k];
+  if (set.has("TP") && set.has("PL")) { tpPlMesmaUC++; if (exTpPl.length < 10) exTpPl.push(k); }
+}
+console.log(`TP+PL da mesma UC no mesmo bloco: ${tpPlMesmaUC}`);
+for (const e of exTpPl) console.log("  ✗ " + e);

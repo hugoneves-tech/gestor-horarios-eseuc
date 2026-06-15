@@ -170,6 +170,18 @@ export default function App() {
   };
   const [editingDocenteId, setEditingDocenteId] = useState<string | null>(null);
   const [editingSalaId, setEditingSalaId] = useState<string | null>(null);
+  // Chave da API Google (Gemini), introduzida na app e guardada no browser (localStorage).
+  // Enviada no corpo de cada pedido /api/gemini/chat; o servidor usa-a (fallback p/ env var).
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    try { return localStorage.getItem("eseuc_gemini_api_key") || ""; } catch { return ""; }
+  });
+  const [showGeminiKeyPanel, setShowGeminiKeyPanel] = useState(false);
+  const [geminiKeyDraft, setGeminiKeyDraft] = useState("");
+  const guardarGeminiKey = (k: string) => {
+    const v = k.trim();
+    setGeminiApiKey(v);
+    try { v ? localStorage.setItem("eseuc_gemini_api_key", v) : localStorage.removeItem("eseuc_gemini_api_key"); } catch { /* ignore */ }
+  };
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1311,6 +1323,9 @@ export default function App() {
       for (const uc of ucs) {
         if (!uc.turmasConfig?.length) continue;
         if (Number(uc.anoCurricular) === 3) continue; // 3.º ano é ensino clínico
+        // Gerar só as UCs do ano selecionado (as regras globais — opcoes — aplicam-se na
+        // mesma a toda a distribuição). Com "todos", entram todas como antes.
+        if (selectedYearFilter !== "todos" && Number(uc.anoCurricular) !== Number(selectedYearFilter)) continue;
 
         const anoSem = anosSemestres.find(s => s.semestre === uc.semestre);
         if (!anoSem?.dataInicioSemestre) continue;
@@ -1379,11 +1394,21 @@ export default function App() {
 
       // Preservar (1) as SEMANAS validadas/bloqueadas inteiras e (2) as sessões fixadas
       // individualmente nas restantes semanas.
+      // Geração por ano: ao gerar um ano específico, as sessões dos OUTROS anos preservam-se
+      // tal como estão (não são tocadas). Com "todos", não há outros anos a preservar.
+      const mesmoAnoGen = (s: SessaoHorario) => {
+        if (selectedYearFilter === "todos") return true;
+        const uc = ucs.find(u => u.sigla === s.ucSigla);
+        return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
+      };
+      const outrosAnos = (activeVersao?.sessoes ?? []).filter(s => !mesmoAnoGen(s));
+
       const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
       const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
-      const sessoesCongeladas = (activeVersao?.sessoes ?? []).filter(ehBloqueada);
-      const fixadas = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !ehBloqueada(s));
+      const sessoesCongeladas = (activeVersao?.sessoes ?? []).filter(s => ehBloqueada(s) && mesmoAnoGen(s));
+      const fixadas = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s));
       const merged: SessaoHorario[] = [
+        ...outrosAnos,                    // anos não selecionados → intactos
         ...sessoesCongeladas,            // semanas validadas → ficam exatamente como estão
         ...fixadas,                       // sessões "fixa" em semanas não bloqueadas
         ...allSessoes.filter(s =>
@@ -1446,6 +1471,7 @@ export default function App() {
         body: JSON.stringify({
           prompt: currentPrompt,
           chatHistory: chatMessages.map(m => ({ role: m.role, content: m.content })),
+          geminiApiKey,
           regras,
           ucs,
           docentes,
@@ -1612,7 +1638,7 @@ export default function App() {
       const prompt = `Regra atual (JSON): ${JSON.stringify({ nome: tutorRegra.nome, tipo: tutorRegra.tipo, categoria: tutorRegra.categoria, escopo: tutorRegra.escopo, anoCurricular: tutorRegra.anoCurricular, descricao: tutorRegra.descricao, peso: tutorRegra.peso })}.\nPedido do utilizador: ${pedido}\nValida e/ou melhora esta regra de horário académico, de forma clara e sucinta. Se sugerires uma nova versão da regra, devolve-a no bloco [REGRA_DETETADA]...[FIM_REGRA].`;
       const resp = await fetch("/api/gemini/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, chatHistory: [], regras, ucs, docentes, salas }),
+        body: JSON.stringify({ prompt, chatHistory: [], geminiApiKey, regras, ucs, docentes, salas }),
       });
       const data = await resp.json();
       setTutorResposta(data.text || data.error || "Sem resposta do tutor.");
@@ -5591,7 +5617,16 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${geminiApiKey ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {geminiApiKey ? "✓ Chave configurada" : "Sem chave — modo demonstração"}
+                  </span>
+                  <button
+                    onClick={() => { setGeminiKeyDraft(geminiApiKey); setShowGeminiKeyPanel(v => !v); }}
+                    className="px-2.5 py-1 hover:bg-stone-200 text-stone-600 rounded-lg text-[10px] font-semibold border border-stone-200 flex items-center gap-1"
+                  >
+                    <Settings className="w-3 h-3" /> Chave API
+                  </button>
                   <button
                     onClick={() => {
                       setChatMessages([
@@ -5609,6 +5644,36 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
+              {showGeminiKeyPanel && (
+                <div className="p-4 border-b border-stone-100 bg-amber-50/40 space-y-2">
+                  <label className="text-[10px] font-bold text-stone-700 block">Chave da API Google (Gemini)</label>
+                  <p className="text-[9px] text-stone-500 leading-snug">
+                    Cola a tua chave do Google AI Studio. Fica guardada apenas neste browser e é usada para o assistente responder com IA real. Sem chave, o assistente fica em modo de demonstração.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="password"
+                      value={geminiKeyDraft}
+                      onChange={(e) => setGeminiKeyDraft(e.target.value)}
+                      placeholder="AIza…"
+                      className="flex-1 min-w-[200px] px-2.5 py-1.5 border border-stone-300 rounded-lg text-[11px] font-mono"
+                    />
+                    <button
+                      onClick={() => { guardarGeminiKey(geminiKeyDraft); setShowGeminiKeyPanel(false); showToast("Chave Gemini guardada neste browser."); }}
+                      className="px-3 py-1.5 bg-stone-900 text-white hover:bg-stone-800 font-bold rounded-lg text-[10px]"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      onClick={() => { guardarGeminiKey(""); setGeminiKeyDraft(""); showToast("Chave Gemini removida."); }}
+                      className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Discussion thread logs */}
               <div className="flex-1 p-4 overflow-y-auto space-y-4">
