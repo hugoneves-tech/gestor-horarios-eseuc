@@ -1,7 +1,6 @@
 ﻿import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
@@ -11,16 +10,6 @@ const app = express();
 app.use(express.json());
 
 const PORT = 3000;
-
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "dummy_key",
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
 
 // ---------------------------------------------------------------------------
 // Cliente Supabase ADMIN (service role) — SÓ no servidor, NUNCA exposto ao cliente.
@@ -185,21 +174,28 @@ Pode clicar em "Adicionar Regra" no assistente acima para ativ?-la no motor de o
       return res.json({ text: mockResultText });
     }
 
-    // Cliente com a chave efetiva do pedido (recai no cliente global se vier vazia).
-    const aiReq = reqKey ? new GoogleGenAI({ apiKey: reqKey, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } }) : ai;
-    const response = await aiReq.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: contents,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      },
+    // Chamada REST direta (chave em ?key=), igual à Netlify Function — evita o caminho de
+    // auth do SDK que dava 401. fetch nativo (Node 18+).
+    const model = "gemini-2.0-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(reqKey as string)}`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents,
+        generationConfig: { temperature: 0.7 },
+      }),
     });
-
-    res.json({ text: response.text });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      return res.status(500).json({ error: `Gemini ${r.status}: ${j?.error?.message || JSON.stringify(j)}` });
+    }
+    const text = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || "").join("");
+    res.json({ text });
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    res.status(500).json({ error: "Erro ao comunicar com o Assistente Gemini: " + error.message });
+    res.status(500).json({ error: "Erro ao comunicar com o Assistente Gemini: " + (error?.message || String(error)) });
   }
 });
 

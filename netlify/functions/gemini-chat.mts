@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 // Netlify Function que replica o endpoint Express /api/gemini/chat.
 // Responde em modo de demonstração se GEMINI_API_KEY não estiver configurada.
 export default async (req: Request): Promise<Response> => {
@@ -63,15 +61,27 @@ Clica em "Aceitar e Ativar Regra" para a gravar.`;
     return Response.json({ text: texto });
   }
 
+  // Chamada REST direta à Gemini Developer API (chave em ?key=). Evita o SDK @google/genai,
+  // que no runtime das functions cai num caminho de auth (Vertex/OAuth) → 401. fetch nativo (Node 22).
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents,
-      config: { systemInstruction, temperature: 0.7 },
+    const model = "gemini-2.0-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey as string)}`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents,
+        generationConfig: { temperature: 0.7 },
+      }),
     });
-    return Response.json({ text: response.text });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      return Response.json({ error: `Gemini ${r.status}: ${j?.error?.message || JSON.stringify(j)}` }, { status: 500 });
+    }
+    const text = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || "").join("");
+    return Response.json({ text });
   } catch (error: any) {
-    return Response.json({ error: "Erro ao comunicar com o Gemini: " + error.message }, { status: 500 });
+    return Response.json({ error: "Erro ao comunicar com o Gemini: " + (error?.message || String(error)) }, { status: 500 });
   }
 };
