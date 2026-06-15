@@ -195,6 +195,17 @@ export default function App() {
     setGeminiApiKey(v);
     try { v ? localStorage.setItem("eseuc_gemini_api_key", v) : localStorage.removeItem("eseuc_gemini_api_key"); } catch { /* ignore */ }
   };
+  // Modelo Gemini a usar (configurável na app, sem precisar de deploy). O tier gratuito de
+  // alguns modelos (ex.: gemini-2.0-flash) está a 0 — daí ser editável.
+  const GEMINI_MODELO_DEFAULT = "gemini-2.5-flash";
+  const [geminiModel, setGeminiModel] = useState<string>(() => {
+    try { return localStorage.getItem("eseuc_gemini_model") || GEMINI_MODELO_DEFAULT; } catch { return GEMINI_MODELO_DEFAULT; }
+  });
+  const guardarGeminiModel = (m: string) => {
+    const v = m.trim() || GEMINI_MODELO_DEFAULT;
+    setGeminiModel(v);
+    try { localStorage.setItem("eseuc_gemini_model", v); } catch { /* ignore */ }
+  };
   // Importação de horário externo (Excel/CSV): sessões lidas, erros de linha e relatório.
   const [sessoesImportadas, setSessoesImportadas] = useState<SessaoHorario[] | null>(null);
   const [errosImport, setErrosImport] = useState<ErroLinha[]>([]);
@@ -1542,6 +1553,7 @@ export default function App() {
           prompt: currentPrompt,
           chatHistory: chatMessages.map(m => ({ role: m.role, content: m.content })),
           geminiApiKey,
+          geminiModel,
           regras,
           ucs,
           docentes,
@@ -1708,7 +1720,7 @@ export default function App() {
       const prompt = `Regra atual (JSON): ${JSON.stringify({ nome: tutorRegra.nome, tipo: tutorRegra.tipo, categoria: tutorRegra.categoria, escopo: tutorRegra.escopo, anoCurricular: tutorRegra.anoCurricular, descricao: tutorRegra.descricao, peso: tutorRegra.peso })}.\nPedido do utilizador: ${pedido}\nValida e/ou melhora esta regra de horário académico, de forma clara e sucinta. Se sugerires uma nova versão da regra, devolve-a no bloco [REGRA_DETETADA]...[FIM_REGRA].`;
       const resp = await fetch("/api/gemini/chat", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, chatHistory: [], geminiApiKey, regras, ucs, docentes, salas }),
+        body: JSON.stringify({ prompt, chatHistory: [], geminiApiKey, geminiModel, regras, ucs, docentes, salas }),
       });
       const data = await resp.json();
       setTutorResposta(data.text || data.error || "Sem resposta do tutor.");
@@ -5804,6 +5816,20 @@ export default function App() {
                       Limpar
                     </button>
                   </div>
+
+                  <label className="text-[10px] font-bold text-stone-700 block pt-1">Modelo</label>
+                  <p className="text-[9px] text-stone-500 leading-snug">
+                    Se um modelo der erro de quota (429), experimenta outro. Modelos <em>preview</em> e 3.x podem exigir billing ativo no Google; o <strong>2.5 Flash</strong> costuma ter tier gratuito.
+                  </p>
+                  <select
+                    value={geminiModel}
+                    onChange={(e) => { guardarGeminiModel(e.target.value); showToast(`Modelo: ${e.target.value}`); }}
+                    className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-[11px] font-mono bg-white"
+                  >
+                    {["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+                      .concat([geminiModel].filter(m => ![ "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"].includes(m)))
+                      .map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
                 </div>
               )}
 

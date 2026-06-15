@@ -7,7 +7,7 @@ export default async (req: Request): Promise<Response> => {
 
   let body: any = {};
   try { body = await req.json(); } catch { /* corpo vazio */ }
-  const { prompt, chatHistory = [], geminiApiKey = "", regras = [], ucs = [], docentes = [], salas = [] } = body;
+  const { prompt, chatHistory = [], geminiApiKey = "", geminiModel = "", regras = [], ucs = [], docentes = [], salas = [] } = body;
 
   if (!prompt || String(prompt).trim() === "") {
     return Response.json({ error: "O campo de prompt é obrigatório." }, { status: 400 });
@@ -64,7 +64,7 @@ Clica em "Aceitar e Ativar Regra" para a gravar.`;
   // Chamada REST direta à Gemini Developer API (chave em ?key=). Evita o SDK @google/genai,
   // que no runtime das functions cai num caminho de auth (Vertex/OAuth) → 401. fetch nativo (Node 22).
   try {
-    const model = "gemini-2.0-flash";
+    const model = (typeof geminiModel === "string" && geminiModel.trim()) || "gemini-2.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey as string)}`;
     const r = await fetch(url, {
       method: "POST",

@@ -83,7 +83,7 @@ app.get("/api/admin/utilizadores", async (req, res) => {
 // Endpoint do assistente IA (Gemini). O motor de horários corre 100% no cliente
 // (src/utils/distribuicao.ts) — não há solver nem SQL no servidor.
 app.post("/api/gemini/chat", async (req, res) => {
-  const { prompt, chatHistory = [], geminiApiKey = "", regras = [], ucs = [], docentes = [], salas = [] } = req.body;
+  const { prompt, chatHistory = [], geminiApiKey = "", geminiModel = "", regras = [], ucs = [], docentes = [], salas = [] } = req.body;
   // Chave introduzida na app (corpo do pedido) tem prioridade; senão usa a env var do servidor.
   const reqKey = (typeof geminiApiKey === "string" && geminiApiKey.trim()) || process.env.GEMINI_API_KEY;
 
@@ -176,7 +176,7 @@ Pode clicar em "Adicionar Regra" no assistente acima para ativ?-la no motor de o
 
     // Chamada REST direta (chave em ?key=), igual à Netlify Function — evita o caminho de
     // auth do SDK que dava 401. fetch nativo (Node 18+).
-    const model = "gemini-2.0-flash";
+    const model = (typeof geminiModel === "string" && geminiModel.trim()) || "gemini-2.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(reqKey as string)}`;
     const r = await fetch(url, {
       method: "POST",
