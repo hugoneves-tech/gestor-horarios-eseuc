@@ -78,6 +78,8 @@ import { TechnicalArchitecture } from "./components/TechnicalArchitecture";
 import { ConfiguracaoCalendario } from "./components/ConfiguracaoCalendario";
 import { AdminConvites } from "./auth/AdminConvites";
 import { gerarSessoesConjunto, calcularSemanas, type EntradaUC } from "./utils/distribuicao";
+import { parseHorarioCSV, gerarTemplateCSV, type ErroLinha } from "./utils/importacao";
+import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
 import { repo } from "./data/supabaseRepo";
 import { dadosIniciais } from "./data/seed";
 
@@ -139,6 +141,17 @@ export default function App() {
     return `${start.getDate()} a ${end.getDate()} de ${months[end.getMonth()]}`;
   };
 
+  // Rótulo de VISUALIZAÇÃO das turmas: Turma A→T1, Turma B→T2, com a derivação (TP/PL) e a
+  // turma-mãe (ex.: "T1 · TP1", "T2 · PL13"). Só no ecrã — os dados, o motor e os exports
+  // (CSV/iCal) mantêm "Turma A"/"Turma B"/TPn/PLn para não partir lógica nem o round-trip do import.
+  const rotuloTurma = (turma: string): string => {
+    if (turma === "Turma A") return "T1";
+    if (turma === "Turma B") return "T2";
+    const tp = turma.match(/^TP(\d+)$/); if (tp) return `${+tp[1] <= 4 ? "T1" : "T2"} · TP${tp[1]}`;
+    const pl = turma.match(/^PL(\d+)$/); if (pl) return `${+pl[1] <= 12 ? "T1" : "T2"} · PL${pl[1]}`;
+    return turma;
+  };
+
   // Modals / Creators Form State
   const [showDuplicarSemestreModal, setShowDuplicarSemestreModal] = useState(false);
   const [newSemesterName, setNewSemesterName] = useState("2026/2027");
@@ -182,6 +195,11 @@ export default function App() {
     setGeminiApiKey(v);
     try { v ? localStorage.setItem("eseuc_gemini_api_key", v) : localStorage.removeItem("eseuc_gemini_api_key"); } catch { /* ignore */ }
   };
+  // Importação de horário externo (Excel/CSV): sessões lidas, erros de linha e relatório.
+  const [sessoesImportadas, setSessoesImportadas] = useState<SessaoHorario[] | null>(null);
+  const [errosImport, setErrosImport] = useState<ErroLinha[]>([]);
+  const [relatorioImport, setRelatorioImport] = useState<RelatorioValidacao | null>(null);
+  const [nomeFicheiroImport, setNomeFicheiroImport] = useState("");
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1303,7 +1321,7 @@ export default function App() {
 
   // Distribuição local pelas 30 semanas letivas usando o motor de distribuição (distribuicao.ts).
   // S1 = semanas 1-15; S2 = semanas 16-30 (offset +15 aplicado automaticamente).
-  const handleTriggerSolver = (semRegras = false) => {
+  const handleTriggerSolver = (semRegras = false, sessoesFixasImport: SessaoHorario[] = []) => {
     setIsSolving(true);
     setLastSolverVerdict(null);
 
@@ -1371,6 +1389,13 @@ export default function App() {
         if (Array.isArray(m.semanasSoTurmaA) && m.semanasSoTurmaA.length) motorAI.semanasSoTurmaA = m.semanasSoTurmaA.map(Number);
         if (Array.isArray(m.semanasSoTurmaB) && m.semanasSoTurmaB.length) motorAI.semanasSoTurmaB = m.semanasSoTurmaB.map(Number);
       }
+      // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
+      // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
+      // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
+      const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
+      const fixasExistentes = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
+      const sessoesFixas = [...sessoesFixasImport, ...fixasExistentes];
+
       const opcoes = {
         plDiasPermitidos: motorAI.plDiasPermitidos ?? (regraPLDias
           ? (regraPLDias.config?.diasPermitidos ?? ["Quarta", "Quinta", "Sexta"])
@@ -1379,12 +1404,15 @@ export default function App() {
         maxTPporMancha: motorAI.maxTPporMancha ?? null,
         prefTurmaAManha,
         ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
-        // Estrutura ESEUC: 8-15 só Turma B (Turma A em estágio); 16-23 só Turma A. Tudo de manhã.
-        semanasSoTurmaB: motorAI.semanasSoTurmaB ?? Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
-        semanasSoTurmaA: motorAI.semanasSoTurmaA ?? Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
+        // Estrutura ESEUC: 8-15 só T1 (Turma A) presente, UCs "-I"; 16-23 só T2 (Turma B), UCs
+        // "-II". Tudo de manhã. Assim T1 está de manhã nas semanas 1-15 e T2 nas 16-30.
+        semanasSoTurmaA: motorAI.semanasSoTurmaA ?? Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
+        semanasSoTurmaB: motorAI.semanasSoTurmaB ?? Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
         // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
         // tarde e o espaço para almoço (e o teto de 8h). Para comparar cenários.
         semRegras,
+        // v2: sessões fixas (importadas/pins) — o motor completa à volta delas.
+        sessoesFixas,
       };
 
       // Schedule each semester fairly across its UCs (round-robin per week).
@@ -1410,6 +1438,7 @@ export default function App() {
       const merged: SessaoHorario[] = [
         ...outrosAnos,                    // anos não selecionados → intactos
         ...sessoesCongeladas,            // semanas validadas → ficam exatamente como estão
+        ...sessoesFixasImport.map(s => ({ ...s, bloqueado: true })),  // v2: importadas (fixas)
         ...fixadas,                       // sessões "fixa" em semanas não bloqueadas
         ...allSessoes.filter(s =>
           !ehBloqueada(s) &&              // descarta as novas das semanas congeladas
@@ -1448,6 +1477,47 @@ export default function App() {
     }
   };
 
+  // --- Importação de horário externo (Excel/CSV) -------------------------------------
+  const descarregarTemplate = () => {
+    const blob = new Blob([gerarTemplateCSV()], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "template_horario_eseuc.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const onFicheiroImport = async (file: File | null) => {
+    if (!file) return;
+    setNomeFicheiroImport(file.name);
+    try {
+      let texto: string;
+      if (/\.xlsx?$/i.test(file.name)) {
+        // Excel nativo: 1.ª folha → CSV (delimitador ';') e reaproveita o parser de CSV.
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        texto = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]], { FS: ";" });
+      } else {
+        texto = await file.text();
+      }
+      const { sessoes, erros } = parseHorarioCSV(texto, ucs);
+      setErrosImport(erros);
+      setSessoesImportadas(sessoes);
+      setRelatorioImport(sessoes.length ? validarHorario(sessoes, ucs) : null);
+    } catch (e: any) {
+      setErrosImport([{ linha: 0, motivo: "Não foi possível ler o ficheiro: " + (e?.message || e), conteudo: "" }]);
+      setSessoesImportadas(null); setRelatorioImport(null);
+    }
+  };
+  const limparImport = () => {
+    setSessoesImportadas(null); setErrosImport([]); setRelatorioImport(null); setNomeFicheiroImport("");
+  };
+  const confirmarImportacao = () => {
+    if (!sessoesImportadas?.length) return;
+    // Semeia as sessões importadas como fixas e deixa o motor completar à volta delas,
+    // gravando na versão ativa (o horário externo passa a base do ano selecionado).
+    handleTriggerSolver(false, sessoesImportadas);
+    showToast(`${sessoesImportadas.length} sessões importadas; o motor completou à volta.`);
+    limparImport();
+  };
+
   // Handles Gemini custom chat messages safely converting SQL-less prompts
   const handleSendAiMessage = async () => {
     if (!aiPrompt.trim()) return;
@@ -1484,7 +1554,7 @@ export default function App() {
       const assistantMessage: ChatMessage = {
         id: "a_" + Date.now(),
         role: "assistant",
-        content: data.text || "Sem resposta do assistente inteligente.",
+        content: data.text || (data.error ? "⚠️ " + data.error : "Sem resposta do assistente inteligente."),
         timestamp: new Date().toISOString()
       };
 
@@ -3366,7 +3436,7 @@ export default function App() {
                             <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm bg-stone-100 text-stone-600">
                               {s.tipoAula}
                             </span>
-                            <span className="text-stone-500">• {s.ucNome} (Turma: {s.turma})</span>
+                            <span className="text-stone-500">• {s.ucNome} (Turma: {rotuloTurma(s.turma)})</span>
                           </div>
                           <div className="text-stone-500 flex items-center gap-3 font-light text-[11px]">
                             <span className="flex items-center gap-1">
@@ -3552,7 +3622,7 @@ export default function App() {
                                 <div className="space-y-0.5 pl-1.5 border-l border-stone-800">
                                   {diaSess.map(ds => (
                                     <div key={ds.id} className="text-[9px] text-zinc-350 leading-relaxed">
-                                      <span className="font-semibold text-white">{ds.horaInicio}</span> - <span className="text-zinc-200 font-medium">{ds.ucSigla}</span> <span className="font-mono text-[7.5px] bg-stone-850 text-stone-400 px-1 rounded">{ds.turmaDescr || ds.turma}</span>
+                                      <span className="font-semibold text-white">{ds.horaInicio}</span> - <span className="text-zinc-200 font-medium">{ds.ucSigla}</span> <span className="font-mono text-[7.5px] bg-stone-850 text-stone-400 px-1 rounded">{rotuloTurma(ds.turmaDescr || ds.turma)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -3626,7 +3696,7 @@ export default function App() {
                           win.document.write(`<tr><td class="slot-hora">${bloco.start}–${bloco.end}</td>`);
                           diasSemanaisP.forEach(dia => {
                             const slotSess = allSessoes.filter(s => s.semana === w && s.diaSemana === dia && s.horaInicio === bloco.start);
-                            win.document.write(`<td>${slotSess.map(s => `<div class="card card-${s.tipoAula.toLowerCase()}"><strong>${s.ucSigla}</strong> (${s.tipoAula}) ${s.turma}</div>`).join("")}</td>`);
+                            win.document.write(`<td>${slotSess.map(s => `<div class="card card-${s.tipoAula.toLowerCase()}"><strong>${s.ucSigla}</strong> (${s.tipoAula}) ${rotuloTurma(s.turma)}</div>`).join("")}</td>`);
                           });
                           win.document.write(`</tr>`);
                         });
@@ -3689,6 +3759,68 @@ export default function App() {
                       </button>
                     </div>
                   )}
+
+                  {/* Importar horário feito fora da plataforma (Excel/CSV) */}
+                  {selectedYearFilter !== "todos" && (
+                    <div className="mt-3 border border-dashed border-stone-300 rounded-xl p-3 bg-stone-50/40 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                          <p className="text-[11px] font-bold text-stone-700">Importar horário externo (Excel/CSV)</p>
+                          <p className="text-[9px] text-stone-500">Carrega o horário do {selectedYearFilter}.º ano feito fora; é validado e o motor completa à volta das sessões importadas.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={descarregarTemplate}
+                            className="px-2.5 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 text-[10px]">
+                            <Download className="w-3 h-3" /> Template
+                          </button>
+                          <label className="px-2.5 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 text-[10px] cursor-pointer">
+                            <Upload className="w-3 h-3" /> Escolher ficheiro
+                            <input type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden"
+                              onChange={(e) => { onFicheiroImport(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                          </label>
+                        </div>
+                      </div>
+
+                      {nomeFicheiroImport && (
+                        <div className="text-[10px] text-stone-600 bg-white rounded-lg border border-stone-200 p-2 space-y-1.5">
+                          <p className="font-semibold">{nomeFicheiroImport}</p>
+                          <p>{sessoesImportadas?.length || 0} linha(s) válida(s){errosImport.length ? ` · ${errosImport.length} com erro` : ""}.</p>
+
+                          {relatorioImport && (
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9.5px]">
+                              <span className={relatorioImport.sobreposicoes ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.sobreposicoes ? "✗" : "✓"} Sobreposições: {relatorioImport.sobreposicoes}</span>
+                              <span className={relatorioImport.excedeu8h ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excedeu8h ? "✗" : "✓"} Máx/dia: {relatorioImport.maxBlocosDia * 2}h</span>
+                              <span className={relatorioImport.violacoesAlmoco ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesAlmoco ? "✗" : "✓"} Almoço: {relatorioImport.violacoesAlmoco}</span>
+                              <span className={relatorioImport.violacoesCronologia.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesCronologia.length ? "✗" : "✓"} Cronologia: {relatorioImport.violacoesCronologia.length}</span>
+                              <span className={relatorioImport.tpPlMesmaUC.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.tpPlMesmaUC.length ? "✗" : "✓"} TP+PL mesma UC: {relatorioImport.tpPlMesmaUC.length}</span>
+                              <span className="text-stone-600">Completude: {relatorioImport.completude.pct}%</span>
+                            </div>
+                          )}
+
+                          {errosImport.length > 0 && (
+                            <details className="text-[9px] text-red-700">
+                              <summary className="cursor-pointer font-semibold">Ver {errosImport.length} erro(s) de linha</summary>
+                              <ul className="mt-1 space-y-0.5 max-h-28 overflow-y-auto">
+                                {errosImport.slice(0, 30).map((er, i) => (
+                                  <li key={i}>Linha {er.linha}: {er.motivo}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button onClick={confirmarImportacao} disabled={isSolving || !sessoesImportadas?.length}
+                              className="px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 disabled:opacity-40 text-[10px]">
+                              <Zap className="w-3 h-3 text-amber-300" /> Importar e Completar
+                            </button>
+                            <button onClick={limparImport} className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]">
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
@@ -3709,7 +3841,7 @@ export default function App() {
                   <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
                     Preferência da turma teórica (manhã / tarde) por ano do CLE
                   </span>
-                  <span className="text-[9px] text-indigo-500/80 font-mono">Turma A = período indicado · Turma B = oposto</span>
+                  <span className="text-[9px] text-indigo-500/80 font-mono">T1 (Turma A) = período indicado · T2 (Turma B) = oposto</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[1, 2, 3, 4].map(ano => (
@@ -3989,7 +4121,7 @@ export default function App() {
                                       </div>
 
                                       <div className="text-[9px] font-bold leading-none truncate mt-0.5 text-black">
-                                        {sessao.turma}
+                                        {rotuloTurma(sessao.turma)}
                                       </div>
 
                                       <div className="text-[8px] opacity-80 mt-0.5 truncate leading-none flex items-center gap-1">
@@ -4037,8 +4169,8 @@ export default function App() {
                   const tc = u.turmasConfig || [];
                   let nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length;
                   const nS = tc.filter(t => t.tipo === "Seminário").length;
-                  // UCs de bloco do 2.º ano ("-I" só Turma B, "-II" só Turma A): apenas
-                  // metade das turmas frequenta — o alvo conta só a família presente.
+                  // UCs de bloco do 2.º ano ("-I" só T1/Turma A nas sem. 8-15, "-II" só T2/Turma B
+                  // nas 16-23): apenas metade das turmas frequenta — o alvo conta só a presente.
                   if (Number(u.anoCurricular) === 2 && /-(I|II)$/.test(u.sigla)) { nT = Math.ceil(nT / 2); nTP = nTP / 2; nPL = nPL / 2; }
                   alvo += Math.floor((u.cargaHorariaTeorica || 0) / 2) * nT + Math.floor((u.cargaHorariaTP || 0) / 2) * nTP + Math.floor((u.cargaHorariaPratica || 0) / 2) * nPL + Math.floor((u.cargaHorariaS || 0) / 2) * nS;
                 }
@@ -4088,7 +4220,7 @@ export default function App() {
                           const horas = dias.map(d => horasTurmaDia(row.g, d));
                           return (
                             <tr key={row.n} className="border-t border-stone-150">
-                              <td className="py-1 font-bold text-stone-700">{row.n}</td>
+                              <td className="py-1 font-bold text-stone-700">{rotuloTurma(row.n)}</td>
                               {horas.map((h, i) => <td key={i} className={`text-center font-mono ${corH(h)}`}>{h ? h + "h" : "·"}</td>)}
                               <td className="text-center font-mono font-bold text-stone-800">{horas.reduce((a, b) => a + b, 0)}h</td>
                             </tr>

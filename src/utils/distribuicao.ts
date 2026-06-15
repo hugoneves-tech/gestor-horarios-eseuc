@@ -588,6 +588,10 @@ export interface OpcoesDistribuicao {
   // conflitos de UC, T só em certos dias, etc.). Mantém APENAS a distribuição pelos turnos
   // da tarde e o espaço para almoço (mais o teto de 8h e não duplicar a mesma turma).
   semRegras?: boolean;
+  // Sessões FIXAS (importadas de fora ou fixadas manualmente): o motor semeia-as como
+  // ocupação/conflitos e desconta a carga já satisfeita, gerando só o que falta À VOLTA
+  // delas. NÃO são devolvidas no output (quem chama preserva-as). Filtradas por semestre.
+  sessoesFixas?: SessaoHorario[];
 }
 
 export function gerarSessoesConjunto(
@@ -747,8 +751,9 @@ export function gerarSessoesConjunto(
     return (i > 0 && set.has(TODOS_PERIODOS[i - 1])) || (i < 5 && set.has(TODOS_PERIODOS[i + 1]));
   };
 
-  // Regista efetivamente uma sessão num slot (toda a contabilidade do motor).
-  const commit = (t: Task, wk: WeekRef, slot: Slot) => {
+  // Atualiza TODA a contabilidade do motor para uma sessão neste slot (ocupação, conflitos,
+  // cronologia, carga diária, espelho). Partilhado por commit (geração) e seedFixa (fixas).
+  const registar = (t: Task, wk: WeekRef, slot: Slot) => {
     registarSlot(ocupacao, t.ano, wk.semanaGlobal, t.turmaNome, slot.dia, slot.hora);
     const smk = tpManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora);
     let sset = siglaMancha.get(smk); if (!sset) { sset = new Set(); siglaMancha.set(smk, sset); }
@@ -796,6 +801,11 @@ export function gerarSessoesConjunto(
       let es = espelho.get(ek); if (!es) { es = new Set(); espelho.set(ek, es); }
       es.add(`${slot.dia}|${slot.hora}`);
     }
+  };
+
+  // Coloca e CONTABILIZA uma sessão gerada (adiciona-a ao output).
+  const commit = (t: Task, wk: WeekRef, slot: Slot) => {
+    registar(t, wk, slot);
     t.placed++;
     const s = getStat(statKeyOf(t));
     if (t.tipo === "T") s.placedT++; else if (t.tipo === "TP") s.placedTP++; else if (t.tipo === "PL") s.placedPL++;
@@ -805,6 +815,18 @@ export function gerarSessoesConjunto(
       turma: t.turmaNome, diaSemana: slot.dia, horaInicio: slot.hora,
       horaFim: addHours(slot.hora, 2), bloqueado: false, semana: wk.semanaGlobal,
     });
+  };
+
+  // Semeia uma sessão FIXA (importada/fixada): regista a sua ocupação/conflitos e desconta
+  // 1 bloco da carga a gerar dessa (UC, turma, tipo). NÃO entra no output (quem chama
+  // preserva as fixas). Assim o motor gera só o que falta, à volta das fixas.
+  const seedFixa = (t: Task, wk: WeekRef, slot: Slot) => {
+    registar(t, wk, slot);
+    if (t.total > 0) t.total--;
+    const s = getStat(statKeyOf(t));
+    if (t.tipo === "T") { if (s.totalT > 0) s.totalT--; }
+    else if (t.tipo === "TP") { if (s.totalTP > 0) s.totalTP--; }
+    else if (t.tipo === "PL") { if (s.totalPL > 0) s.totalPL--; }
   };
 
   // Colocação FORÇADA num slot específico (para a passagem de "encher blocos extra"),
@@ -1088,6 +1110,19 @@ export function gerarSessoesConjunto(
       if (!placedOne) exhausted.add(best);
     }
   };
+
+  // SEMEADURA de sessões FIXAS (importadas/fixadas): regista a sua ocupação/conflitos e
+  // desconta a carga ANTES de gerar, para o motor preencher só o que falta À VOLTA delas.
+  // Passa-se a lista completa; cada chamada (semestre) só semeia as fixas das suas semanas.
+  if (opts.sessoesFixas?.length) {
+    const semanasDesteSem = new Set(tasks.flatMap(t => t.weeks.map(w => w.semanaGlobal)));
+    for (const f of opts.sessoesFixas) {
+      if (f.semana == null || !semanasDesteSem.has(f.semana)) continue; // outra metade do ano
+      const t = tasks.find(x => x.ucSigla === f.ucSigla && x.tipo === f.tipoAula && x.turmaNome === f.turma);
+      if (!t) continue; // UC/turma/tipo sem tarefa correspondente → ignorada (reportado fora)
+      seedFixa(t, { semanaGlobal: f.semana, diasBloqueados: [] }, { dia: f.diaSemana, hora: f.horaInicio });
+    }
+  }
 
   const allWeeks = [...new Set(tasks.flatMap(t => t.weeks.map(w => w.semanaGlobal)))].sort((a, b) => a - b);
   // Chronological: each week lays T, then the gated TP, then the gated PL.

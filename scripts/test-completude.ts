@@ -29,8 +29,9 @@ for (const sem of [1, 2] as const) {
 }
 const opts = {
   maxTPporMancha: null, ucConflitos: [["ESDAC", "EIG"]],
-  semanasSoTurmaB: [8, 9, 10, 11, 12, 13, 14, 15],
-  semanasSoTurmaA: [16, 17, 18, 19, 20, 21, 22, 23],
+  // 8-15 só T1 (Turma A) presente; 16-23 só T2 (Turma B). T1 de manhã nas 1-15, T2 nas 16-30.
+  semanasSoTurmaA: [8, 9, 10, 11, 12, 13, 14, 15],
+  semanasSoTurmaB: [16, 17, 18, 19, 20, 21, 22, 23],
   diasBloqueadosPorSemana,
   plPendentesEntreSemestres: [],
 } as any;
@@ -117,3 +118,48 @@ for (const k of Object.keys(tipoNaMancha)) {
 }
 console.log(`TP+PL da mesma UC no mesmo bloco: ${tpPlMesmaUC}`);
 for (const e of exTpPl) console.log("  ✗ " + e);
+
+// Diagnóstico de turnos: que família está presente (e quantos blocos à tarde) por bloco.
+const famDe = (t: string): "A" | "B" => {
+  if (t === "Turma A") return "A"; if (t === "Turma B") return "B";
+  const tp = t.match(/^TP(\d+)$/); if (tp) return +tp[1] <= 4 ? "A" : "B";
+  const pl = t.match(/^PL(\d+)$/); if (pl) return +pl[1] <= 12 ? "A" : "B";
+  return "A";
+};
+const ehManha = (h: string) => ["08:00", "10:00", "12:00"].includes(h);
+const resumoBloco = (lo: number, hi: number) => {
+  const ss = all.filter(s => s.semana! >= lo && s.semana! <= hi);
+  const fams = [...new Set(ss.map(s => famDe(s.turma)))].sort().join(",");
+  const tarde = ss.filter(s => !ehManha(s.horaInicio)).length;
+  return `famílias={${fams}} · ${ss.length} blocos · ${tarde} à tarde`;
+};
+console.log(`\n[turnos] sem 8-15  → ${resumoBloco(8, 15)}   (esperado só T1=A, 0 à tarde)`);
+console.log(`[turnos] sem 16-23 → ${resumoBloco(16, 23)}   (esperado só T2=B, 0 à tarde)`);
+const t1TardeS1 = all.filter(s => s.semana! >= 2 && s.semana! <= 7 && famDe(s.turma) === "A" && !ehManha(s.horaInicio)).length;
+const t2TardeS2 = all.filter(s => s.semana! >= 24 && s.semana! <= 30 && famDe(s.turma) === "B" && !ehManha(s.horaInicio)).length;
+console.log(`[turnos] sem 2-7: T1(A) à tarde = ${t1TardeS1} (esperado 0)  |  sem 24-30: T2(B) à tarde = ${t2TardeS2} (esperado 0)`);
+
+// === v2: SEMEADURA de sessões fixas — o motor gera só o que falta, à volta delas ========
+function gerarComFixas(fixas: any[]) {
+  const oc2 = new Set<string>(), pc2 = new Map<string, number>();
+  const o = { ...opts, sessoesFixas: fixas };
+  const g1 = gerarSessoesConjunto(build(1) as any, 1, 0, oc2, pc2, o);
+  const g2 = gerarSessoesConjunto(build(2) as any, 2, g1.length, oc2, pc2, o);
+  return [...g1, ...g2];
+}
+const sobreposicoes = (lst: any[]) => {
+  const occ2 = new Set<string>(); let dup = 0;
+  for (const s of lst) { const ano = anoDe[s.ucSigla]; for (const g of folhas(s.turma)) {
+    const k = `${ano}|${s.semana}|${s.diaSemana}|${s.horaInicio}|${g}`;
+    if (occ2.has(k)) dup++; else occ2.add(k);
+  } }
+  return dup;
+};
+// (1) TODAS as sessões como fixas → o motor não deve gerar praticamente nada.
+const genTodas = gerarComFixas(all);
+console.log(`\n[v2] Fixas = TODAS → o motor gerou ${genTodas.length} blocos (esperado 0).`);
+// (2) METADE fixa → gerado + fixas deve cobrir tudo, sem sobreposições de aluno.
+const metade = all.filter((_, i) => i % 2 === 0);
+const genMetade = gerarComFixas(metade);
+const combinado = [...metade, ...genMetade];
+console.log(`[v2] Fixas = metade (${metade.length}) → motor gerou ${genMetade.length}; combinado ${combinado.length}/${all.length} blocos, sobreposições: ${sobreposicoes(combinado)}.`);
