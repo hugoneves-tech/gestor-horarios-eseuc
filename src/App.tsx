@@ -220,6 +220,13 @@ export default function App() {
   const [errosImport, setErrosImport] = useState<ErroLinha[]>([]);
   const [relatorioImport, setRelatorioImport] = useState<RelatorioValidacao | null>(null);
   const [nomeFicheiroImport, setNomeFicheiroImport] = useState("");
+  const [nomePropostaImport, setNomePropostaImport] = useState("");
+  // Propostas (versões): guardar/importar com nome, renomear.
+  const [showGuardarProposta, setShowGuardarProposta] = useState(false);
+  const [nomeProposta, setNomeProposta] = useState("");
+  const [escopoProposta, setEscopoProposta] = useState<"ano" | "todos">("ano");
+  const [renomearPropostaId, setRenomearPropostaId] = useState<string | null>(null);
+  const [nomeRenomear, setNomeRenomear] = useState("");
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1531,15 +1538,72 @@ export default function App() {
     }
   };
   const limparImport = () => {
-    setSessoesImportadas(null); setErrosImport([]); setRelatorioImport(null); setNomeFicheiroImport("");
+    setSessoesImportadas(null); setErrosImport([]); setRelatorioImport(null); setNomeFicheiroImport(""); setNomePropostaImport("");
   };
+
+  // Anos curriculares presentes numa proposta — derivado das sessões (sem coluna nova).
+  const anosDaProposta = (v: VersaoHorario | null | undefined): number[] => {
+    if (!v) return [];
+    const set = new Set<number>();
+    for (const s of v.sessoes) { const uc = ucs.find(u => u.sigla === s.ucSigla); if (uc) set.add(Number(uc.anoCurricular)); }
+    return [...set].sort((a, b) => a - b);
+  };
+  const rotuloAnosProposta = (v: VersaoHorario | null | undefined): string => {
+    const a = anosDaProposta(v);
+    return a.length === 0 ? "vazia" : a.length === 1 ? `${a[0]}.º ano` : "vários anos";
+  };
+  const novaPropostaBase = (nome: string, sessoes: SessaoHorario[]): VersaoHorario => ({
+    id: "v_" + Date.now(),
+    nome,
+    anoSemestreId: activeVersao?.anoSemestreId ?? selectedSemestreId,
+    criadaEm: new Date().toISOString(),
+    criadaPor: user?.email ?? "",
+    ativa: false,
+    score: 0,
+    sessoes: sessoes.map((s, i) => ({ ...s, id: i + 1 })),
+    semanasBloqueadas: [],
+  });
+
+  // Guardar a distribuição atual como NOVA proposta nomeada (só o ano selecionado ou todos).
+  const guardarProposta = () => {
+    const nome = nomeProposta.trim() || `Proposta ${new Date().toLocaleDateString("pt-PT")}`;
+    const base = activeVersao?.sessoes ?? [];
+    const sessoes = (escopoProposta === "ano" && selectedYearFilter !== "todos")
+      ? base.filter(s => { const uc = ucs.find(u => u.sigla === s.ucSigla); return uc && Number(uc.anoCurricular) === Number(selectedYearFilter); })
+      : base;
+    if (!sessoes.length) { showToast("Não há sessões para guardar neste âmbito."); return; }
+    const nova = novaPropostaBase(nome, sessoes);
+    nova.score = activeVersao?.score ?? 0;
+    setVersoes([...versoes, nova]);
+    setSelectedVersaoId(nova.id);
+    setShowGuardarProposta(false); setNomeProposta("");
+    showToast(`Proposta "${nome}" guardada (${sessoes.length} sessões).`);
+  };
+
+  // Importar a proposta lida do ficheiro como NOVA proposta nomeada (sessões fixas).
   const confirmarImportacao = () => {
     if (!sessoesImportadas?.length) return;
-    // Semeia as sessões importadas como fixas e deixa o motor completar à volta delas,
-    // gravando na versão ativa (o horário externo passa a base do ano selecionado).
-    handleTriggerSolver(false, sessoesImportadas);
-    showToast(`${sessoesImportadas.length} sessões importadas; o motor completou à volta.`);
+    const nome = nomePropostaImport.trim() || nomeFicheiroImport.replace(/\.[^.]+$/, "") || `Importada ${new Date().toLocaleDateString("pt-PT")}`;
+    const nova = novaPropostaBase(nome, sessoesImportadas.map(s => ({ ...s, bloqueado: true })));
+    setVersoes([...versoes, nova]);
+    setSelectedVersaoId(nova.id);
+    showToast(`Proposta "${nome}" importada (${sessoesImportadas.length} sessões).`);
     limparImport();
+  };
+
+  const renomearProposta = (id: string, nome: string) => {
+    const n = nome.trim(); if (!n) { setRenomearPropostaId(null); return; }
+    setVersoes(versoes.map(v => v.id === id ? { ...v, nome: n } : v));
+    setRenomearPropostaId(null);
+    showToast("Proposta renomeada.");
+  };
+  const apagarProposta = (id: string) => {
+    if (versoes.length <= 1) { showToast("Tem de existir pelo menos uma proposta."); return; }
+    if (!window.confirm("Apagar esta proposta? Esta ação não se desfaz.")) return;
+    const restantes = versoes.filter(v => v.id !== id);
+    setVersoes(restantes);
+    if (selectedVersaoId === id) setSelectedVersaoId(restantes[0].id);
+    showToast("Proposta apagada.");
   };
 
   // Handles Gemini custom chat messages safely converting SQL-less prompts
@@ -3244,6 +3308,46 @@ export default function App() {
       })()}
 
       {/* Duplicar Semestre Modal */}
+      {showGuardarProposta && (
+        <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="text-base font-serif font-semibold text-stone-900">Guardar proposta</h3>
+              <button onClick={() => setShowGuardarProposta(false)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Nome da proposta</label>
+                <input
+                  autoFocus
+                  value={nomeProposta}
+                  onChange={(e) => setNomeProposta(e.target.value)}
+                  placeholder={`Ex: 2.º ano — versão de ${new Date().toLocaleDateString("pt-PT")}`}
+                  className="w-full text-xs border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Âmbito</label>
+                <div className="space-y-1.5">
+                  <label className={`flex items-center gap-2 text-xs cursor-pointer ${selectedYearFilter === "todos" ? "opacity-40" : ""}`}>
+                    <input type="radio" checked={escopoProposta === "ano"} disabled={selectedYearFilter === "todos"} onChange={() => setEscopoProposta("ano")} />
+                    Só o {selectedYearFilter === "todos" ? "ano selecionado" : `${selectedYearFilter}.º ano`}
+                  </label>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="radio" checked={escopoProposta === "todos"} onChange={() => setEscopoProposta("todos")} />
+                    Todos os anos
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
+              <button onClick={() => setShowGuardarProposta(false)} className="px-4 py-2 bg-stone-100 text-stone-600 text-xs font-semibold rounded-xl hover:bg-stone-200 cursor-pointer">Cancelar</button>
+              <button onClick={guardarProposta} className="px-4 py-2 bg-stone-900 text-white text-xs font-semibold rounded-xl hover:bg-stone-800 cursor-pointer flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDuplicarSemestreModal && (
         <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
@@ -3366,31 +3470,61 @@ export default function App() {
           </div>
 
           <div className="flex gap-4 items-center shrink-0 w-full md:w-auto justify-between md:justify-end">
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <span className="text-4xs font-bold uppercase text-stone-400 block tracking-wider">Proposta Ativa</span>
-              <select
-                value={selectedVersaoId}
-                onChange={(e) => {
-                  setSelectedVersaoId(e.target.value);
-                  const ver = versoes.find(v => v.id === e.target.value);
-                  if (ver) {
-                    setSelectedSemestreId(ver.anoSemestreId);
-                  }
-                }}
-                className="bg-stone-50 cursor-pointer text-xs font-semibold border border-stone-200 rounded-xl px-3 py-2 focus:outline-none w-56 text-ellipsis"
-              >
-                {versoes.filter(v => {
-                  const s = anosSemestres.find(item => item.id === v.anoSemestreId);
-                  return s && s.anoLetivo === selectedAnoLetivo;
-                }).map(v => {
-                  const s = anosSemestres.find(item => item.id === v.anoSemestreId);
-                  return (
-                    <option key={v.id} value={v.id}>
-                      {v.nome} {s ? `(${s.semestre}º Semestre - ${s.anoLetivo})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+              {renomearPropostaId === selectedVersaoId ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    value={nomeRenomear}
+                    onChange={(e) => setNomeRenomear(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") renomearProposta(selectedVersaoId, nomeRenomear); if (e.key === "Escape") setRenomearPropostaId(null); }}
+                    className="text-xs border border-stone-300 rounded-xl px-3 py-2 w-44 focus:outline-none"
+                  />
+                  <button onClick={() => renomearProposta(selectedVersaoId, nomeRenomear)} className="px-2.5 py-2 bg-stone-900 text-white rounded-xl text-[10px] font-bold">OK</button>
+                </div>
+              ) : (
+                <select
+                  value={selectedVersaoId}
+                  onChange={(e) => {
+                    setSelectedVersaoId(e.target.value);
+                    const ver = versoes.find(v => v.id === e.target.value);
+                    if (ver) { setSelectedSemestreId(ver.anoSemestreId); }
+                  }}
+                  className="bg-stone-50 cursor-pointer text-xs font-semibold border border-stone-200 rounded-xl px-3 py-2 focus:outline-none w-56 text-ellipsis"
+                >
+                  {versoes.filter(v => {
+                    const s = anosSemestres.find(item => item.id === v.anoSemestreId);
+                    return s && s.anoLetivo === selectedAnoLetivo;
+                  }).map(v => {
+                    const s = anosSemestres.find(item => item.id === v.anoSemestreId);
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.nome} {s ? `(${s.semestre}º Semestre - ${s.anoLetivo})` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-150">{rotuloAnosProposta(activeVersao)}</span>
+                <button
+                  onClick={() => { setNomeProposta(""); setEscopoProposta(selectedYearFilter === "todos" ? "todos" : "ano"); setShowGuardarProposta(true); }}
+                  className="text-[10px] font-bold px-2 py-1 bg-white border border-stone-300 rounded-lg hover:bg-stone-100 flex items-center gap-1 cursor-pointer"
+                >
+                  <Save className="w-3 h-3" /> Guardar proposta
+                </button>
+                <button
+                  onClick={() => { setRenomearPropostaId(selectedVersaoId); setNomeRenomear(activeVersao?.nome ?? ""); }}
+                  title="Renomear proposta"
+                  className="text-[10px] font-bold px-2 py-1 bg-white border border-stone-300 rounded-lg hover:bg-stone-100 flex items-center gap-1 cursor-pointer"
+                >
+                  <Edit2 className="w-3 h-3" /> Renomear
+                </button>
+                <button onClick={() => apagarProposta(selectedVersaoId)} title="Apagar proposta" className="text-stone-400 hover:text-rose-600 cursor-pointer">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
             
             <div className="bg-stone-50 border border-stone-200/80 rounded-xl p-2 px-3 text-center min-w-[90px]">
@@ -3874,8 +4008,8 @@ export default function App() {
                     <div className="mt-3 border border-dashed border-stone-300 rounded-xl p-3 bg-stone-50/40 space-y-2">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div>
-                          <p className="text-[11px] font-bold text-stone-700">Importar horário externo (Excel/CSV)</p>
-                          <p className="text-[9px] text-stone-500">Carrega o horário do {selectedYearFilter}.º ano feito fora; é validado e o motor completa à volta das sessões importadas.</p>
+                          <p className="text-[11px] font-bold text-stone-700">Importar proposta externa (Excel/CSV)</p>
+                          <p className="text-[9px] text-stone-500">Carrega o horário do {selectedYearFilter}.º ano feito fora; é validado e guardado como uma <strong>nova proposta</strong> com nome. Depois podes gerar para o motor completar à volta.</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button onClick={descarregarTemplate}
@@ -3917,10 +4051,19 @@ export default function App() {
                             </details>
                           )}
 
+                          <div className="pt-1">
+                            <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-400 mb-1">Nome da proposta</label>
+                            <input
+                              value={nomePropostaImport}
+                              onChange={(e) => setNomePropostaImport(e.target.value)}
+                              placeholder={nomeFicheiroImport.replace(/\.[^.]+$/, "") || "Nome da proposta importada"}
+                              className="w-full text-[11px] border border-stone-200 rounded-lg px-2.5 py-1.5 focus:outline-none"
+                            />
+                          </div>
                           <div className="flex items-center gap-2 pt-1">
-                            <button onClick={confirmarImportacao} disabled={isSolving || !sessoesImportadas?.length}
+                            <button onClick={confirmarImportacao} disabled={!sessoesImportadas?.length}
                               className="px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 disabled:opacity-40 text-[10px]">
-                              <Zap className="w-3 h-3 text-amber-300" /> Importar e Completar
+                              <Upload className="w-3 h-3 text-amber-300" /> Importar como proposta
                             </button>
                             <button onClick={limparImport} className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]">
                               Cancelar
