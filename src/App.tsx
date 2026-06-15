@@ -1397,10 +1397,14 @@ export default function App() {
         if ([...docPorUC[sigs[i]]].some(d => docPorUC[sigs[j]].has(d))) ucConflitos.push([sigs[i], sigs[j]]);
       }
       // Regras criadas por IA (ou editadas) com config.motor → aplicam-se ao solver.
-      // Fundem-se TODAS as regras ativas: ucConflitos acumulam; os restantes parâmetros
-      // são substituídos pela última regra ativa que os defina.
+      // ÂMBITO: ao gerar um ano, só entram as TRANSVERSAIS + as DESSE ano (as de outros
+      // anos ficam de fora). ucConflitos acumulam; os restantes parâmetros são substituídos
+      // pela última regra ativa que os defina.
+      const regraNoAmbito = (r: RegraHorario) =>
+        r.escopo !== "ano" || selectedYearFilter === "todos" || Number(r.anoCurricular) === Number(selectedYearFilter);
       const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[] } = {};
       for (const r of regras) {
+        if (!regraNoAmbito(r)) continue;
         const m = r.ativa && (r.config as any)?.motor;
         if (!m || typeof m !== "object") continue;
         if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
@@ -1641,6 +1645,90 @@ export default function App() {
     setRegras(regras.map(r => r.id === id ? { ...r, ativa: !r.ativa } : r));
     showToast("Disponibilidade de regra alterada.");
   };
+
+  // Move uma regra entre âmbitos: "transversal" (todos os anos) ou um ano específico.
+  const atualizarAmbitoRegra = (id: string, valor: string) => {
+    const escopo: "transversal" | "ano" = valor === "transversal" ? "transversal" : "ano";
+    const anoCurricular: number | "todos" = valor === "transversal" ? "todos" : Number(valor);
+    setRegras(regras.map(r => r.id === id ? { ...r, escopo, anoCurricular } : r));
+    showToast(escopo === "transversal" ? "Regra agora transversal." : `Regra agora do ${anoCurricular}.º ano.`);
+  };
+
+  // Cartão de uma regra — partilhado pelos dois conjuntos (transversais e por ano).
+  const cartaoRegra = (reg: RegraHorario) => (
+    <div
+      key={reg.id}
+      className={`p-4 rounded-xl border text-left transition-all ${
+        reg.ativa ? `${themeStyles.borderColor} bg-white shadow-3xs` : "border-stone-150 bg-stone-50/40 opacity-60"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+              reg.tipo === "hard" ? "bg-rose-50 text-rose-800 border border-rose-200" : "bg-indigo-50 text-indigo-800 border border-indigo-200"
+            }`}>
+              {reg.tipo === "hard" ? "Inviolável (Hard)" : `Preferencial (Peso: ${reg.peso})`}
+            </span>
+            <span className="text-[10px] font-semibold text-stone-400">• {reg.categoria}</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-150">
+              {reg.escopo === "ano" ? `${reg.anoCurricular}.º ano` : "Transversal"}
+            </span>
+          </div>
+          <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
+          <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          {regraEditavel(reg) ? (
+            <>
+              <button
+                onClick={() => toggleRegra(reg.id)}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer ${
+                  reg.ativa ? "bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200" : "bg-stone-200 text-stone-500 hover:bg-stone-300"
+                }`}
+              >
+                {reg.ativa ? "Desativar" : "Ativar"}
+              </button>
+              <select
+                value={reg.escopo === "ano" ? String(reg.anoCurricular) : "transversal"}
+                onChange={(e) => atualizarAmbitoRegra(reg.id, e.target.value)}
+                title="Âmbito: transversal ou ano específico"
+                className="text-[9px] border border-stone-200 rounded-lg px-1 py-0.5 bg-white cursor-pointer"
+              >
+                <option value="transversal">Transversal</option>
+                <option value="1">1.º ano</option>
+                <option value="2">2.º ano</option>
+                <option value="3">3.º ano</option>
+                <option value="4">4.º ano</option>
+              </select>
+              <button onClick={() => removeRegra(reg.id)} className="text-stone-400 hover:text-rose-600 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => { setTutorRegra(reg); setTutorPrompt(""); setTutorResposta(""); }}
+                className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1"
+                title="Melhorar ou validar esta regra com o tutor IA"
+              >
+                <Sparkles className="w-3 h-3" /> Tutor IA
+              </button>
+            </>
+          ) : (
+            <span className="text-[8.5px] text-stone-400 font-bold uppercase tracking-wide" title="Regra transversal — gerida pela Direção">
+              Só leitura
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 pt-2 border-t border-stone-100 bg-stone-50/70 p-2.5 rounded-xl space-y-1">
+        <span className="text-[9px] font-bold text-indigo-700 flex items-center gap-1">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" /> Proteção activa da IA:
+        </span>
+        <p className="text-stone-600 text-[10.5px] leading-relaxed font-light">
+          {reg.config?.traducaoSimples || "A IA monitoriza esta regra em tempo real, impedindo conflitos físicos durante a computação de horários."}
+        </p>
+      </div>
+    </div>
+  );
 
   const toggleSessionBlock = (sessionId: number) => {
     if (!activeVersao) return;
@@ -4480,82 +4568,39 @@ export default function App() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {regras.filter(regraVisivel).map((reg) => (
-                  <div
-                    key={reg.id}
-                    className={`p-4 rounded-xl border text-left transition-all ${
-                      reg.ativa
-                        ? `${themeStyles.borderColor} bg-white shadow-3xs`
-                        : "border-stone-150 bg-stone-50/40 opacity-60"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                            reg.tipo === "hard"
-                              ? "bg-rose-50 text-rose-800 border border-rose-200"
-                              : "bg-indigo-50 text-indigo-800 border border-indigo-200"
-                          }`}>
-                            {reg.tipo === "hard" ? "Inviolável (Hard)" : `Preferencial (Peso: ${reg.peso})`}
-                          </span>
-                          <span className="text-[10px] font-semibold text-stone-400">
-                            • {reg.categoria}
-                          </span>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-150">
-                            {reg.escopo === "ano" ? `${reg.anoCurricular}.º ano` : "Transversal"}
-                          </span>
+              {/* DOIS CONJUNTOS: regras transversais (todos os anos) + regras por ano. */}
+              {(() => {
+                const visiveis = regras.filter(regraVisivel);
+                const transversais = visiveis.filter(r => r.escopo !== "ano");
+                const porAno = visiveis.filter(r => r.escopo === "ano");
+                const anos = [...new Set<number>(porAno.map(r => Number(r.anoCurricular)))].sort((a, b) => a - b);
+                return (
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#148A96]" /> Regras transversais (todos os anos) · {transversais.length}
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {transversais.map(cartaoRegra)}
+                        {transversais.length === 0 && <span className="text-[10px] text-stone-400 italic">Sem regras transversais.</span>}
+                      </div>
+                    </div>
+                    {anos.map(ano => (
+                      <div key={ano} className="space-y-2">
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-amber-600" /> Regras do {ano}.º ano · {porAno.filter(r => Number(r.anoCurricular) === ano).length}
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {porAno.filter(r => Number(r.anoCurricular) === ano).map(cartaoRegra)}
                         </div>
-                        <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
-                        <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
                       </div>
-
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        {regraEditavel(reg) ? (
-                          <>
-                            <button
-                              onClick={() => toggleRegra(reg.id)}
-                              className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer ${
-                                reg.ativa
-                                  ? "bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200"
-                                  : "bg-stone-200 text-stone-500 hover:bg-stone-300"
-                              }`}
-                            >
-                              {reg.ativa ? "Desativar" : "Ativar"}
-                            </button>
-                            <button onClick={() => removeRegra(reg.id)} className="text-stone-400 hover:text-rose-600 transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => { setTutorRegra(reg); setTutorPrompt(""); setTutorResposta(""); }}
-                              className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1"
-                              title="Melhorar ou validar esta regra com o tutor IA"
-                            >
-                              <Sparkles className="w-3 h-3" /> Tutor IA
-                            </button>
-                          </>
-                        ) : (
-                          <span className="text-[8.5px] text-stone-400 font-bold uppercase tracking-wide" title="Regra transversal — gerida pela Direção">
-                            Só leitura
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Simple IA Friendly Translation Display. ABSOLUTELY HIDING SQL */}
-                    <div className="mt-3 pt-2 border-t border-stone-100 bg-stone-50/70 p-2.5 rounded-xl space-y-1">
-                      <span className="text-[9px] font-bold text-indigo-700 flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                        ª„ Proteção Activa da IA:
-                      </span>
-                      <p className="text-stone-600 text-[10.5px] leading-relaxed font-light">
-                        {reg.config?.traducaoSimples || "A IA monitoriza esta regra em tempo real, impedindo conflitos físicos durante a computação de horários."}
-                      </p>
-                    </div>
+                    ))}
+                    {porAno.length === 0 && (
+                      <p className="text-[10px] text-stone-400 italic">Ainda não há regras específicas por ano. Cria uma com âmbito "Específica de um ano" (ou muda o âmbito de uma transversal acima).</p>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </div>
         )}
