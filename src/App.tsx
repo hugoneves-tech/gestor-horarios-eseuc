@@ -1654,9 +1654,14 @@ export default function App() {
         try {
           const parts = data.text.split("[REGRA_DETETADA]");
           const subParts = parts[1].split("[FIM_REGRA]");
-          const jsonStr = subParts[0].trim();
+          // Extração robusta: alguns modelos (ex.: 2.5-flash) embrulham o JSON em cercas
+          // ```json ... ``` ou põem texto à volta. Remove as cercas e isola o objeto {…}.
+          let jsonStr = subParts[0].replace(/```(?:json)?/gi, "").trim();
+          const ini = jsonStr.indexOf("{");
+          const fim = jsonStr.lastIndexOf("}");
+          if (ini >= 0 && fim > ini) jsonStr = jsonStr.slice(ini, fim + 1);
           const parsedRule = JSON.parse(jsonStr);
-          
+
           // Preservar a config da IA (inclui config.motor, que aplica a regra ao solver)
           parsedRule.config = {
             ...(parsedRule.config || {}),
@@ -1665,6 +1670,7 @@ export default function App() {
           setPendingAiRule(parsedRule);
         } catch (jsonErr) {
           console.error("Failed to parse rule from AI response:", jsonErr);
+          showToast("A IA sugeriu uma regra mas não consegui interpretá-la. Tenta reformular o pedido.");
         }
       }
     } catch (e: any) {
