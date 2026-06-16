@@ -1857,13 +1857,51 @@ export default function App() {
     const updated = activeVersao.sessoes.map(s => s.id === sessionId ? { ...s, [campo]: valor } : s);
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
   };
-  // Salas compatíveis com o tipo de aula da sessão (T→Teórica, PL→Lab/Computadores, TP/S→TP).
-  const salasCompativeis = (sessao: SessaoHorario): Sala[] => {
-    const tipoAlvo = sessao.tipoAula === "T" ? "Teórica"
+  // Tipo de sala adequado ao tipo de aula (T→Teórica, PL→Lab/Computadores, TP/S→TP).
+  const tipoSalaAlvo = (sessao: SessaoHorario): Sala["tipo"] =>
+    sessao.tipoAula === "T" ? "Teórica"
       : sessao.tipoAula === "PL" ? (/comput/i.test(sessao.salaTipo || "") ? "Sala de Computadores" : "Laboratório")
         : "Teórico-prática";
-    const comp = salas.filter(s => s.tipo === tipoAlvo);
-    return comp.length ? comp : salas; // se não houver do tipo, mostra todas (controlo total)
+  // Estimativa de alunos por turma (para a capacidade da sala).
+  const alunosDaTurma = (turma: string): number =>
+    turma.startsWith("Turma") ? 180 : /^TP\d+$/.test(turma) ? 45 : /^PL\d+$/.test(turma) ? 15 : 30;
+  // Salas DISPONÍVEIS para uma sessão (para o override): tipo certo, capacidade suficiente e
+  // livres naquele bloco (semana+dia+hora) — exceto a já atribuída a esta sessão.
+  const salasDisponiveis = (sessao: SessaoHorario): Sala[] => {
+    const tipo = tipoSalaAlvo(sessao);
+    const necessario = alunosDaTurma(sessao.turma);
+    const ocupadas = new Set((activeVersao?.sessoes || [])
+      .filter(s => s.id !== sessao.id && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio && s.sala)
+      .map(s => s.sala));
+    const livre = (s: Sala) => !ocupadas.has(s.nome) || s.nome === sessao.sala;
+    let comp = salas.filter(s => s.tipo === tipo && (s.capacidade || 0) >= necessario && livre(s));
+    if (!comp.length) comp = salas.filter(s => s.tipo === tipo && livre(s)); // relaxa capacidade
+    if (!comp.length) comp = salas.filter(livre);                            // relaxa tipo
+    return comp.sort((a, b) => (a.capacidade || 0) - (b.capacidade || 0));
+  };
+  // Propõe salas automaticamente às sessões SEM sala (respeita as já escolhidas à mão).
+  // Menor sala que serve, sem dupla-marcação no mesmo bloco. Tu podes trocar depois.
+  const proporSalas = () => {
+    if (!activeVersao) return;
+    const slotKey = (s: SessaoHorario) => `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+    const ocup = new Map<string, Set<string>>();
+    for (const s of activeVersao.sessoes) if (s.sala) {
+      let set = ocup.get(slotKey(s)); if (!set) { set = new Set(); ocup.set(slotKey(s), set); } set.add(s.sala);
+    }
+    let atribuidas = 0, semSala = 0;
+    const novas = activeVersao.sessoes.map(s => {
+      if (s.sala) return s; // respeita override manual / já atribuída
+      const k = slotKey(s); let usadas = ocup.get(k); if (!usadas) { usadas = new Set(); ocup.set(k, usadas); }
+      const u = usadas;
+      const tipo = tipoSalaAlvo(s); const necessario = alunosDaTurma(s.turma);
+      const cand = salas.filter(r => r.tipo === tipo && (r.capacidade || 0) >= necessario && !u.has(r.nome))
+        .sort((a, b) => (a.capacidade || 0) - (b.capacidade || 0));
+      const escolhida = cand[0] || salas.filter(r => r.tipo === tipo && !u.has(r.nome))[0];
+      if (escolhida) { u.add(escolhida.nome); atribuidas++; return { ...s, sala: escolhida.nome }; }
+      semSala++; return s;
+    });
+    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: novas } : v));
+    showToast(`Salas propostas: ${atribuidas} atribuídas${semSala ? ` · ${semSala} sem sala livre` : ""}.`);
   };
 
   // Eliminar uma aula do horário (edição manual para reajustar).
@@ -4510,7 +4548,7 @@ export default function App() {
                                             className="bg-white/80 border border-stone-300 rounded text-[8px] px-0.5 py-0 max-w-[92px] cursor-pointer"
                                           >
                                             <option value="">— sala —</option>
-                                            {salasCompativeis(sessao).map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+                                            {salasDisponiveis(sessao).map(s => <option key={s.id} value={s.nome}>{s.nome} ({s.capacidade})</option>)}
                                           </select>
                                         ) : (
                                           <span>{sessao.sala}</span>
@@ -5054,10 +5092,15 @@ export default function App() {
               <label className="flex items-center justify-between gap-3 bg-stone-50/70 border border-stone-150 rounded-xl px-3 py-2.5 cursor-pointer">
                 <div>
                   <span className="text-xs font-bold text-stone-800">2.ª fase — Distribuição de salas</span>
-                  <p className="text-[10px] text-stone-500">Mostra um seletor de sala em cada sessão (filtrado pelo tipo de sala). Ativa quando tiveres as salas todas no sistema.</p>
+                  <p className="text-[10px] text-stone-500">O sistema <strong>propõe</strong> as salas; depois trocas no grid só entre as <strong>disponíveis</strong> (tipo certo, capacidade, sem choque). Ativa quando tiveres as salas todas no sistema.</p>
                 </div>
                 <input type="checkbox" checked={incluirSalas} onChange={(e) => setIncluirSalas(e.target.checked)} className="w-4 h-4 rounded text-[#148A96] focus:ring-[#148A96] cursor-pointer shrink-0" />
               </label>
+              {incluirSalas && (
+                <button onClick={proporSalas} className="w-fit px-3 py-1.5 bg-[#148A96] text-white hover:bg-[#0f6f78] font-bold rounded-lg text-[11px] flex items-center gap-1.5 cursor-pointer">
+                  <Sparkles className="w-3.5 h-3.5" /> Propor salas para a proposta ativa
+                </button>
+              )}
               <label className="flex items-center justify-between gap-3 bg-stone-50/70 border border-stone-150 rounded-xl px-3 py-2.5 cursor-pointer">
                 <div>
                   <span className="text-xs font-bold text-stone-800">3.ª fase — Distribuição de docentes</span>
