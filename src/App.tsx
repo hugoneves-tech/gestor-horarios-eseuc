@@ -244,6 +244,12 @@ export default function App() {
   // Edição de regra (anos múltiplos + cursos). Reutilizada para validar a sugestão da IA.
   const [regraEmEdicao, setRegraEmEdicao] = useState<RegraHorario | null>(null);
   const [editProveniencia, setEditProveniencia] = useState<"edicao" | "ia">("edicao");
+  // Fases do fluxo (manuais, controladas pelo utilizador): 1.º UCs (sempre), 2.º salas,
+  // 3.º docentes. Interruptores em Configuração; quando ON, o grid permite atribuir à mão.
+  const [incluirSalas, setIncluirSalas] = useState<boolean>(() => { try { return localStorage.getItem("eseuc_incluir_salas") === "1"; } catch { return false; } });
+  const [incluirDocentes, setIncluirDocentes] = useState<boolean>(() => { try { return localStorage.getItem("eseuc_incluir_docentes") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("eseuc_incluir_salas", incluirSalas ? "1" : "0"); } catch { /* ignore */ } }, [incluirSalas]);
+  useEffect(() => { try { localStorage.setItem("eseuc_incluir_docentes", incluirDocentes ? "1" : "0"); } catch { /* ignore */ } }, [incluirDocentes]);
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1843,6 +1849,21 @@ export default function App() {
     });
 
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updatedSessoes } : v));
+  };
+
+  // Atribuição MANUAL de sala/docente a uma sessão (fases 2 e 3 do fluxo, controladas à mão).
+  const atribuirCampoSessao = (sessionId: number, campo: "sala" | "docente", valor: string) => {
+    if (!activeVersao) return;
+    const updated = activeVersao.sessoes.map(s => s.id === sessionId ? { ...s, [campo]: valor } : s);
+    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
+  };
+  // Salas compatíveis com o tipo de aula da sessão (T→Teórica, PL→Lab/Computadores, TP/S→TP).
+  const salasCompativeis = (sessao: SessaoHorario): Sala[] => {
+    const tipoAlvo = sessao.tipoAula === "T" ? "Teórica"
+      : sessao.tipoAula === "PL" ? (/comput/i.test(sessao.salaTipo || "") ? "Sala de Computadores" : "Laboratório")
+        : "Teórico-prática";
+    const comp = salas.filter(s => s.tipo === tipoAlvo);
+    return comp.length ? comp : salas; // se não houver do tipo, mostra todas (controlo total)
   };
 
   // Eliminar uma aula do horário (edição manual para reajustar).
@@ -4481,13 +4502,37 @@ export default function App() {
 
                                       <div className="text-[8px] opacity-80 mt-0.5 truncate leading-none flex items-center gap-1">
                                         <span className="opacity-60">"</span>
-                                        <span>{sessao.sala}</span>
+                                        {incluirSalas ? (
+                                          <select
+                                            value={sessao.sala || ""}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => atribuirCampoSessao(sessao.id, "sala", e.target.value)}
+                                            className="bg-white/80 border border-stone-300 rounded text-[8px] px-0.5 py-0 max-w-[92px] cursor-pointer"
+                                          >
+                                            <option value="">— sala —</option>
+                                            {salasCompativeis(sessao).map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+                                          </select>
+                                        ) : (
+                                          <span>{sessao.sala}</span>
+                                        )}
                                       </div>
 
-                                      {sessao.docente && (
+                                      {(incluirDocentes || sessao.docente) && (
                                         <div className="text-[8px] opacity-80 truncate leading-none flex items-center gap-1">
                                           <span className="opacity-60">'¤</span>
-                                          <span>{sessao.docente}</span>
+                                          {incluirDocentes ? (
+                                            <select
+                                              value={sessao.docente || ""}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={(e) => atribuirCampoSessao(sessao.id, "docente", e.target.value)}
+                                              className="bg-white/80 border border-stone-300 rounded text-[8px] px-0.5 py-0 max-w-[92px] cursor-pointer"
+                                            >
+                                              <option value="">— docente —</option>
+                                              {docentes.map(d => <option key={d.id} value={d.nome}>{d.nome}</option>)}
+                                            </select>
+                                          ) : (
+                                            <span>{sessao.docente}</span>
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -4999,6 +5044,28 @@ export default function App() {
           <div className="space-y-6 animate-fade-in text-xs">
             {/* ADMINISTRAÇÃO — convites (só para administradores) */}
             {perfil?.isAdmin && <AdminConvites />}
+
+            {/* FASES DO FLUXO — atribuição manual de salas e docentes */}
+            <div className="bg-white rounded-2xl p-5 border border-stone-150 shadow-3xs space-y-3">
+              <div>
+                <h3 className="text-base font-serif font-bold text-stone-900 flex items-center gap-1.5"><Layers className="w-4 h-4 text-[#148A96]" /> Fases da distribuição</h3>
+                <p className="text-[11px] text-stone-500 mt-0.5">O horário constrói-se por fases que controlas à mão: <strong>1.º as UCs</strong> (sempre); depois, quando ativares abaixo, atribuis <strong>salas</strong> e <strong>docentes</strong> sessão a sessão, diretamente no grid do horário.</p>
+              </div>
+              <label className="flex items-center justify-between gap-3 bg-stone-50/70 border border-stone-150 rounded-xl px-3 py-2.5 cursor-pointer">
+                <div>
+                  <span className="text-xs font-bold text-stone-800">2.ª fase — Distribuição de salas</span>
+                  <p className="text-[10px] text-stone-500">Mostra um seletor de sala em cada sessão (filtrado pelo tipo de sala). Ativa quando tiveres as salas todas no sistema.</p>
+                </div>
+                <input type="checkbox" checked={incluirSalas} onChange={(e) => setIncluirSalas(e.target.checked)} className="w-4 h-4 rounded text-[#148A96] focus:ring-[#148A96] cursor-pointer shrink-0" />
+              </label>
+              <label className="flex items-center justify-between gap-3 bg-stone-50/70 border border-stone-150 rounded-xl px-3 py-2.5 cursor-pointer">
+                <div>
+                  <span className="text-xs font-bold text-stone-800">3.ª fase — Distribuição de docentes</span>
+                  <p className="text-[10px] text-stone-500">Mostra um seletor de docente em cada sessão do grid.</p>
+                </div>
+                <input type="checkbox" checked={incluirDocentes} onChange={(e) => setIncluirDocentes(e.target.checked)} className="w-4 h-4 rounded text-[#148A96] focus:ring-[#148A96] cursor-pointer shrink-0" />
+              </label>
+            </div>
 
             {/* CALENDÁRIO E DISTRIBUIÇÃO SEMANAL */}
             <ConfiguracaoCalendario
