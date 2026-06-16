@@ -140,6 +140,20 @@ export default function App() {
   const [selectedVersaoId, setSelectedVersaoId] = useState<string>("v1");
   const [activeVersao, setActiveVersao] = useState<VersaoHorario | null>(null);
 
+  // Âmbito de uma regra (multi-ano + cursos), guardado no config (sem migração no Supabase).
+  // config.anos: number[] (vazio = transversal/todos os anos). config.cursoIds: string[]
+  // (vazio = todos os cursos). Compatível com regras antigas (escopo/anoCurricular).
+  const anosDaRegra = (r: RegraHorario): number[] => {
+    const a = (r.config as any)?.anos;
+    if (Array.isArray(a)) return a.map(Number).filter(n => !Number.isNaN(n));
+    if (r.escopo === "ano" && typeof r.anoCurricular === "number") return [r.anoCurricular];
+    return [];
+  };
+  const cursosDaRegra = (r: RegraHorario): string[] => {
+    const c = (r.config as any)?.cursoIds;
+    return Array.isArray(c) ? c.filter((x: any) => typeof x === "string") : [];
+  };
+
   // Helper to generate a reliable week label based on the academic calendar (ignoring holidays for display purpose simply)
   const getWeekLabel = (week: number) => {
     const start = new Date(2025, 8, 8); // Sep 8, 2025 (Monday)
@@ -227,6 +241,9 @@ export default function App() {
   const [escopoProposta, setEscopoProposta] = useState<"ano" | "todos">("ano");
   const [renomearPropostaId, setRenomearPropostaId] = useState<string | null>(null);
   const [nomeRenomear, setNomeRenomear] = useState("");
+  // Edição de regra (anos múltiplos + cursos). Reutilizada para validar a sugestão da IA.
+  const [regraEmEdicao, setRegraEmEdicao] = useState<RegraHorario | null>(null);
+  const [editProveniencia, setEditProveniencia] = useState<"edicao" | "ia">("edicao");
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1407,8 +1424,10 @@ export default function App() {
       // ÂMBITO: ao gerar um ano, só entram as TRANSVERSAIS + as DESSE ano (as de outros
       // anos ficam de fora). ucConflitos acumulam; os restantes parâmetros são substituídos
       // pela última regra ativa que os defina.
-      const regraNoAmbito = (r: RegraHorario) =>
-        r.escopo !== "ano" || selectedYearFilter === "todos" || Number(r.anoCurricular) === Number(selectedYearFilter);
+      const regraNoAmbito = (r: RegraHorario) => {
+        const anos = anosDaRegra(r);
+        return anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
+      };
       const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[] } = {};
       for (const r of regras) {
         if (!regraNoAmbito(r)) continue;
@@ -1688,23 +1707,6 @@ export default function App() {
     }
   };
 
-  const handleAcceptAiRule = () => {
-    if (!pendingAiRule) return;
-    // Coordenador/vice: a regra criada por IA fica obrigatoriamente do seu ano.
-    const escopo = ehDiretor ? (pendingAiRule.escopo ?? "transversal") : "ano";
-    const anoCurricular = ehDiretor ? (pendingAiRule.anoCurricular ?? "todos") : (anoDoPerfil ?? 1);
-    const realRule: RegraHorario = {
-      ...pendingAiRule,
-      id: "ai_rule_" + Date.now(),
-      escopo,
-      anoCurricular,
-      ativa: true
-    };
-    setRegras([realRule, ...regras]);
-    setPendingAiRule(null);
-    showToast(`A regra "${realRule.nome}" criada pela IA foi gravada no Supabase.`);
-  };
-
   const removeUc = (id: string) => setUcs(ucs.filter(u => u.id !== id));
   const removeDocente = (id: string) => setDocentes(docentes.filter(d => d.id !== id));
   const removeSala = (id: string) => setSalas(salas.filter(s => s.id !== id));
@@ -1716,12 +1718,43 @@ export default function App() {
     showToast("Disponibilidade de regra alterada.");
   };
 
-  // Move uma regra entre âmbitos: "transversal" (todos os anos) ou um ano específico.
-  const atualizarAmbitoRegra = (id: string, valor: string) => {
-    const escopo: "transversal" | "ano" = valor === "transversal" ? "transversal" : "ano";
-    const anoCurricular: number | "todos" = valor === "transversal" ? "todos" : Number(valor);
-    setRegras(regras.map(r => r.id === id ? { ...r, escopo, anoCurricular } : r));
-    showToast(escopo === "transversal" ? "Regra agora transversal." : `Regra agora do ${anoCurricular}.º ano.`);
+  // Edição de regra (modal): anos múltiplos + cursos. Serve também para VALIDAR a sugestão
+  // da IA antes de a ativar (garante que os anos são sempre escolhidos).
+  const abrirEdicaoRegra = (reg: RegraHorario, prov: "edicao" | "ia") => {
+    setEditProveniencia(prov);
+    setRegraEmEdicao({ ...reg, config: { ...(reg.config || {}), anos: anosDaRegra(reg), cursoIds: cursosDaRegra(reg) } });
+  };
+  const toggleDraftAno = (ano: number) => setRegraEmEdicao(r => {
+    if (!r) return r;
+    const cur: number[] = Array.isArray((r.config as any)?.anos) ? (r.config as any).anos : [];
+    const next = cur.includes(ano) ? cur.filter(a => a !== ano) : [...cur, ano].sort((a, b) => a - b);
+    return { ...r, config: { ...(r.config || {}), anos: next } };
+  });
+  const toggleDraftCurso = (id: string) => setRegraEmEdicao(r => {
+    if (!r) return r;
+    const cur: string[] = Array.isArray((r.config as any)?.cursoIds) ? (r.config as any).cursoIds : [];
+    const next = cur.includes(id) ? cur.filter(c => c !== id) : [...cur, id];
+    return { ...r, config: { ...(r.config || {}), cursoIds: next } };
+  });
+  const guardarRegraEditada = () => {
+    if (!regraEmEdicao) return;
+    const anos: number[] = Array.isArray((regraEmEdicao.config as any)?.anos) ? (regraEmEdicao.config as any).anos : [];
+    const base: RegraHorario = {
+      ...regraEmEdicao,
+      nome: (regraEmEdicao.nome || "").trim() || "Regra sem nome",
+      escopo: anos.length ? "ano" : "transversal",
+      anoCurricular: anos.length === 1 ? anos[0] : "todos",  // badge/legado; os anos reais ficam no config
+    };
+    if (editProveniencia === "ia") {
+      const realRule: RegraHorario = { ...base, id: "ai_rule_" + Date.now(), ativa: true };
+      setRegras([realRule, ...regras]);
+      setPendingAiRule(null);
+      showToast(`Regra "${realRule.nome}" criada e ativada.`);
+    } else {
+      setRegras(regras.map(r => r.id === base.id ? base : r));
+      showToast("Regra atualizada.");
+    }
+    setRegraEmEdicao(null);
   };
 
   // Cartão de uma regra — partilhado pelos dois conjuntos (transversais e por ano).
@@ -1742,8 +1775,13 @@ export default function App() {
             </span>
             <span className="text-[10px] font-semibold text-stone-400">• {reg.categoria}</span>
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-150">
-              {reg.escopo === "ano" ? `${reg.anoCurricular}.º ano` : "Transversal"}
+              {anosDaRegra(reg).length ? anosDaRegra(reg).map(n => `${n}.º`).join(", ") + " ano" : "Transversal"}
             </span>
+            {cursosDaRegra(reg).length > 0 && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-150">
+                {cursosDaRegra(reg).map(id => cursos.find(c => c.id === id)?.sigla || id).join(", ")}
+              </span>
+            )}
           </div>
           <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
           <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
@@ -1759,18 +1797,13 @@ export default function App() {
               >
                 {reg.ativa ? "Desativar" : "Ativar"}
               </button>
-              <select
-                value={reg.escopo === "ano" ? String(reg.anoCurricular) : "transversal"}
-                onChange={(e) => atualizarAmbitoRegra(reg.id, e.target.value)}
-                title="Âmbito: transversal ou ano específico"
-                className="text-[9px] border border-stone-200 rounded-lg px-1 py-0.5 bg-white cursor-pointer"
+              <button
+                onClick={() => abrirEdicaoRegra(reg, "edicao")}
+                className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200 flex items-center gap-1"
+                title="Editar anos, cursos, nome, peso…"
               >
-                <option value="transversal">Transversal</option>
-                <option value="1">1.º ano</option>
-                <option value="2">2.º ano</option>
-                <option value="3">3.º ano</option>
-                <option value="4">4.º ano</option>
-              </select>
+                <Edit2 className="w-3 h-3" /> Editar
+              </button>
               <button onClick={() => removeRegra(reg.id)} className="text-stone-400 hover:text-rose-600 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -3354,6 +3387,70 @@ export default function App() {
         </div>
       )}
 
+      {regraEmEdicao && (
+        <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h3 className="text-base font-serif font-semibold text-stone-900">{editProveniencia === "ia" ? "Validar regra sugerida pela IA" : "Editar regra"}</h3>
+              <button onClick={() => setRegraEmEdicao(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Nome</label>
+                <input value={regraEmEdicao.nome} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, nome: e.target.value })} className="w-full border border-stone-200 rounded-xl px-3 py-2 focus:outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Severidade</label>
+                  <select value={regraEmEdicao.tipo} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, tipo: e.target.value as any })} className="w-full border border-stone-200 rounded-xl px-2 py-2 bg-white">
+                    <option value="hard">Hard (inviolável)</option>
+                    <option value="soft">Soft (preferência)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Peso (1-10)</label>
+                  <input type="number" min={1} max={10} value={regraEmEdicao.peso} disabled={regraEmEdicao.tipo === "hard"} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, peso: Number(e.target.value) })} className="w-full border border-stone-200 rounded-xl px-3 py-2 disabled:bg-stone-100" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Descrição</label>
+                <textarea value={regraEmEdicao.descricao} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, descricao: e.target.value })} className="w-full h-16 border border-stone-200 rounded-xl p-2.5 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Anos a que se aplica</label>
+                <div className="flex flex-wrap gap-2">
+                  {(ehDiretor ? [1, 2, 3, 4] : ([anoDoPerfil].filter(Boolean) as number[])).map(ano => {
+                    const sel = anosDaRegra(regraEmEdicao!).includes(ano);
+                    return (
+                      <button key={ano} onClick={() => toggleDraftAno(ano)} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${sel ? "bg-emerald-600 text-white border-emerald-700" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"}`}>{ano}.º ano</button>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] text-stone-400 mt-1">Sem anos selecionados = <strong>transversal</strong> (todos os anos).</p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Cursos a que se aplica</label>
+                <div className="flex flex-wrap gap-2">
+                  {cursos.map(c => {
+                    const sel = cursosDaRegra(regraEmEdicao!).includes(c.id);
+                    return (
+                      <button key={c.id} onClick={() => toggleDraftCurso(c.id)} title={c.nome} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${sel ? "bg-sky-600 text-white border-sky-700" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"}`}>{c.sigla}</button>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] text-stone-400 mt-1">Sem cursos selecionados = <strong>todos os cursos</strong>. (Por agora só o CLE; PG/mestrados quando os criares.)</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
+              <button onClick={() => setRegraEmEdicao(null)} className="px-4 py-2 bg-stone-100 text-stone-600 text-xs font-semibold rounded-xl hover:bg-stone-200 cursor-pointer">Cancelar</button>
+              <button onClick={guardarRegraEditada} className="px-4 py-2 bg-stone-900 text-white text-xs font-semibold rounded-xl hover:bg-stone-800 cursor-pointer flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> {editProveniencia === "ia" ? "Ativar regra" : "Guardar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDuplicarSemestreModal && (
         <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
@@ -4720,9 +4817,9 @@ export default function App() {
               {/* DOIS CONJUNTOS: regras transversais (todos os anos) + regras por ano. */}
               {(() => {
                 const visiveis = regras.filter(regraVisivel);
-                const transversais = visiveis.filter(r => r.escopo !== "ano");
-                const porAno = visiveis.filter(r => r.escopo === "ano");
-                const anos = [...new Set<number>(porAno.map(r => Number(r.anoCurricular)))].sort((a, b) => a - b);
+                const transversais = visiveis.filter(r => anosDaRegra(r).length === 0);
+                const porAno = visiveis.filter(r => anosDaRegra(r).length > 0); // pode aparecer em vários anos
+                const anos = [...new Set<number>(porAno.flatMap(r => anosDaRegra(r)))].sort((a, b) => a - b);
                 return (
                   <div className="space-y-5">
                     <div className="space-y-2">
@@ -4737,10 +4834,10 @@ export default function App() {
                     {anos.map(ano => (
                       <div key={ano} className="space-y-2">
                         <h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-amber-600" /> Regras do {ano}.º ano · {porAno.filter(r => Number(r.anoCurricular) === ano).length}
+                          <Calendar className="w-3.5 h-3.5 text-amber-600" /> Regras do {ano}.º ano · {porAno.filter(r => anosDaRegra(r).includes(ano)).length}
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {porAno.filter(r => Number(r.anoCurricular) === ano).map(cartaoRegra)}
+                          {porAno.filter(r => anosDaRegra(r).includes(ano)).map(cartaoRegra)}
                         </div>
                       </div>
                     ))}
@@ -6139,10 +6236,10 @@ export default function App() {
                         Rejeitar
                       </button>
                       <button
-                        onClick={handleAcceptAiRule}
+                        onClick={() => abrirEdicaoRegra(pendingAiRule, "ia")}
                         className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-lg text-xs cursor-pointer"
                       >
-                        Aceitar e Ativar Regra
+                        Validar anos e ativar
                       </button>
                     </div>
                   </div>

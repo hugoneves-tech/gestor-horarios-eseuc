@@ -116,11 +116,17 @@ IMPORTANTE: Se o utilizador desejar traduzir regras em JSON estruturado, voc? po
   "nome": "Nome Curto da Regra",
   "tipo": "hard" ou "soft",
   "descricao": "Descrição clara em portugu?s",
-  "config": { ... },
+  "escopo": "ano",
+  "anoCurricular": 2,
+  "config": { "anos": [2], "cursoIds": [], "traducaoSimples": "...", "motor": {} },
   "ativa": true
 }
 [FIM_REGRA]
 Se não for relevante detetar uma regra nova, não coloque estes blocos especiais.
+
+ÂMBITO (obrigatório): indica SEMPRE a que anos a regra se aplica em config.anos (lista, ex.: [1,2]);
+usa [] só se for transversal a todos os anos. Se o utilizador NÃO disser o(s) ano(s), PERGUNTA
+primeiro e não devolvas ainda a regra. cursoIds fica [] (todos os cursos) salvo indicação.
 
 O campo config.motor é o que APLICA a regra ao motor de distribuição. Parâmetros suportados
 (inclui SÓ os que o pedido implicar, dentro de "config": {"traducaoSimples":"...","motor":{...}}):

@@ -27,8 +27,13 @@ Contexto atual:
 
 Formato da regra (só quando aplicável):
 [REGRA_DETETADA]
-{"id":"temp","nome":"Nome curto","tipo":"hard","descricao":"...","escopo":"transversal","anoCurricular":"todos","config":{"traducaoSimples":"...","motor":{}},"peso":5,"ativa":true}
+{"id":"temp","nome":"Nome curto","tipo":"hard","descricao":"...","escopo":"ano","anoCurricular":2,"config":{"anos":[2],"cursoIds":[],"traducaoSimples":"...","motor":{}},"peso":5,"ativa":true}
 [FIM_REGRA]
+
+ÂMBITO (obrigatório): indica SEMPRE a que anos a regra se aplica em config.anos (lista de
+inteiros, ex.: [1,2]); usa [] APENAS se for mesmo transversal a todos os anos. Se o utilizador
+NÃO disser claramente o(s) ano(s), NÃO devolvas ainda a regra — PERGUNTA primeiro "a que ano(s)
+se aplica?". cursoIds fica [] (todos os cursos) salvo indicação contrária.
 
 O campo config.motor é o que APLICA a regra ao motor de distribuição. Parâmetros suportados
 (inclui SÓ os que o pedido implicar; omite os restantes):
