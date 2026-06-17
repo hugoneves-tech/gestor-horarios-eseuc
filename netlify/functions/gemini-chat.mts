@@ -42,7 +42,14 @@ O campo config.motor é o que APLICA a regra ao motor de distribuição. Parâme
 - "maxTPporMancha": 2 — máximo de turmas TP da mesma UC em simultâneo no mesmo bloco (n.º de salas).
 - "semanasSoTurmaA": [16,17] — semanas globais (1-30) em que só a Turma A tem aulas.
 - "semanasSoTurmaB": [8,9] — semanas globais em que só a Turma B tem aulas.
-Se o pedido NÃO for traduzível nestes parâmetros, devolve a regra com "motor": {} e explica que ficará apenas documental (o motor ainda não suporta esse tipo de restrição).
+- "restricoesUC": [{"siglas":["ESDAC"],"periodosProibidos":["tarde"]}] — bloqueia slots por UC.
+  Campos: siglas (obrigatorio); diasProibidos (ex.: ["Sexta"]); periodosProibidos ("manha"/"tarde");
+  tipos (ex.: ["PL"] so esse tipo; omite para todos). USA ISTO para "X so de manha/tarde" e
+  "X nao em [dia]". Traducoes: "ESDAC so de manha" -> {"siglas":["ESDAC"],"periodosProibidos":["tarde"]};
+  "EIG nao as sextas" -> {"siglas":["EIG"],"diasProibidos":["Sexta"]}; "PL de FT so de tarde" ->
+  {"siglas":["FT"],"tipos":["PL"],"periodosProibidos":["manha"]}.
+Usa SEMPRE um destes parametros quando o pedido se traduzir (restricoesUC cobre a maioria das regras
+de dia/periodo por UC). So devolve "motor": {} (documental) se MESMO nada servir.
 `;
 
   const contents: any[] = [];

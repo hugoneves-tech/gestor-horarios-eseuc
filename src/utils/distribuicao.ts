@@ -592,6 +592,17 @@ export interface OpcoesDistribuicao {
   // ocupação/conflitos e desconta a carga já satisfeita, gerando só o que falta À VOLTA
   // delas. NÃO são devolvidas no output (quem chama preserva-as). Filtradas por semestre.
   sessoesFixas?: SessaoHorario[];
+  // Restrições GENÉRICAS por UC: bloqueiam slots para as siglas indicadas. Cobrem regras
+  // naturais como "ESDAC só de manhã" (diasProibidos/periodosProibidos). Cada entrada:
+  //   { siglas:["ESDAC"], periodosProibidos:["tarde"] }  → ESDAC nunca à tarde
+  //   { siglas:["EIG"], diasProibidos:["Sexta"] }         → EIG nunca à sexta
+  //   { siglas:["MI"], tipos:["PL"], diasProibidos:["Segunda"] } → só as PL de MI, não 2.ª
+  restricoesUC?: {
+    siglas: string[];
+    diasProibidos?: string[];                 // ex.: ["Sexta"]
+    periodosProibidos?: ("manha" | "tarde")[]; // manha = 08/10/12, tarde = 14/16/18
+    tipos?: ("T" | "TP" | "PL" | "S")[];       // restringe a estes tipos de aula (vazio = todos)
+  }[];
 }
 
 export function gerarSessoesConjunto(
@@ -711,6 +722,30 @@ export function gerarSessoesConjunto(
     if (!conflitoUC.has(a)) conflitoUC.set(a, new Set()); conflitoUC.get(a)!.add(b);
     if (!conflitoUC.has(b)) conflitoUC.set(b, new Set()); conflitoUC.get(b)!.add(a);
   }
+  // Restrições genéricas por UC (sigla → lista de bloqueios dia/período/tipo). Aplicam-se
+  // no caminho principal e na recuperação. Cobrem "X só de manhã", "Y não à sexta", etc.
+  const restricaoSigla = new Map<string, { dias: Set<string>; manha: boolean; tarde: boolean; tipos: Set<string> }[]>();
+  for (const r of (opts.restricoesUC || [])) {
+    const dias = new Set(r.diasProibidos || []);
+    const periodos = new Set(r.periodosProibidos || []);
+    const tipos = new Set(r.tipos || []);
+    for (const sig of (r.siglas || [])) {
+      if (!restricaoSigla.has(sig)) restricaoSigla.set(sig, []);
+      restricaoSigla.get(sig)!.push({ dias, manha: periodos.has("manha"), tarde: periodos.has("tarde"), tipos });
+    }
+  }
+  // True se um slot está PROIBIDO para esta (UC, tipo) por uma restrição genérica.
+  const slotProibido = (ucSigla: string, tipo: string, dia: string, hora: string): boolean => {
+    const rs = restricaoSigla.get(ucSigla); if (!rs) return false;
+    const ehManha = PERIODOS_MANHA.includes(hora);
+    for (const r of rs) {
+      if (r.tipos.size && !r.tipos.has(tipo)) continue;
+      if (r.dias.has(dia)) return true;
+      if (r.manha && ehManha) return true;
+      if (r.tarde && !ehManha) return true;
+    }
+    return false;
+  };
   const siglaMancha = new Map<string, Set<string>>(); // mancha → {siglas de UC} (qualquer tipo)
   // Semanas em que cada (UC, família) tem PL → nessas semanas parte-se a TP em 2+2 para
   // emparelhar com as 6 PL (bloco cheio 2TP+6PL). Fora delas, agrupam-se as 4 TP.
@@ -842,6 +877,7 @@ export function gerarSessoesConjunto(
       if (ref === undefined || ordSlot(wk.semanaGlobal, dia, hora) <= ref) return false;
     }
     if (t.placed >= t.total) return false;
+    if (!opts.semRegras && slotProibido(t.ucSigla, t.tipo, dia, hora)) return false; // restrição genérica por UC
     if (ocupacao.has(slotKey(t.ano, wk.semanaGlobal, t.turmaNome, dia, hora))) return false;
     const smk = tpManchaKey(t.ano, wk.semanaGlobal, dia, hora);
     const emConflito = conflitoUC.get(t.ucSigla);
@@ -902,6 +938,10 @@ export function gerarSessoesConjunto(
     if (t.tipo === "PL" && opts.plDiasPermitidos && opts.plDiasPermitidos.length) {
       const permitidos = new Set(opts.plDiasPermitidos);
       pool = pool.filter(s => permitidos.has(s.dia));
+    }
+    // Restrições GENÉRICAS por UC ("X só de manhã", "Y não à sexta", …) — bloqueiam slots.
+    if (!opts.semRegras && restricaoSigla.has(t.ucSigla)) {
+      pool = pool.filter(s => !slotProibido(t.ucSigla, t.tipo, s.dia, s.hora));
     }
     // Limite de 2 TP por mancha (salas de TP): não juntar as 4 TP no mesmo slot.
     if (t.tipo === "TP" && !opts.semRegras) {

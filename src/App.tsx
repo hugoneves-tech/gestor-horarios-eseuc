@@ -155,7 +155,7 @@ export default function App() {
   };
   // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
   // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
-  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB"] as const;
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC"] as const;
   const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
     const m = (r.config as any)?.motor;
     if (!m || typeof m !== "object") return false;
@@ -1445,7 +1445,7 @@ export default function App() {
         const anos = anosDaRegra(r);
         return anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
       };
-      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[] } = {};
+      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[]; restricoesUC?: any[] } = {};
       for (const r of regras) {
         if (!regraNoAmbito(r)) continue;
         const m = r.ativa && (r.config as any)?.motor;
@@ -1455,6 +1455,7 @@ export default function App() {
         if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
         if (Array.isArray(m.semanasSoTurmaA) && m.semanasSoTurmaA.length) motorAI.semanasSoTurmaA = m.semanasSoTurmaA.map(Number);
         if (Array.isArray(m.semanasSoTurmaB) && m.semanasSoTurmaB.length) motorAI.semanasSoTurmaB = m.semanasSoTurmaB.map(Number);
+        if (Array.isArray(m.restricoesUC)) motorAI.restricoesUC = [...(motorAI.restricoesUC || []), ...m.restricoesUC.filter((x: any) => x && Array.isArray(x.siglas) && x.siglas.length)];
       }
       // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
       // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
@@ -1480,6 +1481,8 @@ export default function App() {
         semRegras,
         // v2: sessões fixas (importadas/pins) — o motor completa à volta delas.
         sessoesFixas,
+        // Restrições genéricas por UC (das regras IA): "X só de manhã", "Y não à sexta", …
+        restricoesUC: motorAI.restricoesUC ?? [],
       };
 
       // Schedule each semester fairly across its UCs (round-robin per week).
