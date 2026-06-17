@@ -45,19 +45,9 @@ import {
   ListChecks
 } from "lucide-react";
 
-import {
-  generateEseucTurmas,
-  cursosIniciais,
-  anosSemestresIniciais,
-  ucsIniciais,
-  docentesIniciais,
-  salasIniciais,
-  turmasIniciais,
-  feriadosIniciais,
-  regrasIniciais,
-  versoesIniciais,
-  solverRunsIniciais
-} from "./mockData";
+// Supabase-only: a app NÃO importa dados-semente (UCs/docentes/salas/…). Toda a informação
+// vem do Supabase em runtime. generateEseucTurmas é só um helper (gera config de turmas), não dados.
+import { generateEseucTurmas } from "./mockData";
 
 import {
   Curso,
@@ -81,7 +71,6 @@ import { gerarSessoesConjunto, calcularSemanas, type EntradaUC } from "./utils/d
 import { parseHorarioCSV, gerarTemplateCSV, type ErroLinha } from "./utils/importacao";
 import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
 import { repo } from "./data/supabaseRepo";
-import { dadosIniciais } from "./data/seed";
 
 export default function App() {
   // Theme and Vibe State for ESEUC Coimbra
@@ -105,16 +94,19 @@ export default function App() {
   }, [activeTab]);
 
   // Domain States (Representing PostgreSQL collections held in reactive memory)
-  const [cursos, setCursos] = useState<Curso[]>(cursosIniciais);
-  const [anosSemestres, setAnosSemestres] = useState<AnoLetivoSemestre[]>(anosSemestresIniciais);
-  const [ucs, setUcs] = useState<UC[]>(ucsIniciais);
-  const [docentes, setDocentes] = useState<Docente[]>(docentesIniciais);
-  const [salas, setSalas] = useState<Sala[]>(salasIniciais);
-  const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
-  const [feriados, setFeriados] = useState<FeriadoInterrupcao[]>(feriadosIniciais);
-  const [regras, setRegras] = useState<RegraHorario[]>(regrasIniciais);
-  const [versoes, setVersoes] = useState<VersaoHorario[]>(versoesIniciais);
-  const [solverRuns, setSolverRuns] = useState<SolverRun[]>(solverRunsIniciais);
+  // Supabase-only: estado arranca VAZIO e é preenchido pelo carregamento inicial do Supabase.
+  // Nada de dados-semente no código. O auto-save só liga após um carregamento bem-sucedido
+  // (flag podeGravar), para um erro de carregamento nunca disparar uma gravação que apague tudo.
+  const [cursos, setCursos] = useState<Curso[]>([]);
+  const [anosSemestres, setAnosSemestres] = useState<AnoLetivoSemestre[]>([]);
+  const [ucs, setUcs] = useState<UC[]>([]);
+  const [docentes, setDocentes] = useState<Docente[]>([]);
+  const [salas, setSalas] = useState<Sala[]>([]);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [feriados, setFeriados] = useState<FeriadoInterrupcao[]>([]);
+  const [regras, setRegras] = useState<RegraHorario[]>([]);
+  const [versoes, setVersoes] = useState<VersaoHorario[]>([]);
+  const [solverRuns, setSolverRuns] = useState<SolverRun[]>([]);
 
   // Active Context Filters
   const [selectedSemestreId, setSelectedSemestreId] = useState<string>("as1");
@@ -133,6 +125,9 @@ export default function App() {
   }, [perfil?.papel]);
   const [cloudStatus, setCloudStatus] = useState<"offline" | "synced" | "saving" | "error">("offline");
   const [dbLoaded, setDbLoaded] = useState<boolean>(false);
+  // Só fica true após um carregamento BEM-SUCEDIDO do Supabase. O auto-save exige isto, para
+  // que um erro de leitura (estado vazio) nunca dispare uma gravação que apague a base de dados.
+  const [podeGravar, setPodeGravar] = useState<boolean>(false);
 
   const [selectedYearFilter, setSelectedYearFilter] = useState<number | "todos">("todos");
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState<number | "todos">(1);
@@ -1088,34 +1083,33 @@ export default function App() {
   // Carregamento inicial a partir do Supabase (fonte de verdade).
   // Nao depende do login: o RLS esta aberto por agora (fecha-se com a auth).
   useEffect(() => {
-    if (!repo.disponivel()) { setDbLoaded(true); return; }
+    if (!repo.disponivel()) { setDbLoaded(true); return; } // sem Supabase: app vazia, sem auto-save.
 
     let isMounted = true;
     setCloudStatus("saving");
     repo.carregarTudo()
-      .then(async (d) => {
+      .then((d) => {
         if (!isMounted) return;
-        const vazio = d.ucs.length === 0 && d.cursos.length === 0;
-        if (vazio) {
-          await repo.guardarTudo(dadosIniciais());
-          if (!isMounted) return;
-          showToast("Base de dados Supabase semeada com os dados ESEUC iniciais.");
-        } else {
-          setCursos(d.cursos);
-          setAnosSemestres(d.anosSemestres);
-          setUcs(d.ucs);
-          setDocentes(d.docentes);
-          setSalas(d.salas);
-          setTurmas(d.turmas);
-          setFeriados(d.feriados);
-          setRegras(d.regras);
-          setVersoes(d.versoes);
-          setSolverRuns(d.solverRuns);
+        // Supabase é a ÚNICA fonte de verdade: preenche sempre (mesmo vazio). Sem auto-seed.
+        setCursos(d.cursos);
+        setAnosSemestres(d.anosSemestres);
+        setUcs(d.ucs);
+        setDocentes(d.docentes);
+        setSalas(d.salas);
+        setTurmas(d.turmas);
+        setFeriados(d.feriados);
+        setRegras(d.regras);
+        setVersoes(d.versoes);
+        setSolverRuns(d.solverRuns);
+        if (d.ucs.length === 0 && d.cursos.length === 0) {
+          showToast("Base de dados Supabase vazia. Importe um modelo ou crie os dados pela aplicação.");
         }
         setDbLoaded(true);
+        setPodeGravar(true); // só aqui: carregamento OK → seguro auto-gravar.
         setCloudStatus("synced");
       })
       .catch((err) => {
+        // NÃO ligar o auto-save: com estado vazio, gravar apagaria a base de dados.
         console.error("Erro a carregar do Supabase:", err);
         setCloudStatus("error");
         setDbLoaded(true);
@@ -1127,7 +1121,16 @@ export default function App() {
   // Auto-gravacao (debounced) no Supabase. Usa upsert: adicoes/edicoes persistem;
   // a sincronizacao de REMOCOES e um refinamento seguinte.
   useEffect(() => {
-    if (!repo.disponivel() || !dbLoaded) return;
+    // podeGravar (não dbLoaded): um carregamento falhado deixa o estado vazio; gravá-lo apagaria
+    // a base de dados (apagarEmFalta sem ids = apaga tudo). Só gravamos após um load bem-sucedido.
+    if (!repo.disponivel() || !podeGravar) return;
+    // Salvaguarda extra: nunca auto-gravar um estado COMPLETAMENTE vazio. Um carregamento que
+    // devolva 0 linhas (ex.: sessão sem permissões RLS) não deve disparar o deletion-sync e
+    // apagar a base de dados. Para limpar de propósito usa-se "Limpar Base de Dados" (que mantém
+    // cursos/anos/turmas/feriados → o estado nunca fica totalmente vazio por essa via).
+    const tudoVazio = !cursos.length && !anosSemestres.length && !ucs.length && !docentes.length &&
+      !salas.length && !turmas.length && !feriados.length && !regras.length && !versoes.length && !solverRuns.length;
+    if (tudoVazio) { setCloudStatus("synced"); return; }
     setCloudStatus("saving");
     const delayDebounce = setTimeout(() => {
       repo.guardarTudo({
@@ -1137,7 +1140,7 @@ export default function App() {
         .catch((err) => { console.error("Erro a gravar no Supabase:", err); setCloudStatus("error"); });
     }, 1500);
     return () => clearTimeout(delayDebounce);
-  }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns, dbLoaded]);
+  }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns, podeGravar]);
 
   const handleLogout = async () => {
     await signOut();
@@ -1311,14 +1314,6 @@ export default function App() {
     setVersoes([]);
     setSolverRuns([]);
     showToast("Base de dados académica limpa (sincronizado com o Supabase).");
-  };
-
-  const handleRestoreDatabaseMock = async () => {
-    if (!window.confirm("Repor as Unidades Curriculares (modelos pedagógicos) predefinidas da ESEUC?\n\nSÓ as UCs são substituídas pelas originais do sistema. As tuas REGRAS, PROPOSTAS, SALAS e DOCENTES NÃO são afetadas.")) {
-      return;
-    }
-    setUcs(ucsIniciais);
-    showToast("Unidades Curriculares repostas. Regras, propostas, salas e docentes preservados.");
   };
 
   // Exporta o ESTADO ATUAL (ao vivo — o que está carregado do Supabase + edições desta sessão)
@@ -2300,6 +2295,18 @@ export default function App() {
       ? `Semana ${semana} validada e bloqueada — não muda ao regenerar.`
       : `Semana ${semana} desbloqueada.`);
   };
+
+  // Supabase-only: enquanto a 1.ª leitura não respondeu, mostra um ecrã de carregamento em vez
+  // do estado vazio (evita "flash" de tabelas sem dados). dbLoaded fica true em sucesso OU erro.
+  if (repo.disponivel() && !dbLoaded) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAF8F5] text-stone-700">
+        <Calendar className="w-10 h-10 text-amber-500 animate-pulse" />
+        <p className="text-sm font-serif">A carregar a base de dados (Supabase)…</p>
+        <p className="text-[11px] text-stone-400">Gestor de Horários ESEUC</p>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${themeStyles.bgColor} ${themeStyles.textColor} transition-colors duration-300 flex flex-col font-sans`}>
@@ -5625,7 +5632,7 @@ export default function App() {
                     Manutenção e Limpeza da Base de Dados Académica (Cloud)
                   </h4>
                   <p className="text-[10.5px] text-stone-500 font-light max-w-xl leading-relaxed">
-                    Precisa de redefinir o planeamento ou começar as turmas do zero? Use estes controlos para limpar completamente a base de dados do semestre corrente (zerando disciplinas, docentes, salas e propostas) ou repor instantaneamente os modelos de demonstração predefinidos da ESEUC.
+                    A base de dados (Supabase) é a única fonte de verdade — não há modelos no código. Exporte uma cópia de segurança do estado atual em JSON, ou limpe completamente a base de dados do semestre corrente (zerando disciplinas, docentes, salas e propostas). Para repor os dados-base, importe um modelo (ou aplique o <code>seed-supabase.sql</code>).
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -5636,13 +5643,6 @@ export default function App() {
                   >
                     <Download className="w-3.5 h-3.5 text-emerald-600" />
                     Exportar tudo (JSON)
-                  </button>
-                  <button
-                    onClick={handleRestoreDatabaseMock}
-                    className="px-3 py-1.5 hover:bg-stone-100 text-stone-700 hover:text-stone-950 border border-stone-250 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-stone-500" />
-                    Repor Modelos Pedagogicos
                   </button>
                   <button
                     onClick={handleClearDatabase}
