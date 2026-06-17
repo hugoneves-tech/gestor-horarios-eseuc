@@ -153,6 +153,14 @@ export default function App() {
     const c = (r.config as any)?.cursoIds;
     return Array.isArray(c) ? c.filter((x: any) => typeof x === "string") : [];
   };
+  // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
+  // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB"] as const;
+  const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
+    const m = (r.config as any)?.motor;
+    if (!m || typeof m !== "object") return false;
+    return MOTOR_PARAMS_SUPORTADOS.some(k => { const v = (m as any)[k]; return Array.isArray(v) ? v.length > 0 : typeof v === "number" ? v > 0 : false; });
+  };
 
   // Helper to generate a reliable week label based on the academic calendar (ignoring holidays for display purpose simply)
   const getWeekLabel = (week: number) => {
@@ -1306,16 +1314,11 @@ export default function App() {
   };
 
   const handleRestoreDatabaseMock = async () => {
-    if (!window.confirm("Deseja repor os modelos académicos predefinidos da ESEUC para este semestre? Os dados atuais serão substituídos pelos dados originais.")) {
+    if (!window.confirm("Repor as Unidades Curriculares (modelos pedagógicos) predefinidas da ESEUC?\n\nSÓ as UCs são substituídas pelas originais do sistema. As tuas REGRAS, PROPOSTAS, SALAS e DOCENTES NÃO são afetadas.")) {
       return;
     }
     setUcs(ucsIniciais);
-    setDocentes(docentesIniciais);
-    setSalas(salasIniciais);
-    setRegras(regrasIniciais);
-    setVersoes(versoesIniciais);
-    setSolverRuns(solverRunsIniciais);
-    showToast("Modelos académicos predefinidos repostos (gravado no Supabase).");
+    showToast("Unidades Curriculares repostas. Regras, propostas, salas e docentes preservados.");
   };
 
   const handleAddSala = () => {
@@ -1796,6 +1799,9 @@ export default function App() {
                 {cursosDaRegra(reg).map(id => cursos.find(c => c.id === id)?.sigla || id).join(", ")}
               </span>
             )}
+            {regraAplicadaAoMotor(reg)
+              ? <span title="Esta regra traduz-se num parâmetro do motor e É aplicada na geração." className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">⚙ Aplicada</span>
+              : <span title="O motor ainda não sabe aplicar esta restrição (config.motor vazio). Fica documental — visível mas não influencia a geração." className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-200 text-stone-600 border border-stone-300">📄 Documental</span>}
           </div>
           <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
           <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
