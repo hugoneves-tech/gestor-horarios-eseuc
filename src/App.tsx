@@ -255,6 +255,9 @@ export default function App() {
   const [showDistDocentes, setShowDistDocentes] = useState(false);
   const [ucsSelDocentes, setUcsSelDocentes] = useState<Set<string>>(new Set());
   const [atribDocente, setAtribDocente] = useState<Record<string, string[]>>({});
+  // Turmas (key `${sigla}|${turma}`) BLOQUEADAS: o auto-propor não lhes toca; rearranja só as livres.
+  const [docentesTravados, setDocentesTravados] = useState<Set<string>>(new Set());
+  const toggleTravarTurma = (key: string) => setDocentesTravados(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1908,6 +1911,15 @@ export default function App() {
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: novas } : v));
     showToast(`Salas propostas: ${atribuidas} atribuídas${semSala ? ` · ${semSala} sem sala livre` : ""}.`);
   };
+  // Aviso de conflito de sala numa sessão: dupla-marcação no mesmo bloco ou capacidade insuficiente.
+  const avisoSala = (sessao: SessaoHorario): string | null => {
+    if (!sessao.sala) return null;
+    const mesmas = (activeVersao?.sessoes || []).filter(s => s.sala === sessao.sala && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio);
+    if (mesmas.length > 1) return `Sala "${sessao.sala}" repetida neste bloco (${mesmas.length} aulas).`;
+    const sala = salas.find(r => r.nome === sessao.sala);
+    if (sala && (sala.capacidade || 0) < alunosDaTurma(sessao.turma)) return `Capacidade ${sala.capacidade} < ${alunosDaTurma(sessao.turma)} alunos.`;
+    return null;
+  };
 
   // ===== Distribuição de DOCENTES — "sorteio" com propagação de restrições =====
   type GrupoDoc = { key: string; sigla: string; ucNome: string; turma: string; tipo: string; slotKeys: Set<string>; slots: { dia: string; ini: string; fim: string }[] };
@@ -1956,21 +1968,22 @@ export default function App() {
     }
     return Math.max(0, ...Object.values(porSemana)) * 2;
   };
-  // Domínio de uma turma = elegíveis ∩ disponíveis ∩ sem-conflito ∩ ainda-não-nesta-turma.
-  // (As horas NÃO excluem — é soft; só se assinala.)
+  // Domínio de uma turma = elegíveis ∩ sem-conflito ∩ ainda-não-nesta-turma.
+  // HARD: elegibilidade + sem-conflito (impossibilidade física). SOFT: disponibilidade e horas
+  // (não excluem — assinalam-se; disponíveis vêm primeiro).
   const dominioDocente = (g: GrupoDoc, atrib: Record<string, string[]>, slotKeysMap: Map<string, Set<string>>): { lista: Docente[]; fallback: boolean } => {
     const { lista, fallback } = docentesElegiveis(g.sigla, g.tipo, g.turma);
     const jaNaTurma = new Set(atrib[g.key] || []);
-    const livres = lista.filter(d => {
+    const validos = lista.filter(d => {
       if (jaNaTurma.has(d.nome)) return false;
-      if (!docenteDisponivel(d, g.slots)) return false;
       for (const [k2, nomes] of Object.entries(atrib)) {
         if (k2 === g.key || !nomes.includes(d.nome)) continue;
         const sk2 = slotKeysMap.get(k2); if (sk2) for (const x of g.slotKeys) if (sk2.has(x)) return false;
       }
       return true;
     });
-    return { lista: livres, fallback };
+    validos.sort((a, b) => (docenteDisponivel(b, g.slots) ? 1 : 0) - (docenteDisponivel(a, g.slots) ? 1 : 0));
+    return { lista: validos, fallback };
   };
   // Aplica (UC,turma)→[docentes] às sessões (docente = nomes juntos por vírgula).
   const aplicarDocentes = (atrib: Record<string, string[]>) => {
@@ -1994,32 +2007,37 @@ export default function App() {
     setAtribDocente(next); aplicarDocentes(next);
   };
   // Auto-proposta: preenche cada turma até ao alvo (T/TP:2, PL:1), turmas mais restritas
-  // primeiro; prefere docentes abaixo das 12h (soft) e menos carregados.
+  // primeiro; prefere disponíveis, depois abaixo das 12h (soft) e menos carregados.
+  // BLOQUEIO: as turmas travadas mantêm-se; as livres (selecionadas) são rearranjadas de novo.
   const autoProporDocentes = () => {
     const grupos = gruposDocentes().filter(g => ucsSelDocentes.has(g.sigla));
     const slotKeysMap = new Map(gruposDocentes().map(g => [g.key, g.slotKeys])); // todas, p/ conflito/horas
     const atrib: Record<string, string[]> = {};
     for (const k of Object.keys(atribDocente)) atrib[k] = [...atribDocente[k]];
+    for (const g of grupos) if (!docentesTravados.has(g.key)) delete atrib[g.key]; // rearranja as não travadas
     let progresso = true, adicionadas = 0;
     while (progresso) {
       progresso = false;
       let alvo: GrupoDoc | null = null; let dom: Docente[] = [];
       for (const g of grupos) {
+        if (docentesTravados.has(g.key)) continue;
         if ((atrib[g.key]?.length || 0) >= targetDocsTipo(g.tipo)) continue;
         const d = dominioDocente(g, atrib, slotKeysMap).lista;
         if (!alvo || d.length < dom.length) { alvo = g; dom = d; }
       }
       if (alvo && dom.length) {
+        const slots = alvo.slots;
         const esc = [...dom].sort((a, b) => {
+          const da = docenteDisponivel(a, slots) ? 0 : 1, db = docenteDisponivel(b, slots) ? 0 : 1;
           const ha = horasSemanaisDoc(a.nome, atrib, slotKeysMap), hb = horasSemanaisDoc(b.nome, atrib, slotKeysMap);
-          return (ha >= LIMITE_HORAS_SOFT ? 1 : 0) - (hb >= LIMITE_HORAS_SOFT ? 1 : 0) || ha - hb;
+          return da - db || (ha >= LIMITE_HORAS_SOFT ? 1 : 0) - (hb >= LIMITE_HORAS_SOFT ? 1 : 0) || ha - hb;
         })[0];
         atrib[alvo.key] = [...(atrib[alvo.key] || []), esc.nome]; adicionadas++; progresso = true;
       }
     }
     const incompletas = grupos.filter(g => (atrib[g.key]?.length || 0) < targetDocsTipo(g.tipo)).length;
     setAtribDocente(atrib); aplicarDocentes(atrib);
-    showToast(`Docentes: ${adicionadas} atribuições${incompletas ? ` · ${incompletas} turmas abaixo do alvo` : ""}.`);
+    showToast(`Docentes: ${adicionadas} atribuições${incompletas ? ` · ${incompletas} abaixo do alvo` : ""}.`);
   };
   const abrirDistDocentes = () => {
     setUcsSelDocentes(new Set(gruposDocentes().map(g => g.sigla)));
@@ -3615,8 +3633,11 @@ export default function App() {
                           const podeAdd = atrib.length < cap;
                           const semOpcao = atrib.length === 0 && lista.length === 0;
                           return (
-                            <div key={g.key} className="flex items-start gap-1.5 text-[11px] py-0.5">
-                              <span className="font-mono font-bold text-stone-600 w-14 shrink-0 truncate mt-0.5">{rotuloTurma(g.turma)}</span>
+                            <div key={g.key} className={`flex items-start gap-1.5 text-[11px] py-0.5 ${docentesTravados.has(g.key) ? "bg-amber-50/50 rounded-lg px-1 -mx-1" : ""}`}>
+                              <button onClick={() => toggleTravarTurma(g.key)} title={docentesTravados.has(g.key) ? "Turma bloqueada — o auto-propor não lhe toca. Clica para desbloquear." : "Bloquear: o auto-propor mantém estes docentes e rearranja só as outras turmas."} className="shrink-0 mt-0.5 cursor-pointer">
+                                {docentesTravados.has(g.key) ? <Lock className="w-3 h-3 text-amber-600" /> : <Unlock className="w-3 h-3 text-stone-300 hover:text-stone-500" />}
+                              </button>
+                              <span className="font-mono font-bold text-stone-600 w-12 shrink-0 truncate mt-0.5">{rotuloTurma(g.turma)}</span>
                               <span className="text-[8.5px] text-stone-400 w-12 shrink-0 mt-0.5 leading-tight">{g.tipo}·{g.slotKeys.size * 2}h<br /><span className="text-stone-300">máx {cap}</span></span>
                               <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
                                 {atrib.map(nome => {
@@ -3635,7 +3656,8 @@ export default function App() {
                                     <option value="">{semOpcao ? "— sem disponível —" : "+ adicionar"}</option>
                                     {lista.map(d => {
                                       const h = horasSemanaisDoc(d.nome, atribDocente, slotKeysMap);
-                                      return <option key={d.id} value={d.nome}>{d.nome}{h >= LIMITE_HORAS_SOFT ? ` (${h}h ⚠)` : ""}</option>;
+                                      const indisp = !docenteDisponivel(d, g.slots);
+                                      return <option key={d.id} value={d.nome}>{d.nome}{indisp ? " (fora disp.)" : ""}{h >= LIMITE_HORAS_SOFT ? ` · ${h}h ⚠` : ""}</option>;
                                     })}
                                   </select>
                                 )}
@@ -4766,6 +4788,7 @@ export default function App() {
                                         ) : (
                                           <span>{sessao.sala}</span>
                                         )}
+                                        {avisoSala(sessao) && <span title={avisoSala(sessao)!} className="text-rose-500 font-bold shrink-0">⚠</span>}
                                       </div>
 
                                       {(incluirDocentes || sessao.docente) && (
