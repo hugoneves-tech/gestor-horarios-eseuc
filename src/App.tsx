@@ -1321,6 +1321,30 @@ export default function App() {
     showToast("Unidades Curriculares repostas. Regras, propostas, salas e docentes preservados.");
   };
 
+  // Exporta o ESTADO ATUAL (ao vivo — o que está carregado do Supabase + edições desta sessão)
+  // para um JSON portátil. Backup completo de salas/docentes/regras/propostas reais, ao contrário
+  // do scripts/exportar-mockdata.ts que só exporta os dados-semente do código.
+  const handleExportarTudo = () => {
+    const dados = {
+      exportadoEm: new Date().toISOString(),
+      cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns,
+    };
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gestor-horarios-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(
+      `Backup exportado: ${ucs.length} UCs · ${docentes.length} docentes · ${salas.length} salas · ` +
+      `${regras.length} regras · ${versoes.length} propostas.`
+    );
+  };
+
   const handleAddSala = () => {
     if (!newSala.nome) return;
     const item: Sala = {
@@ -5605,6 +5629,14 @@ export default function App() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleExportarTudo}
+                    className="px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                    title="Descarrega um JSON com TODO o estado atual (carregado do Supabase + edições): UCs, docentes, salas, turmas, regras e propostas."
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-600" />
+                    Exportar tudo (JSON)
+                  </button>
                   <button
                     onClick={handleRestoreDatabaseMock}
                     className="px-3 py-1.5 hover:bg-stone-100 text-stone-700 hover:text-stone-950 border border-stone-250 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
