@@ -250,10 +250,11 @@ export default function App() {
   const [incluirDocentes, setIncluirDocentes] = useState<boolean>(() => { try { return localStorage.getItem("eseuc_incluir_docentes") === "1"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("eseuc_incluir_salas", incluirSalas ? "1" : "0"); } catch { /* ignore */ } }, [incluirSalas]);
   useEffect(() => { try { localStorage.setItem("eseuc_incluir_docentes", incluirDocentes ? "1" : "0"); } catch { /* ignore */ } }, [incluirDocentes]);
-  // Ecrã do "sorteio" de docentes: UCs selecionadas + atribuições (UC,turma)→docente.
+  // Ecrã do "sorteio" de docentes: UCs selecionadas + atribuições (UC,turma)→LISTA de docentes
+  // (T/TP: 2-3 docentes; PL: 1). Um docente pode ter várias turmas.
   const [showDistDocentes, setShowDistDocentes] = useState(false);
   const [ucsSelDocentes, setUcsSelDocentes] = useState<Set<string>>(new Set());
-  const [atribDocente, setAtribDocente] = useState<Record<string, string>>({});
+  const [atribDocente, setAtribDocente] = useState<Record<string, string[]>>({});
   const [newUc, setNewUc] = useState<Partial<UC>>({
     nome: "",
     sigla: "",
@@ -1941,60 +1942,89 @@ export default function App() {
     return { lista: docentes, fallback: true };
   };
   // Domínio de uma turma = elegíveis ∩ disponíveis ∩ sem-conflito (dado o estado atual de atribuições).
-  const dominioDocente = (g: GrupoDoc, atrib: Record<string, string>, slotKeysMap: Map<string, Set<string>>): { lista: Docente[]; fallback: boolean } => {
+  // Nº de docentes por turma: T/TP até 3 (alvo 2), PL exatamente 1.
+  const LIMITE_HORAS_SOFT = 12; // máx. horas/semana (soft — pode ser ultrapassado)
+  const capDocsTipo = (tipo: string) => tipo === "PL" ? 1 : (tipo === "T" || tipo === "TP") ? 3 : 2;
+  const targetDocsTipo = (tipo: string) => tipo === "PL" ? 1 : (tipo === "T" || tipo === "TP") ? 2 : 1;
+  // Horas na semana de PICO de um docente (blocos por semana × 2) — para o limite soft.
+  const horasSemanaisDoc = (nome: string, atrib: Record<string, string[]>, slotKeysMap: Map<string, Set<string>>): number => {
+    const porSemana: Record<string, number> = {};
+    for (const [k, lista] of Object.entries(atrib)) {
+      if (!lista.includes(nome)) continue;
+      const sk = slotKeysMap.get(k); if (!sk) continue;
+      for (const x of sk) { const sem = x.split("|")[0]; porSemana[sem] = (porSemana[sem] || 0) + 1; }
+    }
+    return Math.max(0, ...Object.values(porSemana)) * 2;
+  };
+  // Domínio de uma turma = elegíveis ∩ disponíveis ∩ sem-conflito ∩ ainda-não-nesta-turma.
+  // (As horas NÃO excluem — é soft; só se assinala.)
+  const dominioDocente = (g: GrupoDoc, atrib: Record<string, string[]>, slotKeysMap: Map<string, Set<string>>): { lista: Docente[]; fallback: boolean } => {
     const { lista, fallback } = docentesElegiveis(g.sigla, g.tipo, g.turma);
+    const jaNaTurma = new Set(atrib[g.key] || []);
     const livres = lista.filter(d => {
+      if (jaNaTurma.has(d.nome)) return false;
       if (!docenteDisponivel(d, g.slots)) return false;
-      for (const [k2, nome] of Object.entries(atrib)) {
-        if (k2 === g.key || nome !== d.nome) continue;
+      for (const [k2, nomes] of Object.entries(atrib)) {
+        if (k2 === g.key || !nomes.includes(d.nome)) continue;
         const sk2 = slotKeysMap.get(k2); if (sk2) for (const x of g.slotKeys) if (sk2.has(x)) return false;
       }
       return true;
     });
     return { lista: livres, fallback };
   };
-  // Aplica as atribuições (UC,turma)→docente a todas as sessões correspondentes da proposta.
-  const aplicarDocentes = (atrib: Record<string, string>) => {
+  // Aplica (UC,turma)→[docentes] às sessões (docente = nomes juntos por vírgula).
+  const aplicarDocentes = (atrib: Record<string, string[]>) => {
     if (!activeVersao) return;
     const updated = activeVersao.sessoes.map(s => {
-      const nome = atrib[`${s.ucSigla}|${s.turma}`];
-      return nome !== undefined ? { ...s, docente: nome } : s;
+      const lista = atrib[`${s.ucSigla}|${s.turma}`];
+      return lista !== undefined ? { ...s, docente: lista.join(", ") } : s;
     });
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
   };
-  const definirDocenteTurma = (key: string, nome: string) => {
-    const next = { ...atribDocente }; if (nome) next[key] = nome; else delete next[key];
+  const adicionarDocenteTurma = (key: string, nome: string, tipo: string) => {
+    if (!nome) return;
+    const cur = atribDocente[key] || [];
+    if (cur.includes(nome) || cur.length >= capDocsTipo(tipo)) return;
+    const next = { ...atribDocente, [key]: [...cur, nome] };
     setAtribDocente(next); aplicarDocentes(next);
   };
-  // Auto-proposta: atribui primeiro as turmas mais restritas (menor domínio), propagando.
+  const removerDocenteTurma = (key: string, nome: string) => {
+    const restantes = (atribDocente[key] || []).filter(n => n !== nome);
+    const next = { ...atribDocente }; if (restantes.length) next[key] = restantes; else delete next[key];
+    setAtribDocente(next); aplicarDocentes(next);
+  };
+  // Auto-proposta: preenche cada turma até ao alvo (T/TP:2, PL:1), turmas mais restritas
+  // primeiro; prefere docentes abaixo das 12h (soft) e menos carregados.
   const autoProporDocentes = () => {
     const grupos = gruposDocentes().filter(g => ucsSelDocentes.has(g.sigla));
-    const slotKeysMap = new Map(grupos.map(g => [g.key, g.slotKeys]));
-    const carga: Record<string, number> = {};
-    const atrib = { ...atribDocente };
-    for (const k of Object.keys(atrib)) carga[atrib[k]] = (carga[atrib[k]] || 0) + 1;
-    let progresso = true, atribuidas = 0;
+    const slotKeysMap = new Map(gruposDocentes().map(g => [g.key, g.slotKeys])); // todas, p/ conflito/horas
+    const atrib: Record<string, string[]> = {};
+    for (const k of Object.keys(atribDocente)) atrib[k] = [...atribDocente[k]];
+    let progresso = true, adicionadas = 0;
     while (progresso) {
       progresso = false;
       let alvo: GrupoDoc | null = null; let dom: Docente[] = [];
       for (const g of grupos) {
-        if (atrib[g.key]) continue;
+        if ((atrib[g.key]?.length || 0) >= targetDocsTipo(g.tipo)) continue;
         const d = dominioDocente(g, atrib, slotKeysMap).lista;
         if (!alvo || d.length < dom.length) { alvo = g; dom = d; }
       }
       if (alvo && dom.length) {
-        const esc = [...dom].sort((a, b) => (carga[a.nome] || 0) - (carga[b.nome] || 0))[0]; // menos carregado
-        atrib[alvo.key] = esc.nome; carga[esc.nome] = (carga[esc.nome] || 0) + 1; atribuidas++; progresso = true;
+        const esc = [...dom].sort((a, b) => {
+          const ha = horasSemanaisDoc(a.nome, atrib, slotKeysMap), hb = horasSemanaisDoc(b.nome, atrib, slotKeysMap);
+          return (ha >= LIMITE_HORAS_SOFT ? 1 : 0) - (hb >= LIMITE_HORAS_SOFT ? 1 : 0) || ha - hb;
+        })[0];
+        atrib[alvo.key] = [...(atrib[alvo.key] || []), esc.nome]; adicionadas++; progresso = true;
       }
     }
-    const semOpcao = grupos.filter(g => !atrib[g.key]).length;
+    const incompletas = grupos.filter(g => (atrib[g.key]?.length || 0) < targetDocsTipo(g.tipo)).length;
     setAtribDocente(atrib); aplicarDocentes(atrib);
-    showToast(`Docentes propostos: ${atribuidas} turmas${semOpcao ? ` · ${semOpcao} sem opção disponível` : ""}.`);
+    showToast(`Docentes: ${adicionadas} atribuições${incompletas ? ` · ${incompletas} turmas abaixo do alvo` : ""}.`);
   };
   const abrirDistDocentes = () => {
     setUcsSelDocentes(new Set(gruposDocentes().map(g => g.sigla)));
-    const atrib: Record<string, string> = {};
-    for (const s of activeVersao?.sessoes || []) if (s.docente) atrib[`${s.ucSigla}|${s.turma}`] = s.docente;
+    const atrib: Record<string, string[]> = {};
+    for (const s of activeVersao?.sessoes || []) if (s.docente) atrib[`${s.ucSigla}|${s.turma}`] = s.docente.split(",").map(x => x.trim()).filter(Boolean);
     setAtribDocente(atrib);
     setShowDistDocentes(true);
   };
@@ -3580,21 +3610,37 @@ export default function App() {
                       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {gs.map(g => {
                           const { lista, fallback } = dominioDocente(g, atribDocente, slotKeysMap);
-                          const atual = atribDocente[g.key] || "";
-                          const opcoes: { id: string; nome: string }[] = atual && !lista.some(d => d.nome === atual)
-                            ? [{ id: "__atual", nome: atual }, ...lista.map(d => ({ id: d.id, nome: d.nome }))]
-                            : lista.map(d => ({ id: d.id, nome: d.nome }));
-                          const vazio = opcoes.length === 0;
+                          const atrib = atribDocente[g.key] || [];
+                          const cap = capDocsTipo(g.tipo);
+                          const podeAdd = atrib.length < cap;
+                          const semOpcao = atrib.length === 0 && lista.length === 0;
                           return (
-                            <div key={g.key} className="flex items-center gap-1.5 text-[11px]">
-                              <span className="font-mono font-bold text-stone-600 w-14 shrink-0 truncate">{rotuloTurma(g.turma)}</span>
-                              <span className="text-[9px] text-stone-400 w-12 shrink-0">{g.tipo}·{g.slotKeys.size * 2}h</span>
-                              <select value={atual} onChange={(e) => definirDocenteTurma(g.key, e.target.value)} onClick={(e) => e.stopPropagation()}
-                                className={`flex-1 min-w-0 border rounded-lg px-1.5 py-1 text-[10px] cursor-pointer ${vazio ? "border-rose-300 bg-rose-50" : "border-stone-200"}`}>
-                                <option value="">{vazio ? "— sem docente disponível —" : "— escolher —"}</option>
-                                {opcoes.map(d => <option key={d.id} value={d.nome}>{d.nome}</option>)}
-                              </select>
-                              {fallback && <span title="Nenhum docente configurado para esta UC — a mostrar todos. Configura em Docentes." className="text-amber-500 shrink-0">⚠</span>}
+                            <div key={g.key} className="flex items-start gap-1.5 text-[11px] py-0.5">
+                              <span className="font-mono font-bold text-stone-600 w-14 shrink-0 truncate mt-0.5">{rotuloTurma(g.turma)}</span>
+                              <span className="text-[8.5px] text-stone-400 w-12 shrink-0 mt-0.5 leading-tight">{g.tipo}·{g.slotKeys.size * 2}h<br /><span className="text-stone-300">máx {cap}</span></span>
+                              <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+                                {atrib.map(nome => {
+                                  const h = horasSemanaisDoc(nome, atribDocente, slotKeysMap);
+                                  const over = h > LIMITE_HORAS_SOFT;
+                                  return (
+                                    <span key={nome} title={over ? `${h}h/semana (acima das ${LIMITE_HORAS_SOFT}h)` : `${h}h/semana`} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold border ${over ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-stone-100 text-stone-700 border-stone-200"}`}>
+                                      {nome}{over ? " ⚠" : ""}
+                                      <button onClick={() => removerDocenteTurma(g.key, nome)} className="text-stone-400 hover:text-rose-600 font-bold">×</button>
+                                    </span>
+                                  );
+                                })}
+                                {podeAdd && (
+                                  <select value="" onChange={(e) => adicionarDocenteTurma(g.key, e.target.value, g.tipo)} onClick={(e) => e.stopPropagation()}
+                                    className={`border rounded-lg px-1.5 py-0.5 text-[10px] cursor-pointer ${semOpcao ? "border-rose-300 bg-rose-50" : "border-stone-200"}`}>
+                                    <option value="">{semOpcao ? "— sem disponível —" : "+ adicionar"}</option>
+                                    {lista.map(d => {
+                                      const h = horasSemanaisDoc(d.nome, atribDocente, slotKeysMap);
+                                      return <option key={d.id} value={d.nome}>{d.nome}{h >= LIMITE_HORAS_SOFT ? ` (${h}h ⚠)` : ""}</option>;
+                                    })}
+                                  </select>
+                                )}
+                                {fallback && <span title="Nenhum docente configurado para esta UC — a mostrar todos. Configura em Docentes." className="text-amber-500">⚠</span>}
+                              </div>
                             </div>
                           );
                         })}
