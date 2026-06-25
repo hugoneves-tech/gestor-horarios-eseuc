@@ -101,12 +101,13 @@ export interface FeriadoInterrupcao {
 export interface RegraHorario {
   id: string;
   nome: string;
-  tipo: "hard" | "soft";
+  tipo: "hard" | "soft" | "motor_ai";
   categoria: string; // e.g. "Docente", "Sala", "Estudante", "Calendário"
   descricao: string;
   escopo?: "transversal" | "ano";
   anoCurricular?: number | "todos";
   config: any; // JSONB parameters
+  parametros?: any; // Novo formato para regras complexas (ex. motor)
   peso: number; // for soft constraints, 1-10
   ativa: boolean;
 }

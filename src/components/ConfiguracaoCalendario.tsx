@@ -1,10 +1,8 @@
 import React, { useState, useMemo } from "react";
-import {
-  Calendar, ChevronDown, ChevronRight, Zap,
-  AlertTriangle, CheckCircle, Info, Clock
-} from "lucide-react";
-import type { AnoLetivoSemestre, UC, FeriadoInterrupcao, VersaoHorario } from "../types";
+import { Calendar, ChevronDown, ChevronRight, Zap, AlertTriangle, CheckCircle, Info, Clock, Settings } from "lucide-react";
+import type { AnoLetivoSemestre, UC, FeriadoInterrupcao, VersaoHorario, RegraHorario } from "../types";
 import { calcularSemanas, calcularPlano, gerarSessoesConjunto, type SemanaInfo, type PlanoSemanal, type EntradaUC } from "../utils/distribuicao";
+import { ModalConfigCalendario } from "./ModalConfigCalendario";
 
 interface Props {
   anosSemestres: AnoLetivoSemestre[];
@@ -13,15 +11,23 @@ interface Props {
   feriados: FeriadoInterrupcao[];
   versoes: VersaoHorario[];
   setVersoes: (v: VersaoHorario[]) => void;
+  prefManhaDe: (ano: number, sem: number) => boolean;
+  setPrefManha: (ano: number, sem: number, manha: boolean) => void;
+  regras: RegraHorario[];
+  setRegras: (v: RegraHorario[]) => void;
+  motorRegra: RegraHorario | undefined;
 }
 
 export function ConfiguracaoCalendario({
   anosSemestres, setAnosSemestres,
   ucs, feriados, versoes, setVersoes,
+  prefManhaDe, setPrefManha,
+  regras, setRegras, motorRegra
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSetDataInicio = (id: string, value: string) => {
     setAnosSemestres(anosSemestres.map(a => a.id === id ? { ...a, dataInicioSemestre: value } : a));
@@ -87,20 +93,41 @@ export function ConfiguracaoCalendario({
   return (
     <div className="bg-white rounded-2xl p-6 border border-stone-150 shadow-xs space-y-5">
       {/* Header */}
-      <div className="border-b border-stone-100 pb-3">
-        <span className="text-[10px] uppercase font-bold tracking-wider text-teal-700 font-mono">
-          Calendário Académico ESEUC
-        </span>
-        <h3 className="text-base font-serif font-bold text-stone-900 mt-1 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-teal-600" />
-          Configuração do Calendário e Distribuição Semanal
-        </h3>
-        <p className="text-xs text-stone-500 font-light mt-0.5 max-w-2xl">
-          Defina a data de início (segunda-feira da semana 1) de cada semestre. A aplicação
-          calcula automaticamente a distribuição proporcional de T → TP → PL ao longo das
-          semanas letivas disponíveis, tendo em conta feriados e interrupções.
-        </p>
+      <div className="border-b border-stone-100 pb-3 flex justify-between items-start gap-4">
+        <div>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-teal-700 font-mono">
+            Calendário Académico ESEUC
+          </span>
+          <h3 className="text-base font-serif font-bold text-stone-900 mt-1 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-teal-600" />
+            Configuração do Calendário e Distribuição Semanal
+          </h3>
+          <p className="text-xs text-stone-500 font-light mt-0.5 max-w-2xl">
+            Defina a data de início de cada semestre e as preferências das turmas. A aplicação
+            calcula automaticamente a distribuição proporcional ao longo das semanas letivas.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
+        >
+          <Settings className="w-4 h-4" />
+          Configurações Avançadas
+        </button>
       </div>
+
+      {isModalOpen && (
+        <ModalConfigCalendario
+          anosSemestres={anosSemestres}
+          onSave={setAnosSemestres}
+          onClose={() => setIsModalOpen(false)}
+          prefManhaDe={prefManhaDe}
+          setPrefManha={setPrefManha}
+          regras={regras}
+          setRegras={setRegras}
+          motorRegra={motorRegra}
+        />
+      )}
 
       {/* Info box */}
       <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
@@ -158,18 +185,6 @@ export function ConfiguracaoCalendario({
               </div>
 
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <label className="text-[10px] font-semibold text-stone-600 whitespace-nowrap">
-                    Início {anoSem.semestre}.º Sem.:
-                  </label>
-                  <input
-                    type="date"
-                    value={anoSem.dataInicioSemestre || ""}
-                    onChange={e => handleSetDataInicio(anoSem.id, e.target.value)}
-                    className="px-2 py-1 border border-stone-200 rounded-lg text-[10px] bg-white w-32 focus:outline-none focus:ring-1 focus:ring-teal-400"
-                    title="Selecione a segunda-feira da primeira semana letiva"
-                  />
-                </div>
                 {temData && (
                   <button
                     onClick={() => handleGerarSessoes(anoSem)}

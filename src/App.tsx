@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { useAuth } from "./auth/AuthProvider";
 import {
@@ -319,9 +319,11 @@ export default function App() {
     semanasPL: number[] | undefined,
     numSemanas: number | undefined,
     semestre: number | undefined,
+    semanaInicio: number | undefined,
     onChange: (s: number[] | undefined) => void
   ) => {
     const total = Math.max(1, Math.min(20, numSemanas || 15));
+    const startOffset = (semanaInicio || 1) - 1;
     const sel = new Set(semanasPL || []);
     const semanaGlobalBase = (semestre === 2 ? 15 : 0);
     const toggle = (n: number) => {
@@ -352,14 +354,14 @@ export default function App() {
           )}
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {Array.from({ length: total }, (_, i) => i + 1).map((n) => {
+          {Array.from({ length: total }, (_, i) => i + 1 + startOffset).map((n) => {
             const ativa = sel.has(n);
             return (
               <button
                 key={n}
                 type="button"
                 onClick={() => toggle(n)}
-                title={`Semana ${n} (global ${semanaGlobalBase + n})`}
+                title={`Semana do Semestre ${n} (global ${semanaGlobalBase + n})`}
                 className={`w-8 h-8 rounded-lg text-[11px] font-bold font-mono transition-all cursor-pointer border ${
                   ativa
                     ? "bg-indigo-600 border-indigo-700 text-white shadow-sm scale-105"
@@ -1142,6 +1144,49 @@ export default function App() {
     return () => clearTimeout(delayDebounce);
   }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns, podeGravar]);
 
+  // Sincronização em tempo real das regras (para garantir que criações da IA ou de outros utilizadores migram para todos)
+  useEffect(() => {
+    if (!repo.disponivel() || !dbLoaded) return;
+    let isSubscribed = true;
+    import("./data/supabaseClient").then(({ supabase }) => {
+      if (!supabase) return;
+      const channel = supabase
+        .channel('regras-sync')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'regras' },
+          () => {
+            // Recarrega regras para todos os clientes sempre que houver alteração
+            supabase.from('regras').select('*').then(({ data, error }) => {
+              if (error) {
+                console.error("Erro a recarregar regras em tempo real:", error);
+                return;
+              }
+              if (data && isSubscribed) {
+                import("./data/mappers").then(M => {
+                  const newRegras = data.map(M.rowToRegra);
+                  setRegras(prev => {
+                    // Evitar ciclo infinito: só atualiza se houver diferenças estruturais
+                    const stringifiedPrev = JSON.stringify(prev);
+                    const stringifiedNew = JSON.stringify(newRegras);
+                    if (stringifiedPrev !== stringifiedNew) {
+                       return newRegras;
+                    }
+                    return prev;
+                  });
+                });
+              }
+            });
+          }
+        )
+        .subscribe();
+      return () => {
+        isSubscribed = false;
+        supabase.removeChannel(channel);
+      };
+    });
+  }, [dbLoaded]);
+
   const handleLogout = async () => {
     await signOut();
   };
@@ -1414,6 +1459,58 @@ export default function App() {
       const ocupacaoGlobal = new Set<string>();
       const plCount = new Map<string, number>();
 
+      // pela última regra ativa que os defina.
+      const regraNoAmbito = (r: RegraHorario) => {
+        const anos = anosDaRegra(r);
+        return anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
+      };
+      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: Record<number, number[]>; semanasSoTurmaB?: Record<number, number[]>; restricoesUC?: any[]; [key: string]: any } = {
+        semanasSoTurmaA: { 2: Array.from({ length: 8 }, (_, i) => 8 + i) },
+        semanasSoTurmaB: { 2: Array.from({ length: 8 }, (_, i) => 16 + i) }
+      };
+      for (const r of regras) {
+        if (!regraNoAmbito(r) || !r.ativa) continue;
+        
+        // Suporte ao novo formato `parametros` e ao legado `config.motor`
+        const m = (r.tipo === "motor_ai" ? r.parametros : (r.config as any)?.motor) || {};
+        
+        if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
+        if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
+        if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
+        
+        // Semanas exclusivas por ano
+        for (const ano of [1, 2, 3, 4]) {
+          if (Array.isArray(m[`ano${ano}_semanasSoTurmaA`]) && m[`ano${ano}_semanasSoTurmaA`].length) {
+            motorAI.semanasSoTurmaA![ano] = m[`ano${ano}_semanasSoTurmaA`].map(Number);
+          }
+          if (Array.isArray(m[`ano${ano}_semanasSoTurmaB`]) && m[`ano${ano}_semanasSoTurmaB`].length) {
+            motorAI.semanasSoTurmaB![ano] = m[`ano${ano}_semanasSoTurmaB`].map(Number);
+          }
+        }
+        
+        // Legacy fallbacks
+        if (Array.isArray(m.semanasSoTurmaA) && m.semanasSoTurmaA.length) motorAI.semanasSoTurmaA![2] = m.semanasSoTurmaA.map(Number);
+        if (Array.isArray(m.semanasSoTurmaB) && m.semanasSoTurmaB.length) motorAI.semanasSoTurmaB![2] = m.semanasSoTurmaB.map(Number);
+        
+        // Fallback for custom year start dates
+        for (const k of Object.keys(m)) {
+          if (k.includes("dataInicioSem")) motorAI[k] = m[k];
+        }
+
+        if (Array.isArray(m.restricoesUC)) {
+          const ruleYears = anosDaRegra(r);
+          const ucsDaRegra = ruleYears.length ? ucs.filter(u => ruleYears.includes(u.anoCurricular)).map(u => u.sigla) : ucs.map(u => u.sigla);
+          const mappedRestricoes = m.restricoesUC.map((x: any) => {
+            if (!x) return null;
+            if (!Array.isArray(x.siglas) || x.siglas.length === 0) {
+              return { ...x, siglas: ucsDaRegra };
+            }
+            return x;
+          }).filter(Boolean);
+          motorAI.restricoesUC = [...(motorAI.restricoesUC || []), ...mappedRestricoes];
+        }
+      }
+
       // Build the entry list (per UC: its weeks + global offset), grouped by semester.
       // Each semester is scheduled together so UCs share slots fairly (round-robin).
       const entradasS1: EntradaUC[] = [];
@@ -1429,7 +1526,8 @@ export default function App() {
         if (!anoSem?.dataInicioSemestre) continue;
 
         // Use UC-specific start date if set (e.g. year 2 starts on Thursday Sept 10).
-        const dataInicio = uc.dataInicio || anoSem.dataInicioSemestre;
+        const anoDataInicio = motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`];
+        const dataInicio = uc.dataInicio || anoDataInicio || anoSem.dataInicioSemestre;
         const semanaGlobalOffset = uc.semestre === 2 ? 15 : 0;
         const semStart = uc.semanaInicio || 1;
         const semEnd = semStart + (uc.numSemanas || 15) - 1;
@@ -1456,26 +1554,6 @@ export default function App() {
       for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++) {
         if ([...docPorUC[sigs[i]]].some(d => docPorUC[sigs[j]].has(d))) ucConflitos.push([sigs[i], sigs[j]]);
       }
-      // Regras criadas por IA (ou editadas) com config.motor → aplicam-se ao solver.
-      // ÂMBITO: ao gerar um ano, só entram as TRANSVERSAIS + as DESSE ano (as de outros
-      // anos ficam de fora). ucConflitos acumulam; os restantes parâmetros são substituídos
-      // pela última regra ativa que os defina.
-      const regraNoAmbito = (r: RegraHorario) => {
-        const anos = anosDaRegra(r);
-        return anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
-      };
-      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[]; restricoesUC?: any[] } = {};
-      for (const r of regras) {
-        if (!regraNoAmbito(r)) continue;
-        const m = r.ativa && (r.config as any)?.motor;
-        if (!m || typeof m !== "object") continue;
-        if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
-        if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
-        if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
-        if (Array.isArray(m.semanasSoTurmaA) && m.semanasSoTurmaA.length) motorAI.semanasSoTurmaA = m.semanasSoTurmaA.map(Number);
-        if (Array.isArray(m.semanasSoTurmaB) && m.semanasSoTurmaB.length) motorAI.semanasSoTurmaB = m.semanasSoTurmaB.map(Number);
-        if (Array.isArray(m.restricoesUC)) motorAI.restricoesUC = [...(motorAI.restricoesUC || []), ...m.restricoesUC.filter((x: any) => x && Array.isArray(x.siglas) && x.siglas.length)];
-      }
       // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
       // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
       // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
@@ -1493,8 +1571,8 @@ export default function App() {
         ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
         // Estrutura ESEUC: 8-15 só T1 (Turma A) presente, UCs "-I"; 16-23 só T2 (Turma B), UCs
         // "-II". Tudo de manhã. Assim T1 está de manhã nas semanas 1-15 e T2 nas 16-30.
-        semanasSoTurmaA: motorAI.semanasSoTurmaA ?? Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
-        semanasSoTurmaB: motorAI.semanasSoTurmaB ?? Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
+        semanasSoTurmaA: motorAI.semanasSoTurmaA,
+        semanasSoTurmaB: motorAI.semanasSoTurmaB,
         // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
         // tarde e o espaço para almoço (e o teto de 8h). Para comparar cenários.
         semRegras,
@@ -2864,6 +2942,7 @@ export default function App() {
                         activeEditingUc.semanasPL,
                         activeEditingUc.numSemanas,
                         activeEditingUc.semestre,
+                        activeEditingUc.semanaInicio,
                         (sel) => setUcs(ucs.map(u => u.id === editingUcId ? { ...u, semanasPL: sel } : u))
                       )
                     : null}
@@ -4524,40 +4603,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* PREFERÊNCIA MANHÃ/TARDE — entre o Ano Curricular e o explorador */}
-              <div className="bg-indigo-50/50 border border-indigo-200/70 p-4 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
-                    Preferência da turma teórica (manhã / tarde) por ano do CLE
-                  </span>
-                  <span className="text-[9px] text-indigo-500/80 font-mono">T1 (Turma A) = período indicado · T2 (Turma B) = oposto</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[1, 2, 3, 4].map(ano => (
-                    <div key={ano} className="flex items-center gap-2 bg-white/70 border border-indigo-100 rounded-lg px-2.5 py-1.5">
-                      <span className="text-[10px] font-bold text-stone-700 w-12">{ano}.º ano</span>
-                      {[1, 2].map(sem => (
-                        <div key={sem} className="flex items-center gap-1">
-                          <span className="text-[8.5px] text-stone-400 font-mono">S{sem}</span>
-                          <div className="flex rounded-md overflow-hidden border border-indigo-200">
-                            {(["manha", "tarde"] as const).map(p => {
-                              const ativa = prefManhaDe(ano, sem) === (p === "manha");
-                              return (
-                                <button key={p} onClick={() => setPrefManha(ano, sem, p === "manha")}
-                                  className={`px-2 py-0.5 text-[9px] font-bold cursor-pointer transition-colors ${ativa ? "bg-indigo-600 text-white" : "bg-white text-indigo-500 hover:bg-indigo-50"}`}>
-                                  {p === "manha" ? "Manhã" : "Tarde"}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[9px] text-indigo-700/70 leading-tight">Aplica-se na próxima geração. Define se a Turma A desse ano arranca de manhã ou de tarde nesse semestre.</p>
-              </div>
-
               {/* DYNAMIC WEEK TIMELINE SELECTOR */}
               <div className="bg-stone-50/70 p-4 rounded-xl border border-stone-150 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -5399,6 +5444,11 @@ export default function App() {
               feriados={feriados}
               versoes={versoes}
               setVersoes={setVersoes}
+              prefManhaDe={prefManhaDe}
+              setPrefManha={setPrefManha}
+              regras={regras}
+              setRegras={setRegras}
+              motorRegra={regras.find(r => r.tipo === "motor_ai")}
             />
 
             {/* EDITOR DE TURMAS POR ANO */}
@@ -5783,6 +5833,7 @@ export default function App() {
                             newUc.semanasPL,
                             newUc.numSemanas,
                             newUc.semestre,
+                            newUc.semanaInicio,
                             (sel) => setNewUc({ ...newUc, semanasPL: sel })
                           )
                         : null}

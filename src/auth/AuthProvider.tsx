@@ -74,8 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn: AuthCtx["signIn"] = async (email, password) => {
     if (!supabase) return { error: "Supabase não configurado." };
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return error ? { error: traduzErro(error.message) } : {};
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return error ? { error: traduzErro(error.message) } : {};
+    } catch (err: any) {
+      return { error: traduzErro(err.message || "Erro desconhecido") };
+    }
   };
 
   const signOut: AuthCtx["signOut"] = async () => {
@@ -104,5 +108,6 @@ function traduzErro(msg: string): string {
   if (m.includes("already registered")) return "Já existe uma conta com este email.";
   if (m.includes("password should be at least")) return "A palavra-passe deve ter pelo menos 6 caracteres.";
   if (m.includes("email not confirmed")) return "Confirma o email antes de entrar.";
+  if (m.includes("failed to fetch")) return "Erro de ligação ao Supabase (Failed to fetch). O seu projeto Supabase pode estar em pausa, apagado, ou a chave do Netlify não está configurada corretamente. Se estiver a usar o Supabase, verifique se o URL e a Anon Key estão corretos no menu de Definições.";
   return msg;
 }
