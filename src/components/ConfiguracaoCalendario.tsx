@@ -60,17 +60,20 @@ export function ConfiguracaoCalendario({
       const plCount = new Map<string, number>();
       const semanaGlobalOffset = anoSemestre.semestre === 2 ? 15 : 0;
       // Schedule all UCs of this semester together (round-robin) for fair slot sharing.
-      const entradas: EntradaUC[] = ucsDeste.map(uc => ({
-        uc,
-        semanas: calcularSemanas(
-          uc.dataInicio || anoSemestre.dataInicioSemestre!,
-          uc.semanaInicio ?? 1,
-          uc.semanaFim ?? uc.numSemanas,
-          feriados,
-          anoSemestre.semanasPersonalizadas
-        ),
-        semanaGlobalOffset,
-      }));
+      const entradas: EntradaUC[] = ucsDeste.map(uc => {
+        const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSemestre.semestre}`];
+        return {
+          uc,
+          semanas: calcularSemanas(
+            uc.dataInicio || specificDate || anoSemestre.dataInicioSemestre!,
+            uc.semanaInicio ?? 1,
+            uc.semanaFim ?? uc.numSemanas,
+            feriados,
+            anoSemestre.semanasPersonalizadas
+          ),
+          semanaGlobalOffset,
+        };
+      });
       const todas = gerarSessoesConjunto(entradas, anoSemestre.semestre as 1 | 2, 0, ocupacao, plCount);
 
       setVersoes(versoes.map(v =>
@@ -234,7 +237,7 @@ export function ConfiguracaoCalendario({
                 ) : ucsDeste.length === 0 ? (
                   <p className="text-xs text-stone-400">Nenhuma UC configurada para este semestre.</p>
                 ) : (
-                  <DistribuicaoDetalhe anoSem={anoSem} ucs={ucsDeste} feriados={feriados} />
+                  <DistribuicaoDetalhe anoSem={anoSem} ucs={ucsDeste} feriados={feriados} motorRegra={motorRegra} />
                 )}
               </div>
             )}
@@ -267,22 +270,27 @@ interface DetalheProps {
   anoSem: AnoLetivoSemestre;
   ucs: UC[];
   feriados: FeriadoInterrupcao[];
+  motorRegra?: RegraHorario;
 }
 
-function DistribuicaoDetalhe({ anoSem, ucs, feriados }: DetalheProps) {
+function DistribuicaoDetalhe({ anoSem, ucs, feriados, motorRegra }: DetalheProps) {
   const [selectedUcId, setSelectedUcId] = useState(ucs[0]?.id ?? "");
   const uc = ucs.find(u => u.id === selectedUcId);
 
   const semanas = useMemo<SemanaInfo[]>(() => {
     if (!uc || !anoSem.dataInicioSemestre) return [];
+    
+    const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`];
+    const startDateToUse = uc.dataInicio || specificDate || anoSem.dataInicioSemestre;
+
     return calcularSemanas(
-      anoSem.dataInicioSemestre,
+      startDateToUse,
       uc.semanaInicio ?? 1,
       uc.semanaFim ?? uc.numSemanas,
       feriados,
       anoSem.semanasPersonalizadas
     );
-  }, [uc, anoSem.dataInicioSemestre, feriados, anoSem.semanasPersonalizadas]);
+  }, [uc, anoSem.dataInicioSemestre, feriados, anoSem.semanasPersonalizadas, motorRegra?.parametros, anoSem.semestre]);
 
   const plano = useMemo<PlanoSemanal[]>(() => {
     if (!uc || !semanas.length) return [];

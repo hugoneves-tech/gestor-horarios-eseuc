@@ -151,8 +151,8 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
   };
 
   return (
-    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-start justify-center pt-10 pb-10 px-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col my-auto shrink-0">
         <div className="flex items-center justify-between p-5 border-b border-stone-100 bg-stone-50/50">
           <div>
             <h2 className="text-lg font-serif font-bold text-stone-800 flex items-center gap-2">
@@ -166,7 +166,26 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto bg-stone-50/30">
+        <div className="p-6 overflow-y-visible bg-stone-50/30 space-y-6">
+          <div className="flex flex-col md:flex-row gap-6 p-4 bg-white border border-stone-200 rounded-xl shadow-sm">
+            <div className="flex-1 space-y-1">
+              <label className="text-[10px] uppercase font-bold text-stone-500 tracking-wide">Data de Início Global - 1º Semestre</label>
+              <input type="date" value={sem1?.dataInicioSemestre || ""} onChange={e => {
+                if (sem1) updateGlobalDate(sem1.id, e.target.value);
+              }}
+                className="w-full px-2 py-1.5 border border-stone-200 rounded-md text-xs focus:ring-1 focus:ring-teal-500 outline-none" />
+              <p className="text-[9px] text-stone-400">Usado se não for definida uma data específica por ano.</p>
+            </div>
+            <div className="flex-1 space-y-1">
+              <label className="text-[10px] uppercase font-bold text-stone-500 tracking-wide">Data de Início Global - 2º Semestre</label>
+              <input type="date" value={sem2?.dataInicioSemestre || ""} onChange={e => {
+                if (sem2) updateGlobalDate(sem2.id, e.target.value);
+              }}
+                className="w-full px-2 py-1.5 border border-stone-200 rounded-md text-xs focus:ring-1 focus:ring-teal-500 outline-none" />
+              <p className="text-[9px] text-stone-400">Usado se não for definida uma data específica por ano.</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {[1, 2, 3, 4].map(ano => (
               <div key={ano}>
@@ -176,7 +195,7 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
           </div>
         </div>
 
-        <div className="p-5 border-t border-stone-100 bg-stone-50 flex justify-end gap-3">
+        <div className="p-5 border-t border-stone-100 bg-stone-50 flex justify-end gap-3 rounded-b-2xl">
           <button onClick={onClose} className="px-4 py-2 text-xs font-bold text-stone-600 hover:bg-stone-200/50 rounded-lg transition-colors">Cancelar</button>
           <button onClick={save} className="px-5 py-2 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-lg flex items-center gap-2 transition-all shadow-sm">
             <Check className="w-4 h-4" /> Guardar Configuração

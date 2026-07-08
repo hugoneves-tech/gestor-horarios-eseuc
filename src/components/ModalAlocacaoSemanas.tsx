@@ -158,8 +158,8 @@ export function ModalAlocacaoSemanas({
   });
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-stone-950/60 backdrop-blur-xs p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 space-y-4 max-h-[90vh] overflow-y-auto relative flex flex-col">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-10 pb-10 px-4 bg-stone-950/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 space-y-4 relative flex flex-col my-auto shrink-0">
         {/* Header */}
         <div className="flex justify-between items-start border-b border-stone-100 pb-3">
           <div>
