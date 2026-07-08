@@ -1533,7 +1533,7 @@ export default function App() {
         const dataInicio = uc.dataInicio || anoDataInicio || anoSem.dataInicioSemestre;
         const semanaGlobalOffset = uc.semestre === 2 ? 15 : 0;
         const semStart = uc.semanaInicio || 1;
-        const semEnd = semStart + (uc.numSemanas || 15) - 1;
+        const semEnd = uc.semanaFim ?? (semStart + (uc.numSemanas || 15) - 1);
 
         const semanas = calcularSemanas(dataInicio, semStart, semEnd, feriados, anoSem.semanasPersonalizadas);
         const entrada: EntradaUC = { uc, semanas, semanaGlobalOffset };

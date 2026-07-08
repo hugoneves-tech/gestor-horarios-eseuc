@@ -62,12 +62,14 @@ export function ConfiguracaoCalendario({
       // Schedule all UCs of this semester together (round-robin) for fair slot sharing.
       const entradas: EntradaUC[] = ucsDeste.map(uc => {
         const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSemestre.semestre}`];
+        const startWeek = uc.semanaInicio ?? 1;
+        const endWeek = uc.semanaFim ?? (startWeek + uc.numSemanas - 1);
         return {
           uc,
           semanas: calcularSemanas(
             uc.dataInicio || specificDate || anoSemestre.dataInicioSemestre!,
-            uc.semanaInicio ?? 1,
-            uc.semanaFim ?? uc.numSemanas,
+            startWeek,
+            endWeek,
             feriados,
             anoSemestre.semanasPersonalizadas
           ),
@@ -283,10 +285,13 @@ function DistribuicaoDetalhe({ anoSem, ucs, feriados, motorRegra }: DetalheProps
     const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`];
     const startDateToUse = uc.dataInicio || specificDate || anoSem.dataInicioSemestre;
 
+    const startWeek = uc.semanaInicio ?? 1;
+    const endWeek = uc.semanaFim ?? (startWeek + uc.numSemanas - 1);
+
     return calcularSemanas(
       startDateToUse,
-      uc.semanaInicio ?? 1,
-      uc.semanaFim ?? uc.numSemanas,
+      startWeek,
+      endWeek,
       feriados,
       anoSem.semanasPersonalizadas
     );
@@ -331,11 +336,15 @@ function DistribuicaoDetalhe({ anoSem, ucs, feriados, motorRegra }: DetalheProps
           onChange={e => setSelectedUcId(e.target.value)}
           className="px-2 py-1 border border-stone-200 rounded-lg text-xs bg-white"
         >
-          {ucs.map(u => (
+          {ucs.map(u => {
+            const sStart = u.semanaInicio ?? 1;
+            const sEnd = u.semanaFim ?? (sStart + u.numSemanas - 1);
+            return (
             <option key={u.id} value={u.id}>
-              {u.sigla} — {u.nome} (sem. {u.semanaInicio ?? 1}–{u.semanaFim ?? u.numSemanas})
+              {u.sigla} — {u.nome} (sem. {sStart}–{sEnd})
             </option>
-          ))}
+            );
+          })}
         </select>
         <span className="text-[9px] text-stone-400 font-mono">
           {semanas.length} semanas · {semanas.filter(s => s.feriadosNesta.length > 0).length} com feriados

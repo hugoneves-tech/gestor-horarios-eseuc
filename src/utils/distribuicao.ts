@@ -116,7 +116,7 @@ export function calcularSemanas(
     let numeroPedagogico: number | undefined = undefined;
     if (!isPausa) {
       let activeCount = 0;
-      for (let i = semanaInicio; i <= w; i++) {
+      for (let i = 1; i <= w; i++) {
         const c = semanasPersonalizadas?.find(cp => cp.numero === i);
         if (!c?.isPausa) {
           activeCount++;
