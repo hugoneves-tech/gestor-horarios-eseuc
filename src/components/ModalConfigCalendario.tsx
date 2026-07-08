@@ -76,6 +76,19 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
     onSave(draftAnoSem);
     if (motorRegra) {
       setRegras(regras.map(r => r.id === motorRegra.id ? { ...r, parametros: draftMotor } : r));
+    } else {
+      const newRegra: RegraHorario = {
+        id: crypto.randomUUID(),
+        nome: "Configurações Avançadas do Motor",
+        tipo: "motor_ai",
+        categoria: "Calendário",
+        descricao: "Guarda configurações específicas de datas e turnos",
+        config: {},
+        parametros: draftMotor,
+        peso: 10,
+        ativa: true,
+      };
+      setRegras([...regras, newRegra]);
     }
     onClose();
   };
