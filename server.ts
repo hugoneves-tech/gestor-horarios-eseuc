@@ -164,7 +164,7 @@ Inclua em 'config.motor' apenas as restrições que façam sentido para o pedido
       parts: [{ text: prompt }]
     });
 
-    const isApiKeyConfigured = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY";
+    const isApiKeyConfigured = geminiApiKey || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY");
 
     if (!isApiKeyConfigured) {
       // Graceful fallback description when key is not added
@@ -196,14 +196,27 @@ Pode clicar em "Adicionar Regra" no assistente acima para ativ?-la no motor de o
       }
     });
 
-    const response = await localAi.models.generateContent({
-      model: geminiModel || "gemini-2.0-flash",
-      contents: contents,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      },
-    });
+    let response;
+    try {
+      response = await localAi.models.generateContent({
+        model: geminiModel || "gemini-3.5-flash",
+        contents: contents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        },
+      });
+    } catch (primaryError: any) {
+      console.warn("Primary model failed, trying fallback...", primaryError.message);
+      response = await localAi.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: contents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        },
+      });
+    }
 
     res.json({ text: response.text });
   } catch (error: any) {

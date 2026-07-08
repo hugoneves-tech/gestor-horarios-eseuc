@@ -223,7 +223,7 @@ export default function App() {
   };
   // Modelo Gemini a usar (configurável na app, sem precisar de deploy). O tier gratuito de
   // alguns modelos (ex.: gemini-2.0-flash) está a 0 — daí ser editável.
-  const GEMINI_MODELO_DEFAULT = "gemini-2.5-flash";
+  const GEMINI_MODELO_DEFAULT = "gemini-3.5-flash";
   const [geminiModel, setGeminiModel] = useState<string>(() => {
     try { return localStorage.getItem("eseuc_gemini_model") || GEMINI_MODELO_DEFAULT; } catch { return GEMINI_MODELO_DEFAULT; }
   });

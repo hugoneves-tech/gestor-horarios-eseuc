@@ -956,7 +956,21 @@ export function gerarSessoesConjunto(
     if (t.tipo === "PL") {
       if ((plCount.get(manchaKey(t.ano, wk.semanaGlobal, dia, hora, t.salaPool)) || 0) >= MAX_PL_POR_POOL[t.salaPool]) return false;
       // relaxPLuc: bloco de recuperação da 6ª admite PL de UCs diferentes (3 ESDAC + 3 FT).
-      if (!relaxPLuc && t.salaPool !== "comp") { const set = plUCs.get(smk); if (set && !(set.size === 1 && set.has(t.ucKey))) return false; }
+      if (!relaxPLuc && t.salaPool !== "comp") {
+        const set = plUCs.get(smk);
+        if (set && set.size > 0 && !set.has(t.ucKey)) {
+          if (t.maxSimultaneoPL === 3) {
+            let ok = true;
+            for (const otherUc of set) {
+              const otherTask = tasks.find(x => x.ucKey === otherUc && x.tipo === "PL");
+              if (!otherTask || otherTask.maxSimultaneoPL !== 3) { ok = false; break; }
+            }
+            if (!ok) return false;
+          } else {
+            return false;
+          }
+        }
+      }
       if (tpUCs.get(smk)?.has(t.ucKey)) return false; // docente partilhado: não com TP da mesma UC
     }
     commit(t, wk, { dia, hora });
@@ -1048,10 +1062,20 @@ export function gerarSessoesConjunto(
       // RÍGIDO: nunca PLs de UCs DIFERENTES no mesmo bloco (proibido 1 PL de uma + 5 de
       // outra). Só mancha sem PL ou já com PL da MESMA UC. (MI usa salas de computadores
       // — pool próprio — e está isenta desta regra.)
+      // EXCEÇÃO: se a UC só possibilita 3 PLs em simultâneo, pode conjugar com outras UCs que também só possibilitem 3 PLs, para perfazer os 6 PLs.
       if (t.salaPool !== "comp") {
         pool = pool.filter(s => {
           const set = plUCs.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
-          return !set || set.size === 0 || (set.size === 1 && set.has(t.ucKey));
+          if (!set || set.size === 0) return true;
+          if (set.has(t.ucKey)) return true;
+          if (t.maxSimultaneoPL === 3) {
+            for (const otherUc of set) {
+              const otherTask = tasks.find(x => x.ucKey === otherUc && x.tipo === "PL");
+              if (!otherTask || otherTask.maxSimultaneoPL !== 3) return false;
+            }
+            return true;
+          }
+          return false;
         });
       }
       // Docente partilhado TP↔PL: a PL NÃO pode estar na mancha que já tem TP da MESMA UC.
