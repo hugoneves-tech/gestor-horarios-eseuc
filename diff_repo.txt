@@ -1,0 +1,58 @@
+--- src/data/supabaseRepo.ts	2026-06-25 07:54:04.116008096 +0000
++++ gestor_github/src/data/supabaseRepo.ts	2026-06-25 08:24:18.687606298 +0000
+@@ -24,7 +24,11 @@
+ 
+   async carregarTudo(): Promise<DadosAcademicos> {
+     const db = this.cli();
+-    const sel = async (t: string) => { const { data, error } = await db.from(t).select("*"); if (error) { console.warn(); return []; } return data ?? []; };
++    const sel = async (t: string) => {
++      const { data, error } = await db.from(t).select("*");
++      if (error) throw new Error(`[${t}] ${error.message}`);
++      return data ?? [];
++    };
+     const [
+       cursos, anosSemestres, ucs, turmas, docentes, salas, feriados, regras, versoes, solverRuns,
+     ] = await Promise.all([
+@@ -58,7 +62,7 @@
+     const up = async (t: string, rows: any[]) => {
+       if (!rows?.length) return;
+       const { error } = await db.from(t).upsert(rows);
+-      if (error) { console.error("Erro no upsert:", error.message); return []; }
++      if (error) throw new Error(`[${t}] ${error.message}`);
+     };
+     const apagarEmFalta = async (t: string, items?: { id: string }[]) => {
+       if (items === undefined) return; // tabela não fornecida → não mexer
+@@ -68,7 +72,7 @@
+         ? q.not("id", "in", `(${ids.map(i => JSON.stringify(i)).join(",")})`)
+         : q.neq("id", "__none__"); // sem ids → apaga tudo
+       const { error } = await q;
+-      if (error) { console.warn("error on delete", error.message); }
++      if (error) throw new Error(`[${t}] delete: ${error.message}`);
+     };
+ 
+     // Passo 1 — upsert por ordem de dependência (pais primeiro).
+@@ -99,13 +103,13 @@
+   async guardarVersao(v: VersaoHorario): Promise<void> {
+     const db = this.cli();
+     const { error } = await db.from("versoes").upsert(M.versaoToRow(v));
+-    if (error) { console.warn("error on save", error.message); }
++    if (error) throw new Error(`[versoes] ${error.message}`);
+   }
+ 
+   async guardarSolverRun(s: SolverRun): Promise<void> {
+     const db = this.cli();
+     const { error } = await db.from("solver_runs").upsert(M.solverRunToRow(s));
+-    if (error) { console.warn("error on save", error.message); }
++    if (error) throw new Error(`[solver_runs] ${error.message}`);
+   }
+ 
+   async limparTudo(): Promise<void> {
+@@ -113,7 +117,7 @@
+     // Apaga dependentes primeiro, depois catálogo. (neq a um id impossível = "tudo")
+     for (const t of [...TABELAS_DEPENDENTES, ...TABELAS_CATALOGO]) {
+       const { error } = await db.from(t).delete().neq("id", "__none__");
+-      if (error) { console.warn("error on save", error.message); }
++      if (error) throw new Error(`[${t}] ${error.message}`);
+     }
+   }
+ }

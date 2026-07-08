@@ -1,0 +1,1725 @@
+--- src/App.tsx	2026-06-25 07:56:12.610873770 +0000
++++ gestor_github/src/App.tsx	2026-06-25 08:24:18.686778509 +0000
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect } from "react";
++﻿import React, { useState, useEffect } from "react";
+ import * as XLSX from "xlsx";
+ import { useAuth } from "./auth/AuthProvider";
+ import {
+@@ -45,19 +45,9 @@
+   ListChecks
+ } from "lucide-react";
+ 
+-import {
+-  generateEseucTurmas,
+-  cursosIniciais,
+-  anosSemestresIniciais,
+-  ucsIniciais,
+-  docentesIniciais,
+-  salasIniciais,
+-  turmasIniciais,
+-  feriadosIniciais,
+-  regrasIniciais,
+-  versoesIniciais,
+-  solverRunsIniciais
+-} from "./mockData";
++// Supabase-only: a app NÃO importa dados-semente (UCs/docentes/salas/…). Toda a informação
++// vem do Supabase em runtime. generateEseucTurmas é só um helper (gera config de turmas), não dados.
++import { generateEseucTurmas } from "./mockData";
+ 
+ import {
+   Curso,
+@@ -78,8 +68,9 @@
+ import { ConfiguracaoCalendario } from "./components/ConfiguracaoCalendario";
+ import { AdminConvites } from "./auth/AdminConvites";
+ import { gerarSessoesConjunto, calcularSemanas, type EntradaUC } from "./utils/distribuicao";
++import { parseHorarioCSV, gerarTemplateCSV, type ErroLinha } from "./utils/importacao";
++import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
+ import { repo } from "./data/supabaseRepo";
+-import { dadosIniciais } from "./data/seed";
+ 
+ export default function App() {
+   // Theme and Vibe State for ESEUC Coimbra
+@@ -88,22 +79,34 @@
+   // - "eseuc_cardoso": Deep Academic Faculty Burgundy / Slate Red
+   const [vibe, setVibe] = useState<"eseuc_ouro" | "eseuc_escola" | "eseuc_cardoso">("eseuc_ouro");
+ 
+-  // Global Active Tab Navigation
++  // Global Active Tab Navigation — persistida no browser para manter o local ao recarregar.
+   const [activeTab, setActiveTab ] = useState<
+     "horario" | "config" | "regras" | "assistant"
+-  >("horario");
++  >(() => {
++    try {
++      const v = localStorage.getItem("eseuc_active_tab");
++      if (v === "horario" || v === "config" || v === "regras" || v === "assistant") return v;
++    } catch { /* ignore */ }
++    return "horario";
++  });
++  useEffect(() => {
++    try { localStorage.setItem("eseuc_active_tab", activeTab); } catch { /* ignore */ }
++  }, [activeTab]);
+ 
+   // Domain States (Representing PostgreSQL collections held in reactive memory)
+-  const [cursos, setCursos] = useState<Curso[]>(cursosIniciais);
+-  const [anosSemestres, setAnosSemestres] = useState<AnoLetivoSemestre[]>(anosSemestresIniciais);
+-  const [ucs, setUcs] = useState<UC[]>(ucsIniciais);
+-  const [docentes, setDocentes] = useState<Docente[]>(docentesIniciais);
+-  const [salas, setSalas] = useState<Sala[]>(salasIniciais);
+-  const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
+-  const [feriados, setFeriados] = useState<FeriadoInterrupcao[]>(feriadosIniciais);
+-  const [regras, setRegras] = useState<RegraHorario[]>(regrasIniciais);
+-  const [versoes, setVersoes] = useState<VersaoHorario[]>(versoesIniciais);
+-  const [solverRuns, setSolverRuns] = useState<SolverRun[]>(solverRunsIniciais);
++  // Supabase-only: estado arranca VAZIO e é preenchido pelo carregamento inicial do Supabase.
++  // Nada de dados-semente no código. O auto-save só liga após um carregamento bem-sucedido
++  // (flag podeGravar), para um erro de carregamento nunca disparar uma gravação que apague tudo.
++  const [cursos, setCursos] = useState<Curso[]>([]);
++  const [anosSemestres, setAnosSemestres] = useState<AnoLetivoSemestre[]>([]);
++  const [ucs, setUcs] = useState<UC[]>([]);
++  const [docentes, setDocentes] = useState<Docente[]>([]);
++  const [salas, setSalas] = useState<Sala[]>([]);
++  const [turmas, setTurmas] = useState<Turma[]>([]);
++  const [feriados, setFeriados] = useState<FeriadoInterrupcao[]>([]);
++  const [regras, setRegras] = useState<RegraHorario[]>([]);
++  const [versoes, setVersoes] = useState<VersaoHorario[]>([]);
++  const [solverRuns, setSolverRuns] = useState<SolverRun[]>([]);
+ 
+   // Active Context Filters
+   const [selectedSemestreId, setSelectedSemestreId] = useState<string>("as1");
+@@ -122,6 +125,9 @@
+   }, [perfil?.papel]);
+   const [cloudStatus, setCloudStatus] = useState<"offline" | "synced" | "saving" | "error">("offline");
+   const [dbLoaded, setDbLoaded] = useState<boolean>(false);
++  // Só fica true após um carregamento BEM-SUCEDIDO do Supabase. O auto-save exige isto, para
++  // que um erro de leitura (estado vazio) nunca dispare uma gravação que apague a base de dados.
++  const [podeGravar, setPodeGravar] = useState<boolean>(false);
+ 
+   const [selectedYearFilter, setSelectedYearFilter] = useState<number | "todos">("todos");
+   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState<number | "todos">(1);
+@@ -129,6 +135,28 @@
+   const [selectedVersaoId, setSelectedVersaoId] = useState<string>("v1");
+   const [activeVersao, setActiveVersao] = useState<VersaoHorario | null>(null);
+ 
++  // Âmbito de uma regra (multi-ano + cursos), guardado no config (sem migração no Supabase).
++  // config.anos: number[] (vazio = transversal/todos os anos). config.cursoIds: string[]
++  // (vazio = todos os cursos). Compatível com regras antigas (escopo/anoCurricular).
++  const anosDaRegra = (r: RegraHorario): number[] => {
++    const a = (r.config as any)?.anos;
++    if (Array.isArray(a)) return a.map(Number).filter(n => !Number.isNaN(n));
++    if (r.escopo === "ano" && typeof r.anoCurricular === "number") return [r.anoCurricular];
++    return [];
++  };
++  const cursosDaRegra = (r: RegraHorario): string[] => {
++    const c = (r.config as any)?.cursoIds;
++    return Array.isArray(c) ? c.filter((x: any) => typeof x === "string") : [];
++  };
++  // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
++  // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
++  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC"] as const;
++  const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
++    const m = (r.config as any)?.motor;
++    if (!m || typeof m !== "object") return false;
++    return MOTOR_PARAMS_SUPORTADOS.some(k => { const v = (m as any)[k]; return Array.isArray(v) ? v.length > 0 : typeof v === "number" ? v > 0 : false; });
++  };
++
+   // Helper to generate a reliable week label based on the academic calendar (ignoring holidays for display purpose simply)
+   const getWeekLabel = (week: number) => {
+     const start = new Date(2025, 8, 8); // Sep 8, 2025 (Monday)
+@@ -139,6 +167,17 @@
+     return `${start.getDate()} a ${end.getDate()} de ${months[end.getMonth()]}`;
+   };
+ 
++  // Rótulo de VISUALIZAÇÃO das turmas: Turma A→T1, Turma B→T2, com a derivação (TP/PL) e a
++  // turma-mãe (ex.: "T1 · TP1", "T2 · PL13"). Só no ecrã — os dados, o motor e os exports
++  // (CSV/iCal) mantêm "Turma A"/"Turma B"/TPn/PLn para não partir lógica nem o round-trip do import.
++  const rotuloTurma = (turma: string): string => {
++    if (turma === "Turma A") return "T1";
++    if (turma === "Turma B") return "T2";
++    const tp = turma.match(/^TP(\d+)$/); if (tp) return `${+tp[1] <= 4 ? "T1" : "T2"} · TP${tp[1]}`;
++    const pl = turma.match(/^PL(\d+)$/); if (pl) return `${+pl[1] <= 12 ? "T1" : "T2"} · PL${pl[1]}`;
++    return turma;
++  };
++
+   // Modals / Creators Form State
+   const [showDuplicarSemestreModal, setShowDuplicarSemestreModal] = useState(false);
+   const [newSemesterName, setNewSemesterName] = useState("2026/2027");
+@@ -170,6 +209,58 @@
+   };
+   const [editingDocenteId, setEditingDocenteId] = useState<string | null>(null);
+   const [editingSalaId, setEditingSalaId] = useState<string | null>(null);
++  // Chave da API Google (Gemini), introduzida na app e guardada no browser (localStorage).
++  // Enviada no corpo de cada pedido /api/gemini/chat; o servidor usa-a (fallback p/ env var).
++  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
++    try { return localStorage.getItem("eseuc_gemini_api_key") || ""; } catch { return ""; }
++  });
++  const [showGeminiKeyPanel, setShowGeminiKeyPanel] = useState(false);
++  const [geminiKeyDraft, setGeminiKeyDraft] = useState("");
++  const guardarGeminiKey = (k: string) => {
++    const v = k.trim();
++    setGeminiApiKey(v);
++    try { v ? localStorage.setItem("eseuc_gemini_api_key", v) : localStorage.removeItem("eseuc_gemini_api_key"); } catch { /* ignore */ }
++  };
++  // Modelo Gemini a usar (configurável na app, sem precisar de deploy). O tier gratuito de
++  // alguns modelos (ex.: gemini-2.0-flash) está a 0 — daí ser editável.
++  const GEMINI_MODELO_DEFAULT = "gemini-2.5-flash";
++  const [geminiModel, setGeminiModel] = useState<string>(() => {
++    try { return localStorage.getItem("eseuc_gemini_model") || GEMINI_MODELO_DEFAULT; } catch { return GEMINI_MODELO_DEFAULT; }
++  });
++  const guardarGeminiModel = (m: string) => {
++    const v = m.trim() || GEMINI_MODELO_DEFAULT;
++    setGeminiModel(v);
++    try { localStorage.setItem("eseuc_gemini_model", v); } catch { /* ignore */ }
++  };
++  // Importação de horário externo (Excel/CSV): sessões lidas, erros de linha e relatório.
++  const [sessoesImportadas, setSessoesImportadas] = useState<SessaoHorario[] | null>(null);
++  const [errosImport, setErrosImport] = useState<ErroLinha[]>([]);
++  const [relatorioImport, setRelatorioImport] = useState<RelatorioValidacao | null>(null);
++  const [nomeFicheiroImport, setNomeFicheiroImport] = useState("");
++  const [nomePropostaImport, setNomePropostaImport] = useState("");
++  // Propostas (versões): guardar/importar com nome, renomear.
++  const [showGuardarProposta, setShowGuardarProposta] = useState(false);
++  const [nomeProposta, setNomeProposta] = useState("");
++  const [escopoProposta, setEscopoProposta] = useState<"ano" | "todos">("ano");
++  const [renomearPropostaId, setRenomearPropostaId] = useState<string | null>(null);
++  const [nomeRenomear, setNomeRenomear] = useState("");
++  // Edição de regra (anos múltiplos + cursos). Reutilizada para validar a sugestão da IA.
++  const [regraEmEdicao, setRegraEmEdicao] = useState<RegraHorario | null>(null);
++  const [editProveniencia, setEditProveniencia] = useState<"edicao" | "ia">("edicao");
++  // Fases do fluxo (manuais, controladas pelo utilizador): 1.º UCs (sempre), 2.º salas,
++  // 3.º docentes. Interruptores em Configuração; quando ON, o grid permite atribuir à mão.
++  const [incluirSalas, setIncluirSalas] = useState<boolean>(() => { try { return localStorage.getItem("eseuc_incluir_salas") === "1"; } catch { return false; } });
++  const [incluirDocentes, setIncluirDocentes] = useState<boolean>(() => { try { return localStorage.getItem("eseuc_incluir_docentes") === "1"; } catch { return false; } });
++  useEffect(() => { try { localStorage.setItem("eseuc_incluir_salas", incluirSalas ? "1" : "0"); } catch { /* ignore */ } }, [incluirSalas]);
++  useEffect(() => { try { localStorage.setItem("eseuc_incluir_docentes", incluirDocentes ? "1" : "0"); } catch { /* ignore */ } }, [incluirDocentes]);
++  // Ecrã do "sorteio" de docentes: UCs selecionadas + atribuições (UC,turma)→LISTA de docentes
++  // (T/TP: 2-3 docentes; PL: 1). Um docente pode ter várias turmas.
++  const [showDistDocentes, setShowDistDocentes] = useState(false);
++  const [ucsSelDocentes, setUcsSelDocentes] = useState<Set<string>>(new Set());
++  const [atribDocente, setAtribDocente] = useState<Record<string, string[]>>({});
++  // Turmas (key `${sigla}|${turma}`) BLOQUEADAS: o auto-propor não lhes toca; rearranja só as livres.
++  const [docentesTravados, setDocentesTravados] = useState<Set<string>>(new Set());
++  const toggleTravarTurma = (key: string) => setDocentesTravados(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+   const [newUc, setNewUc] = useState<Partial<UC>>({
+     nome: "",
+     sigla: "",
+@@ -992,34 +1083,33 @@
+   // Carregamento inicial a partir do Supabase (fonte de verdade).
+   // Nao depende do login: o RLS esta aberto por agora (fecha-se com a auth).
+   useEffect(() => {
+-    if (!repo.disponivel()) { setDbLoaded(true); return; }
++    if (!repo.disponivel()) { setDbLoaded(true); return; } // sem Supabase: app vazia, sem auto-save.
+ 
+     let isMounted = true;
+     setCloudStatus("saving");
+     repo.carregarTudo()
+-      .then(async (d) => {
++      .then((d) => {
+         if (!isMounted) return;
+-        const vazio = d.ucs.length === 0 && d.cursos.length === 0;
+-        if (vazio) {
+-          await repo.guardarTudo(dadosIniciais());
+-          if (!isMounted) return;
+-          showToast("Base de dados Supabase semeada com os dados ESEUC iniciais.");
+-        } else {
+-          setCursos(d.cursos);
+-          setAnosSemestres(d.anosSemestres);
+-          setUcs(d.ucs);
+-          setDocentes(d.docentes);
+-          setSalas(d.salas);
+-          setTurmas(d.turmas);
+-          setFeriados(d.feriados);
+-          setRegras(d.regras);
+-          setVersoes(d.versoes);
+-          setSolverRuns(d.solverRuns);
++        // Supabase é a ÚNICA fonte de verdade: preenche sempre (mesmo vazio). Sem auto-seed.
++        setCursos(d.cursos);
++        setAnosSemestres(d.anosSemestres);
++        setUcs(d.ucs);
++        setDocentes(d.docentes);
++        setSalas(d.salas);
++        setTurmas(d.turmas);
++        setFeriados(d.feriados);
++        setRegras(d.regras);
++        setVersoes(d.versoes);
++        setSolverRuns(d.solverRuns);
++        if (d.ucs.length === 0 && d.cursos.length === 0) {
++          showToast("Base de dados Supabase vazia. Importe um modelo ou crie os dados pela aplicação.");
+         }
+         setDbLoaded(true);
++        setPodeGravar(true); // só aqui: carregamento OK → seguro auto-gravar.
+         setCloudStatus("synced");
+       })
+       .catch((err) => {
++        // NÃO ligar o auto-save: com estado vazio, gravar apagaria a base de dados.
+         console.error("Erro a carregar do Supabase:", err);
+         setCloudStatus("error");
+         setDbLoaded(true);
+@@ -1031,7 +1121,16 @@
+   // Auto-gravacao (debounced) no Supabase. Usa upsert: adicoes/edicoes persistem;
+   // a sincronizacao de REMOCOES e um refinamento seguinte.
+   useEffect(() => {
+-    if (!repo.disponivel() || !dbLoaded) return;
++    // podeGravar (não dbLoaded): um carregamento falhado deixa o estado vazio; gravá-lo apagaria
++    // a base de dados (apagarEmFalta sem ids = apaga tudo). Só gravamos após um load bem-sucedido.
++    if (!repo.disponivel() || !podeGravar) return;
++    // Salvaguarda extra: nunca auto-gravar um estado COMPLETAMENTE vazio. Um carregamento que
++    // devolva 0 linhas (ex.: sessão sem permissões RLS) não deve disparar o deletion-sync e
++    // apagar a base de dados. Para limpar de propósito usa-se "Limpar Base de Dados" (que mantém
++    // cursos/anos/turmas/feriados → o estado nunca fica totalmente vazio por essa via).
++    const tudoVazio = !cursos.length && !anosSemestres.length && !ucs.length && !docentes.length &&
++      !salas.length && !turmas.length && !feriados.length && !regras.length && !versoes.length && !solverRuns.length;
++    if (tudoVazio) { setCloudStatus("synced"); return; }
+     setCloudStatus("saving");
+     const delayDebounce = setTimeout(() => {
+       repo.guardarTudo({
+@@ -1041,50 +1140,7 @@
+         .catch((err) => { console.error("Erro a gravar no Supabase:", err); setCloudStatus("error"); });
+     }, 1500);
+     return () => clearTimeout(delayDebounce);
+-  }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns, dbLoaded]);
+-
+-  // Sincronização em tempo real das regras (para garantir que criações da IA ou de outros utilizadores migram para todos)
+-  useEffect(() => {
+-    if (!repo.disponivel() || !dbLoaded) return;
+-    let isSubscribed = true;
+-    import("./data/supabaseClient").then(({ supabase }) => {
+-      if (!supabase) return;
+-      const channel = supabase
+-        .channel('regras-sync')
+-        .on(
+-          'postgres_changes',
+-          { event: '*', schema: 'public', table: 'regras' },
+-          () => {
+-            // Recarrega regras para todos os clientes sempre que houver alteração
+-            supabase.from('regras').select('*').then(({ data, error }) => {
+-              if (error) {
+-                console.error("Erro a recarregar regras em tempo real:", error);
+-                return;
+-              }
+-              if (data && isSubscribed) {
+-                import("./data/mappers").then(M => {
+-                  const newRegras = data.map(M.rowToRegra);
+-                  setRegras(prev => {
+-                    // Evitar ciclo infinito: só atualiza se houver diferenças estruturais
+-                    const stringifiedPrev = JSON.stringify(prev);
+-                    const stringifiedNew = JSON.stringify(newRegras);
+-                    if (stringifiedPrev !== stringifiedNew) {
+-                       return newRegras;
+-                    }
+-                    return prev;
+-                  });
+-                });
+-              }
+-            });
+-          }
+-        )
+-        .subscribe();
+-      return () => {
+-        isSubscribed = false;
+-        supabase.removeChannel(channel);
+-      };
+-    });
+-  }, [dbLoaded]);
++  }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns, podeGravar]);
+ 
+   const handleLogout = async () => {
+     await signOut();
+@@ -1260,17 +1316,28 @@
+     showToast("Base de dados académica limpa (sincronizado com o Supabase).");
+   };
+ 
+-  const handleRestoreDatabaseMock = async () => {
+-    if (!window.confirm("Deseja repor os modelos académicos predefinidos da ESEUC para este semestre? Os dados atuais serão substituídos pelos dados originais.")) {
+-      return;
+-    }
+-    setUcs(ucsIniciais);
+-    setDocentes(docentesIniciais);
+-    setSalas(salasIniciais);
+-    setRegras(regrasIniciais);
+-    setVersoes(versoesIniciais);
+-    setSolverRuns(solverRunsIniciais);
+-    showToast("Modelos académicos predefinidos repostos (gravado no Supabase).");
++  // Exporta o ESTADO ATUAL (ao vivo — o que está carregado do Supabase + edições desta sessão)
++  // para um JSON portátil. Backup completo de salas/docentes/regras/propostas reais, ao contrário
++  // do scripts/exportar-mockdata.ts que só exporta os dados-semente do código.
++  const handleExportarTudo = () => {
++    const dados = {
++      exportadoEm: new Date().toISOString(),
++      cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns,
++    };
++    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
++    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
++    const url = URL.createObjectURL(blob);
++    const a = document.createElement("a");
++    a.href = url;
++    a.download = `gestor-horarios-backup-${stamp}.json`;
++    document.body.appendChild(a);
++    a.click();
++    document.body.removeChild(a);
++    URL.revokeObjectURL(url);
++    showToast(
++      `Backup exportado: ${ucs.length} UCs · ${docentes.length} docentes · ${salas.length} salas · ` +
++      `${regras.length} regras · ${versoes.length} propostas.`
++    );
+   };
+ 
+   const handleAddSala = () => {
+@@ -1334,7 +1401,7 @@
+ 
+   // Distribuição local pelas 30 semanas letivas usando o motor de distribuição (distribuicao.ts).
+   // S1 = semanas 1-15; S2 = semanas 16-30 (offset +15 aplicado automaticamente).
+-  const handleTriggerSolver = (semRegras = false) => {
++  const handleTriggerSolver = (semRegras = false, sessoesFixasImport: SessaoHorario[] = []) => {
+     setIsSolving(true);
+     setLastSolverVerdict(null);
+ 
+@@ -1354,6 +1421,9 @@
+       for (const uc of ucs) {
+         if (!uc.turmasConfig?.length) continue;
+         if (Number(uc.anoCurricular) === 3) continue; // 3.º ano é ensino clínico
++        // Gerar só as UCs do ano selecionado (as regras globais — opcoes — aplicam-se na
++        // mesma a toda a distribuição). Com "todos", entram todas como antes.
++        if (selectedYearFilter !== "todos" && Number(uc.anoCurricular) !== Number(selectedYearFilter)) continue;
+ 
+         const anoSem = anosSemestres.find(s => s.semestre === uc.semestre);
+         if (!anoSem?.dataInicioSemestre) continue;
+@@ -1386,20 +1456,52 @@
+       for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++) {
+         if ([...docPorUC[sigs[i]]].some(d => docPorUC[sigs[j]].has(d))) ucConflitos.push([sigs[i], sigs[j]]);
+       }
++      // Regras criadas por IA (ou editadas) com config.motor → aplicam-se ao solver.
++      // ÂMBITO: ao gerar um ano, só entram as TRANSVERSAIS + as DESSE ano (as de outros
++      // anos ficam de fora). ucConflitos acumulam; os restantes parâmetros são substituídos
++      // pela última regra ativa que os defina.
++      const regraNoAmbito = (r: RegraHorario) => {
++        const anos = anosDaRegra(r);
++        return anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
++      };
++      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: number[]; semanasSoTurmaB?: number[]; restricoesUC?: any[] } = {};
++      for (const r of regras) {
++        if (!regraNoAmbito(r)) continue;
++        const m = r.ativa && (r.config as any)?.motor;
++        if (!m || typeof m !== "object") continue;
++        if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
++        if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
++        if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
++        if (Array.isArray(m.semanasSoTurmaA) && m.semanasSoTurmaA.length) motorAI.semanasSoTurmaA = m.semanasSoTurmaA.map(Number);
++        if (Array.isArray(m.semanasSoTurmaB) && m.semanasSoTurmaB.length) motorAI.semanasSoTurmaB = m.semanasSoTurmaB.map(Number);
++        if (Array.isArray(m.restricoesUC)) motorAI.restricoesUC = [...(motorAI.restricoesUC || []), ...m.restricoesUC.filter((x: any) => x && Array.isArray(x.siglas) && x.siglas.length)];
++      }
++      // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
++      // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
++      // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
++      const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
++      const fixasExistentes = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
++      const sessoesFixas = [...sessoesFixasImport, ...fixasExistentes];
++
+       const opcoes = {
+-        plDiasPermitidos: regraPLDias
++        plDiasPermitidos: motorAI.plDiasPermitidos ?? (regraPLDias
+           ? (regraPLDias.config?.diasPermitidos ?? ["Quarta", "Quinta", "Sexta"])
+-          : null,
++          : null),
+         // Sem limite de TP por mancha nesta fase: 4 TP podem coexistir.
+-        maxTPporMancha: null,
++        maxTPporMancha: motorAI.maxTPporMancha ?? null,
+         prefTurmaAManha,
+-        ucConflitos,
+-        // Estrutura ESEUC: 8-15 só Turma B (Turma A em estágio); 16-23 só Turma A. Tudo de manhã.
+-        semanasSoTurmaB: Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
+-        semanasSoTurmaA: Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
++        ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
++        // Estrutura ESEUC: 8-15 só T1 (Turma A) presente, UCs "-I"; 16-23 só T2 (Turma B), UCs
++        // "-II". Tudo de manhã. Assim T1 está de manhã nas semanas 1-15 e T2 nas 16-30.
++        semanasSoTurmaA: motorAI.semanasSoTurmaA ?? Array.from({ length: 8 }, (_, i) => 8 + i),   // 8..15
++        semanasSoTurmaB: motorAI.semanasSoTurmaB ?? Array.from({ length: 8 }, (_, i) => 16 + i),  // 16..23
+         // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
+         // tarde e o espaço para almoço (e o teto de 8h). Para comparar cenários.
+         semRegras,
++        // v2: sessões fixas (importadas/pins) — o motor completa à volta delas.
++        sessoesFixas,
++        // Restrições genéricas por UC (das regras IA): "X só de manhã", "Y não à sexta", …
++        restricoesUC: motorAI.restricoesUC ?? [],
+       };
+ 
+       // Schedule each semester fairly across its UCs (round-robin per week).
+@@ -1409,12 +1511,23 @@
+ 
+       // Preservar (1) as SEMANAS validadas/bloqueadas inteiras e (2) as sessões fixadas
+       // individualmente nas restantes semanas.
++      // Geração por ano: ao gerar um ano específico, as sessões dos OUTROS anos preservam-se
++      // tal como estão (não são tocadas). Com "todos", não há outros anos a preservar.
++      const mesmoAnoGen = (s: SessaoHorario) => {
++        if (selectedYearFilter === "todos") return true;
++        const uc = ucs.find(u => u.sigla === s.ucSigla);
++        return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
++      };
++      const outrosAnos = (activeVersao?.sessoes ?? []).filter(s => !mesmoAnoGen(s));
++
+       const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
+       const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
+-      const sessoesCongeladas = (activeVersao?.sessoes ?? []).filter(ehBloqueada);
+-      const fixadas = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !ehBloqueada(s));
++      const sessoesCongeladas = (activeVersao?.sessoes ?? []).filter(s => ehBloqueada(s) && mesmoAnoGen(s));
++      const fixadas = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s));
+       const merged: SessaoHorario[] = [
++        ...outrosAnos,                    // anos não selecionados → intactos
+         ...sessoesCongeladas,            // semanas validadas → ficam exatamente como estão
++        ...sessoesFixasImport.map(s => ({ ...s, bloqueado: true })),  // v2: importadas (fixas)
+         ...fixadas,                       // sessões "fixa" em semanas não bloqueadas
+         ...allSessoes.filter(s =>
+           !ehBloqueada(s) &&              // descarta as novas das semanas congeladas
+@@ -1453,6 +1566,104 @@
+     }
+   };
+ 
++  // --- Importação de horário externo (Excel/CSV) -------------------------------------
++  const descarregarTemplate = () => {
++    const blob = new Blob([gerarTemplateCSV()], { type: "text/csv;charset=utf-8" });
++    const url = URL.createObjectURL(blob);
++    const a = document.createElement("a");
++    a.href = url; a.download = "template_horario_eseuc.csv"; a.click();
++    URL.revokeObjectURL(url);
++  };
++  const onFicheiroImport = async (file: File | null) => {
++    if (!file) return;
++    setNomeFicheiroImport(file.name);
++    try {
++      let texto: string;
++      if (/\.xlsx?$/i.test(file.name)) {
++        // Excel nativo: 1.ª folha → CSV (delimitador ';') e reaproveita o parser de CSV.
++        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
++        texto = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]], { FS: ";" });
++      } else {
++        texto = await file.text();
++      }
++      const { sessoes, erros } = parseHorarioCSV(texto, ucs);
++      setErrosImport(erros);
++      setSessoesImportadas(sessoes);
++      setRelatorioImport(sessoes.length ? validarHorario(sessoes, ucs) : null);
++    } catch (e: any) {
++      setErrosImport([{ linha: 0, motivo: "Não foi possível ler o ficheiro: " + (e?.message || e), conteudo: "" }]);
++      setSessoesImportadas(null); setRelatorioImport(null);
++    }
++  };
++  const limparImport = () => {
++    setSessoesImportadas(null); setErrosImport([]); setRelatorioImport(null); setNomeFicheiroImport(""); setNomePropostaImport("");
++  };
++
++  // Anos curriculares presentes numa proposta — derivado das sessões (sem coluna nova).
++  const anosDaProposta = (v: VersaoHorario | null | undefined): number[] => {
++    if (!v) return [];
++    const set = new Set<number>();
++    for (const s of v.sessoes) { const uc = ucs.find(u => u.sigla === s.ucSigla); if (uc) set.add(Number(uc.anoCurricular)); }
++    return [...set].sort((a, b) => a - b);
++  };
++  const rotuloAnosProposta = (v: VersaoHorario | null | undefined): string => {
++    const a = anosDaProposta(v);
++    return a.length === 0 ? "vazia" : a.length === 1 ? `${a[0]}.º ano` : "vários anos";
++  };
++  const novaPropostaBase = (nome: string, sessoes: SessaoHorario[]): VersaoHorario => ({
++    id: "v_" + Date.now(),
++    nome,
++    anoSemestreId: activeVersao?.anoSemestreId ?? selectedSemestreId,
++    criadaEm: new Date().toISOString(),
++    criadaPor: user?.email ?? "",
++    ativa: false,
++    score: 0,
++    sessoes: sessoes.map((s, i) => ({ ...s, id: i + 1 })),
++    semanasBloqueadas: [],
++  });
++
++  // Guardar a distribuição atual como NOVA proposta nomeada (só o ano selecionado ou todos).
++  const guardarProposta = () => {
++    const nome = nomeProposta.trim() || `Proposta ${new Date().toLocaleDateString("pt-PT")}`;
++    const base = activeVersao?.sessoes ?? [];
++    const sessoes = (escopoProposta === "ano" && selectedYearFilter !== "todos")
++      ? base.filter(s => { const uc = ucs.find(u => u.sigla === s.ucSigla); return uc && Number(uc.anoCurricular) === Number(selectedYearFilter); })
++      : base;
++    if (!sessoes.length) { showToast("Não há sessões para guardar neste âmbito."); return; }
++    const nova = novaPropostaBase(nome, sessoes);
++    nova.score = activeVersao?.score ?? 0;
++    setVersoes([...versoes, nova]);
++    setSelectedVersaoId(nova.id);
++    setShowGuardarProposta(false); setNomeProposta("");
++    showToast(`Proposta "${nome}" guardada (${sessoes.length} sessões).`);
++  };
++
++  // Importar a proposta lida do ficheiro como NOVA proposta nomeada (sessões fixas).
++  const confirmarImportacao = () => {
++    if (!sessoesImportadas?.length) return;
++    const nome = nomePropostaImport.trim() || nomeFicheiroImport.replace(/\.[^.]+$/, "") || `Importada ${new Date().toLocaleDateString("pt-PT")}`;
++    const nova = novaPropostaBase(nome, sessoesImportadas.map(s => ({ ...s, bloqueado: true })));
++    setVersoes([...versoes, nova]);
++    setSelectedVersaoId(nova.id);
++    showToast(`Proposta "${nome}" importada (${sessoesImportadas.length} sessões).`);
++    limparImport();
++  };
++
++  const renomearProposta = (id: string, nome: string) => {
++    const n = nome.trim(); if (!n) { setRenomearPropostaId(null); return; }
++    setVersoes(versoes.map(v => v.id === id ? { ...v, nome: n } : v));
++    setRenomearPropostaId(null);
++    showToast("Proposta renomeada.");
++  };
++  const apagarProposta = (id: string) => {
++    if (versoes.length <= 1) { showToast("Tem de existir pelo menos uma proposta."); return; }
++    if (!window.confirm("Apagar esta proposta? Esta ação não se desfaz.")) return;
++    const restantes = versoes.filter(v => v.id !== id);
++    setVersoes(restantes);
++    if (selectedVersaoId === id) setSelectedVersaoId(restantes[0].id);
++    showToast("Proposta apagada.");
++  };
++
+   // Handles Gemini custom chat messages safely converting SQL-less prompts
+   const handleSendAiMessage = async () => {
+     if (!aiPrompt.trim()) return;
+@@ -1476,6 +1687,8 @@
+         body: JSON.stringify({
+           prompt: currentPrompt,
+           chatHistory: chatMessages.map(m => ({ role: m.role, content: m.content })),
++          geminiApiKey,
++          geminiModel,
+           regras,
+           ucs,
+           docentes,
+@@ -1488,7 +1701,7 @@
+       const assistantMessage: ChatMessage = {
+         id: "a_" + Date.now(),
+         role: "assistant",
+-        content: data.text || "Sem resposta do assistente inteligente.",
++        content: data.text || (data.error ? "⚠️ " + data.error : "Sem resposta do assistente inteligente."),
+         timestamp: new Date().toISOString()
+       };
+ 
+@@ -1499,16 +1712,23 @@
+         try {
+           const parts = data.text.split("[REGRA_DETETADA]");
+           const subParts = parts[1].split("[FIM_REGRA]");
+-          const jsonStr = subParts[0].trim();
++          // Extração robusta: alguns modelos (ex.: 2.5-flash) embrulham o JSON em cercas
++          // ```json ... ``` ou põem texto à volta. Remove as cercas e isola o objeto {…}.
++          let jsonStr = subParts[0].replace(/```(?:json)?/gi, "").trim();
++          const ini = jsonStr.indexOf("{");
++          const fim = jsonStr.lastIndexOf("}");
++          if (ini >= 0 && fim > ini) jsonStr = jsonStr.slice(ini, fim + 1);
+           const parsedRule = JSON.parse(jsonStr);
+-          
+-          // Inject user-friendly configuration translation
++
++          // Preservar a config da IA (inclui config.motor, que aplica a regra ao solver)
+           parsedRule.config = {
+-            traducaoSimples: `Traduzido em tempo real da análise inteligente: "${currentPrompt}"`
++            ...(parsedRule.config || {}),
++            traducaoSimples: parsedRule.config?.traducaoSimples || `Traduzido da análise inteligente: "${currentPrompt}"`,
+           };
+           setPendingAiRule(parsedRule);
+         } catch (jsonErr) {
+           console.error("Failed to parse rule from AI response:", jsonErr);
++          showToast("A IA sugeriu uma regra mas não consegui interpretá-la. Tenta reformular o pedido.");
+         }
+       }
+     } catch (e: any) {
+@@ -1526,23 +1746,6 @@
+     }
+   };
+ 
+-  const handleAcceptAiRule = () => {
+-    if (!pendingAiRule) return;
+-    // Coordenador/vice: a regra criada por IA fica obrigatoriamente do seu ano.
+-    const escopo = ehDiretor ? (pendingAiRule.escopo ?? "transversal") : "ano";
+-    const anoCurricular = ehDiretor ? (pendingAiRule.anoCurricular ?? "todos") : (anoDoPerfil ?? 1);
+-    const realRule: RegraHorario = {
+-      ...pendingAiRule,
+-      id: "ai_rule_" + Date.now(),
+-      escopo,
+-      anoCurricular,
+-      ativa: true
+-    };
+-    setRegras([realRule, ...regras]);
+-    setPendingAiRule(null);
+-    showToast(`A regra "${realRule.nome}" criada pela IA foi gravada no Supabase.`);
+-  };
+-
+   const removeUc = (id: string) => setUcs(ucs.filter(u => u.id !== id));
+   const removeDocente = (id: string) => setDocentes(docentes.filter(d => d.id !== id));
+   const removeSala = (id: string) => setSalas(salas.filter(s => s.id !== id));
+@@ -1554,6 +1757,124 @@
+     showToast("Disponibilidade de regra alterada.");
+   };
+ 
++  // Edição de regra (modal): anos múltiplos + cursos. Serve também para VALIDAR a sugestão
++  // da IA antes de a ativar (garante que os anos são sempre escolhidos).
++  const abrirEdicaoRegra = (reg: RegraHorario, prov: "edicao" | "ia") => {
++    setEditProveniencia(prov);
++    setRegraEmEdicao({ ...reg, config: { ...(reg.config || {}), anos: anosDaRegra(reg), cursoIds: cursosDaRegra(reg) } });
++  };
++  const toggleDraftAno = (ano: number) => setRegraEmEdicao(r => {
++    if (!r) return r;
++    const cur: number[] = Array.isArray((r.config as any)?.anos) ? (r.config as any).anos : [];
++    const next = cur.includes(ano) ? cur.filter(a => a !== ano) : [...cur, ano].sort((a, b) => a - b);
++    return { ...r, config: { ...(r.config || {}), anos: next } };
++  });
++  const toggleDraftCurso = (id: string) => setRegraEmEdicao(r => {
++    if (!r) return r;
++    const cur: string[] = Array.isArray((r.config as any)?.cursoIds) ? (r.config as any).cursoIds : [];
++    const next = cur.includes(id) ? cur.filter(c => c !== id) : [...cur, id];
++    return { ...r, config: { ...(r.config || {}), cursoIds: next } };
++  });
++  const guardarRegraEditada = () => {
++    if (!regraEmEdicao) return;
++    const anos: number[] = Array.isArray((regraEmEdicao.config as any)?.anos) ? (regraEmEdicao.config as any).anos : [];
++    const base: RegraHorario = {
++      ...regraEmEdicao,
++      nome: (regraEmEdicao.nome || "").trim() || "Regra sem nome",
++      escopo: anos.length ? "ano" : "transversal",
++      anoCurricular: anos.length === 1 ? anos[0] : "todos",  // badge/legado; os anos reais ficam no config
++    };
++    if (editProveniencia === "ia") {
++      const realRule: RegraHorario = { ...base, id: "ai_rule_" + Date.now(), ativa: true };
++      setRegras([realRule, ...regras]);
++      setPendingAiRule(null);
++      showToast(`Regra "${realRule.nome}" criada e ativada.`);
++    } else {
++      setRegras(regras.map(r => r.id === base.id ? base : r));
++      showToast("Regra atualizada.");
++    }
++    setRegraEmEdicao(null);
++  };
++
++  // Cartão de uma regra — partilhado pelos dois conjuntos (transversais e por ano).
++  const cartaoRegra = (reg: RegraHorario) => (
++    <div
++      key={reg.id}
++      className={`p-4 rounded-xl border text-left transition-all ${
++        reg.ativa ? `${themeStyles.borderColor} bg-white shadow-3xs` : "border-stone-150 bg-stone-50/40 opacity-60"
++      }`}
++    >
++      <div className="flex items-start justify-between gap-2">
++        <div className="space-y-1">
++          <div className="flex items-center gap-1.5 flex-wrap">
++            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
++              reg.tipo === "hard" ? "bg-rose-50 text-rose-800 border border-rose-200" : "bg-indigo-50 text-indigo-800 border border-indigo-200"
++            }`}>
++              {reg.tipo === "hard" ? "Inviolável (Hard)" : `Preferencial (Peso: ${reg.peso})`}
++            </span>
++            <span className="text-[10px] font-semibold text-stone-400">• {reg.categoria}</span>
++            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-150">
++              {anosDaRegra(reg).length ? anosDaRegra(reg).map(n => `${n}.º`).join(", ") + " ano" : "Transversal"}
++            </span>
++            {cursosDaRegra(reg).length > 0 && (
++              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-150">
++                {cursosDaRegra(reg).map(id => cursos.find(c => c.id === id)?.sigla || id).join(", ")}
++              </span>
++            )}
++            {regraAplicadaAoMotor(reg)
++              ? <span title="Esta regra traduz-se num parâmetro do motor e É aplicada na geração." className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">⚙ Aplicada</span>
++              : <span title="O motor ainda não sabe aplicar esta restrição (config.motor vazio). Fica documental — visível mas não influencia a geração." className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-200 text-stone-600 border border-stone-300">📄 Documental</span>}
++          </div>
++          <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
++          <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
++        </div>
++        <div className="flex flex-col items-end gap-2 shrink-0">
++          {regraEditavel(reg) ? (
++            <>
++              <button
++                onClick={() => toggleRegra(reg.id)}
++                className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer ${
++                  reg.ativa ? "bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200" : "bg-stone-200 text-stone-500 hover:bg-stone-300"
++                }`}
++              >
++                {reg.ativa ? "Desativar" : "Ativar"}
++              </button>
++              <button
++                onClick={() => abrirEdicaoRegra(reg, "edicao")}
++                className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200 flex items-center gap-1"
++                title="Editar anos, cursos, nome, peso…"
++              >
++                <Edit2 className="w-3 h-3" /> Editar
++              </button>
++              <button onClick={() => removeRegra(reg.id)} className="text-stone-400 hover:text-rose-600 transition-colors">
++                <Trash2 className="w-3.5 h-3.5" />
++              </button>
++              <button
++                onClick={() => { setTutorRegra(reg); setTutorPrompt(""); setTutorResposta(""); }}
++                className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1"
++                title="Melhorar ou validar esta regra com o tutor IA"
++              >
++                <Sparkles className="w-3 h-3" /> Tutor IA
++              </button>
++            </>
++          ) : (
++            <span className="text-[8.5px] text-stone-400 font-bold uppercase tracking-wide" title="Regra transversal — gerida pela Direção">
++              Só leitura
++            </span>
++          )}
++        </div>
++      </div>
++      <div className="mt-3 pt-2 border-t border-stone-100 bg-stone-50/70 p-2.5 rounded-xl space-y-1">
++        <span className="text-[9px] font-bold text-indigo-700 flex items-center gap-1">
++          <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" /> Proteção activa da IA:
++        </span>
++        <p className="text-stone-600 text-[10.5px] leading-relaxed font-light">
++          {reg.config?.traducaoSimples || "A IA monitoriza esta regra em tempo real, impedindo conflitos físicos durante a computação de horários."}
++        </p>
++      </div>
++    </div>
++  );
++
+   const toggleSessionBlock = (sessionId: number) => {
+     if (!activeVersao) return;
+     const updatedSessoes = activeVersao.sessoes.map(s => {
+@@ -1566,6 +1887,194 @@
+     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updatedSessoes } : v));
+   };
+ 
++  // Atribuição MANUAL de sala/docente a uma sessão (fases 2 e 3 do fluxo, controladas à mão).
++  const atribuirCampoSessao = (sessionId: number, campo: "sala" | "docente", valor: string) => {
++    if (!activeVersao) return;
++    const updated = activeVersao.sessoes.map(s => s.id === sessionId ? { ...s, [campo]: valor } : s);
++    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
++  };
++  // Tipo de sala adequado ao tipo de aula (T→Teórica, PL→Lab/Computadores, TP/S→TP).
++  const tipoSalaAlvo = (sessao: SessaoHorario): Sala["tipo"] =>
++    sessao.tipoAula === "T" ? "Teórica"
++      : sessao.tipoAula === "PL" ? (/comput/i.test(sessao.salaTipo || "") ? "Sala de Computadores" : "Laboratório")
++        : "Teórico-prática";
++  // Estimativa de alunos por turma (para a capacidade da sala).
++  const alunosDaTurma = (turma: string): number =>
++    turma.startsWith("Turma") ? 180 : /^TP\d+$/.test(turma) ? 45 : /^PL\d+$/.test(turma) ? 15 : 30;
++  // Salas DISPONÍVEIS para uma sessão (para o override): tipo certo, capacidade suficiente e
++  // livres naquele bloco (semana+dia+hora) — exceto a já atribuída a esta sessão.
++  const salasDisponiveis = (sessao: SessaoHorario): Sala[] => {
++    const tipo = tipoSalaAlvo(sessao);
++    const necessario = alunosDaTurma(sessao.turma);
++    const ocupadas = new Set((activeVersao?.sessoes || [])
++      .filter(s => s.id !== sessao.id && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio && s.sala)
++      .map(s => s.sala));
++    const livre = (s: Sala) => !ocupadas.has(s.nome) || s.nome === sessao.sala;
++    let comp = salas.filter(s => s.tipo === tipo && (s.capacidade || 0) >= necessario && livre(s));
++    if (!comp.length) comp = salas.filter(s => s.tipo === tipo && livre(s)); // relaxa capacidade
++    if (!comp.length) comp = salas.filter(livre);                            // relaxa tipo
++    return comp.sort((a, b) => (a.capacidade || 0) - (b.capacidade || 0));
++  };
++  // Propõe salas automaticamente às sessões SEM sala (respeita as já escolhidas à mão).
++  // Menor sala que serve, sem dupla-marcação no mesmo bloco. Tu podes trocar depois.
++  const proporSalas = () => {
++    if (!activeVersao) return;
++    const slotKey = (s: SessaoHorario) => `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
++    const ocup = new Map<string, Set<string>>();
++    for (const s of activeVersao.sessoes) if (s.sala) {
++      let set = ocup.get(slotKey(s)); if (!set) { set = new Set(); ocup.set(slotKey(s), set); } set.add(s.sala);
++    }
++    let atribuidas = 0, semSala = 0;
++    const novas = activeVersao.sessoes.map(s => {
++      if (s.sala) return s; // respeita override manual / já atribuída
++      const k = slotKey(s); let usadas = ocup.get(k); if (!usadas) { usadas = new Set(); ocup.set(k, usadas); }
++      const u = usadas;
++      const tipo = tipoSalaAlvo(s); const necessario = alunosDaTurma(s.turma);
++      const cand = salas.filter(r => r.tipo === tipo && (r.capacidade || 0) >= necessario && !u.has(r.nome))
++        .sort((a, b) => (a.capacidade || 0) - (b.capacidade || 0));
++      const escolhida = cand[0] || salas.filter(r => r.tipo === tipo && !u.has(r.nome))[0];
++      if (escolhida) { u.add(escolhida.nome); atribuidas++; return { ...s, sala: escolhida.nome }; }
++      semSala++; return s;
++    });
++    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: novas } : v));
++    showToast(`Salas propostas: ${atribuidas} atribuídas${semSala ? ` · ${semSala} sem sala livre` : ""}.`);
++  };
++  // Aviso de conflito de sala numa sessão: dupla-marcação no mesmo bloco ou capacidade insuficiente.
++  const avisoSala = (sessao: SessaoHorario): string | null => {
++    if (!sessao.sala) return null;
++    const mesmas = (activeVersao?.sessoes || []).filter(s => s.sala === sessao.sala && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio);
++    if (mesmas.length > 1) return `Sala "${sessao.sala}" repetida neste bloco (${mesmas.length} aulas).`;
++    const sala = salas.find(r => r.nome === sessao.sala);
++    if (sala && (sala.capacidade || 0) < alunosDaTurma(sessao.turma)) return `Capacidade ${sala.capacidade} < ${alunosDaTurma(sessao.turma)} alunos.`;
++    return null;
++  };
++
++  // ===== Distribuição de DOCENTES — "sorteio" com propagação de restrições =====
++  type GrupoDoc = { key: string; sigla: string; ucNome: string; turma: string; tipo: string; slotKeys: Set<string>; slots: { dia: string; ini: string; fim: string }[] };
++  const _min = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
++  const _rangeContem = (range: string, ini: string, fim: string) => {
++    const [ri, rf] = range.split("-"); return ri && rf && _min(ri) <= _min(ini) && _min(rf) >= _min(fim);
++  };
++  // Grupos (UC, turma) da proposta ativa, com os seus blocos (a unidade de atribuição).
++  const gruposDocentes = (): GrupoDoc[] => {
++    const map = new Map<string, GrupoDoc>();
++    for (const s of activeVersao?.sessoes || []) {
++      const key = `${s.ucSigla}|${s.turma}`;
++      let g = map.get(key);
++      if (!g) { g = { key, sigla: s.ucSigla, ucNome: s.ucNome, turma: s.turma, tipo: s.tipoAula, slotKeys: new Set(), slots: [] }; map.set(key, g); }
++      g.slotKeys.add(`${s.semana}|${s.diaSemana}|${s.horaInicio}`);
++      g.slots.push({ dia: s.diaSemana, ini: s.horaInicio, fim: s.horaFim });
++    }
++    return [...map.values()].sort((a, b) => a.sigla.localeCompare(b.sigla) || a.turma.localeCompare(b.turma, undefined, { numeric: true }));
++  };
++  const docenteDisponivel = (d: Docente, slots: { dia: string; ini: string; fim: string }[]): boolean => {
++    const disp = d.disponibilidade || {};
++    if (Object.keys(disp).length === 0) return true; // sem disponibilidade declarada = sem restrição
++    return slots.every(sl => (disp[sl.dia] || []).some(r => _rangeContem(r, sl.ini, sl.fim)));
++  };
++  // Elegíveis: 1.º por atribuicoesUcs (UC+tipo+turma), 2.º por unidadesCurriculares, senão TODOS (fallback).
++  const docentesElegiveis = (sigla: string, tipo: string, turma: string): { lista: Docente[]; fallback: boolean } => {
++    const fino = docentes.filter(d => d.atribuicoesUcs?.[sigla]?.tipos?.includes(tipo as any)
++      && (!(d.atribuicoesUcs![sigla].turmas?.length) || d.atribuicoesUcs![sigla].turmas.includes(turma)));
++    if (fino.length) return { lista: fino, fallback: false };
++    const coarse = docentes.filter(d => (d.unidadesCurriculares || []).includes(sigla));
++    if (coarse.length) return { lista: coarse, fallback: false };
++    return { lista: docentes, fallback: true };
++  };
++  // Domínio de uma turma = elegíveis ∩ disponíveis ∩ sem-conflito (dado o estado atual de atribuições).
++  // Nº de docentes por turma: T/TP até 3 (alvo 2), PL exatamente 1.
++  const LIMITE_HORAS_SOFT = 12; // máx. horas/semana (soft — pode ser ultrapassado)
++  const capDocsTipo = (tipo: string) => tipo === "PL" ? 1 : (tipo === "T" || tipo === "TP") ? 3 : 2;
++  const targetDocsTipo = (tipo: string) => tipo === "PL" ? 1 : (tipo === "T" || tipo === "TP") ? 2 : 1;
++  // Horas na semana de PICO de um docente (blocos por semana × 2) — para o limite soft.
++  const horasSemanaisDoc = (nome: string, atrib: Record<string, string[]>, slotKeysMap: Map<string, Set<string>>): number => {
++    const porSemana: Record<string, number> = {};
++    for (const [k, lista] of Object.entries(atrib)) {
++      if (!lista.includes(nome)) continue;
++      const sk = slotKeysMap.get(k); if (!sk) continue;
++      for (const x of sk) { const sem = x.split("|")[0]; porSemana[sem] = (porSemana[sem] || 0) + 1; }
++    }
++    return Math.max(0, ...Object.values(porSemana)) * 2;
++  };
++  // Domínio de uma turma = elegíveis ∩ sem-conflito ∩ ainda-não-nesta-turma.
++  // HARD: elegibilidade + sem-conflito (impossibilidade física). SOFT: disponibilidade e horas
++  // (não excluem — assinalam-se; disponíveis vêm primeiro).
++  const dominioDocente = (g: GrupoDoc, atrib: Record<string, string[]>, slotKeysMap: Map<string, Set<string>>): { lista: Docente[]; fallback: boolean } => {
++    const { lista, fallback } = docentesElegiveis(g.sigla, g.tipo, g.turma);
++    const jaNaTurma = new Set(atrib[g.key] || []);
++    const validos = lista.filter(d => {
++      if (jaNaTurma.has(d.nome)) return false;
++      for (const [k2, nomes] of Object.entries(atrib)) {
++        if (k2 === g.key || !nomes.includes(d.nome)) continue;
++        const sk2 = slotKeysMap.get(k2); if (sk2) for (const x of g.slotKeys) if (sk2.has(x)) return false;
++      }
++      return true;
++    });
++    validos.sort((a, b) => (docenteDisponivel(b, g.slots) ? 1 : 0) - (docenteDisponivel(a, g.slots) ? 1 : 0));
++    return { lista: validos, fallback };
++  };
++  // Aplica (UC,turma)→[docentes] às sessões (docente = nomes juntos por vírgula).
++  const aplicarDocentes = (atrib: Record<string, string[]>) => {
++    if (!activeVersao) return;
++    const updated = activeVersao.sessoes.map(s => {
++      const lista = atrib[`${s.ucSigla}|${s.turma}`];
++      return lista !== undefined ? { ...s, docente: lista.join(", ") } : s;
++    });
++    setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
++  };
++  const adicionarDocenteTurma = (key: string, nome: string, tipo: string) => {
++    if (!nome) return;
++    const cur = atribDocente[key] || [];
++    if (cur.includes(nome) || cur.length >= capDocsTipo(tipo)) return;
++    const next = { ...atribDocente, [key]: [...cur, nome] };
++    setAtribDocente(next); aplicarDocentes(next);
++  };
++  const removerDocenteTurma = (key: string, nome: string) => {
++    const restantes = (atribDocente[key] || []).filter(n => n !== nome);
++    const next = { ...atribDocente }; if (restantes.length) next[key] = restantes; else delete next[key];
++    setAtribDocente(next); aplicarDocentes(next);
++  };
++  // Auto-proposta: preenche cada turma até ao alvo (T/TP:2, PL:1), turmas mais restritas
++  // primeiro; prefere disponíveis, depois abaixo das 12h (soft) e menos carregados.
++  // BLOQUEIO: as turmas travadas mantêm-se; as livres (selecionadas) são rearranjadas de novo.
++  const autoProporDocentes = () => {
++    const grupos = gruposDocentes().filter(g => ucsSelDocentes.has(g.sigla));
++    const slotKeysMap = new Map(gruposDocentes().map(g => [g.key, g.slotKeys])); // todas, p/ conflito/horas
++    const atrib: Record<string, string[]> = {};
++    for (const k of Object.keys(atribDocente)) atrib[k] = [...atribDocente[k]];
++    for (const g of grupos) if (!docentesTravados.has(g.key)) delete atrib[g.key]; // rearranja as não travadas
++    let progresso = true, adicionadas = 0;
++    while (progresso) {
++      progresso = false;
++      let alvo: GrupoDoc | null = null; let dom: Docente[] = [];
++      for (const g of grupos) {
++        if (docentesTravados.has(g.key)) continue;
++        if ((atrib[g.key]?.length || 0) >= targetDocsTipo(g.tipo)) continue;
++        const d = dominioDocente(g, atrib, slotKeysMap).lista;
++        if (!alvo || d.length < dom.length) { alvo = g; dom = d; }
++      }
++      if (alvo && dom.length) {
++        const slots = alvo.slots;
++        const esc = [...dom].sort((a, b) => {
++          const da = docenteDisponivel(a, slots) ? 0 : 1, db = docenteDisponivel(b, slots) ? 0 : 1;
++          const ha = horasSemanaisDoc(a.nome, atrib, slotKeysMap), hb = horasSemanaisDoc(b.nome, atrib, slotKeysMap);
++          return da - db || (ha >= LIMITE_HORAS_SOFT ? 1 : 0) - (hb >= LIMITE_HORAS_SOFT ? 1 : 0) || ha - hb;
++        })[0];
++        atrib[alvo.key] = [...(atrib[alvo.key] || []), esc.nome]; adicionadas++; progresso = true;
++      }
++    }
++    const incompletas = grupos.filter(g => (atrib[g.key]?.length || 0) < targetDocsTipo(g.tipo)).length;
++    setAtribDocente(atrib); aplicarDocentes(atrib);
++    showToast(`Docentes: ${adicionadas} atribuições${incompletas ? ` · ${incompletas} abaixo do alvo` : ""}.`);
++  };
++  const abrirDistDocentes = () => {
++    setUcsSelDocentes(new Set(gruposDocentes().map(g => g.sigla)));
++    const atrib: Record<string, string[]> = {};
++    for (const s of activeVersao?.sessoes || []) if (s.docente) atrib[`${s.ucSigla}|${s.turma}`] = s.docente.split(",").map(x => x.trim()).filter(Boolean);
++    setAtribDocente(atrib);
++    setShowDistDocentes(true);
++  };
++
+   // Eliminar uma aula do horário (edição manual para reajustar).
+   const deleteSession = (sessionId: number) => {
+     if (!activeVersao) return;
+@@ -1641,7 +2150,7 @@
+       const prompt = `Regra atual (JSON): ${JSON.stringify({ nome: tutorRegra.nome, tipo: tutorRegra.tipo, categoria: tutorRegra.categoria, escopo: tutorRegra.escopo, anoCurricular: tutorRegra.anoCurricular, descricao: tutorRegra.descricao, peso: tutorRegra.peso })}.\nPedido do utilizador: ${pedido}\nValida e/ou melhora esta regra de horário académico, de forma clara e sucinta. Se sugerires uma nova versão da regra, devolve-a no bloco [REGRA_DETETADA]...[FIM_REGRA].`;
+       const resp = await fetch("/api/gemini/chat", {
+         method: "POST", headers: { "Content-Type": "application/json" },
+-        body: JSON.stringify({ prompt, chatHistory: [], regras, ucs, docentes, salas }),
++        body: JSON.stringify({ prompt, chatHistory: [], geminiApiKey, geminiModel, regras, ucs, docentes, salas }),
+       });
+       const data = await resp.json();
+       setTutorResposta(data.text || data.error || "Sem resposta do tutor.");
+@@ -1787,6 +2296,18 @@
+       : `Semana ${semana} desbloqueada.`);
+   };
+ 
++  // Supabase-only: enquanto a 1.ª leitura não respondeu, mostra um ecrã de carregamento em vez
++  // do estado vazio (evita "flash" de tabelas sem dados). dbLoaded fica true em sucesso OU erro.
++  if (repo.disponivel() && !dbLoaded) {
++    return (
++      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#FAF8F5] text-stone-700">
++        <Calendar className="w-10 h-10 text-amber-500 animate-pulse" />
++        <p className="text-sm font-serif">A carregar a base de dados (Supabase)…</p>
++        <p className="text-[11px] text-stone-400">Gestor de Horários ESEUC</p>
++      </div>
++    );
++  }
++
+   return (
+     <div className={`min-h-screen ${themeStyles.bgColor} ${themeStyles.textColor} transition-colors duration-300 flex flex-col font-sans`}>
+       {/* Toast Notification */}
+@@ -3068,6 +3589,202 @@
+       })()}
+ 
+       {/* Duplicar Semestre Modal */}
++      {showGuardarProposta && (
++        <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
++          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
++            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
++              <h3 className="text-base font-serif font-semibold text-stone-900">Guardar proposta</h3>
++              <button onClick={() => setShowGuardarProposta(false)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
++            </div>
++            <div className="space-y-3">
++              <div>
++                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Nome da proposta</label>
++                <input
++                  autoFocus
++                  value={nomeProposta}
++                  onChange={(e) => setNomeProposta(e.target.value)}
++                  placeholder={`Ex: 2.º ano — versão de ${new Date().toLocaleDateString("pt-PT")}`}
++                  className="w-full text-xs border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none"
++                />
++              </div>
++              <div>
++                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Âmbito</label>
++                <div className="space-y-1.5">
++                  <label className={`flex items-center gap-2 text-xs cursor-pointer ${selectedYearFilter === "todos" ? "opacity-40" : ""}`}>
++                    <input type="radio" checked={escopoProposta === "ano"} disabled={selectedYearFilter === "todos"} onChange={() => setEscopoProposta("ano")} />
++                    Só o {selectedYearFilter === "todos" ? "ano selecionado" : `${selectedYearFilter}.º ano`}
++                  </label>
++                  <label className="flex items-center gap-2 text-xs cursor-pointer">
++                    <input type="radio" checked={escopoProposta === "todos"} onChange={() => setEscopoProposta("todos")} />
++                    Todos os anos
++                  </label>
++                </div>
++              </div>
++            </div>
++            <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
++              <button onClick={() => setShowGuardarProposta(false)} className="px-4 py-2 bg-stone-100 text-stone-600 text-xs font-semibold rounded-xl hover:bg-stone-200 cursor-pointer">Cancelar</button>
++              <button onClick={guardarProposta} className="px-4 py-2 bg-stone-900 text-white text-xs font-semibold rounded-xl hover:bg-stone-800 cursor-pointer flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Guardar</button>
++            </div>
++          </div>
++        </div>
++      )}
++
++      {showDistDocentes && (() => {
++        const grupos = gruposDocentes();
++        const slotKeysMap = new Map(grupos.map(g => [g.key, g.slotKeys]));
++        const ucsAll = [...new Map(grupos.map(g => [g.sigla, g.ucNome])).entries()].sort((a, b) => a[0].localeCompare(b[0]));
++        const selGrupos = grupos.filter(g => ucsSelDocentes.has(g.sigla));
++        return (
++          <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
++            <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-stone-200 space-y-4 max-h-[90vh] overflow-y-auto">
++              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
++                <div>
++                  <h3 className="text-base font-serif font-semibold text-stone-900">Distribuição de docentes</h3>
++                  <p className="text-[10px] text-stone-500">Seleciona as UCs, vê as turmas/horas e atribui — só entre os <strong>disponíveis</strong>. As opções encolhem à medida que atribuis.</p>
++                </div>
++                <button onClick={() => setShowDistDocentes(false)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
++              </div>
++
++              <div>
++                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">UCs a distribuir</span>
++                <div className="flex flex-wrap gap-1.5 mt-1">
++                  {ucsAll.map(([sigla, nome]) => (
++                    <button key={sigla} title={nome} onClick={() => setUcsSelDocentes(prev => { const n = new Set(prev); n.has(sigla) ? n.delete(sigla) : n.add(sigla); return n; })}
++                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer ${ucsSelDocentes.has(sigla) ? "bg-stone-900 text-white border-stone-900" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"}`}>{sigla}</button>
++                  ))}
++                </div>
++              </div>
++
++              <button onClick={autoProporDocentes} className="w-fit px-3 py-1.5 bg-[#148A96] text-white hover:bg-[#0f6f78] font-bold rounded-lg text-[11px] flex items-center gap-1.5 cursor-pointer">
++                <Sparkles className="w-3.5 h-3.5" /> Auto-propor docentes (mais restritos primeiro)
++              </button>
++
++              <div className="space-y-3">
++                {[...new Set(selGrupos.map(g => g.sigla))].map(sigla => {
++                  const gs = selGrupos.filter(g => g.sigla === sigla);
++                  return (
++                    <div key={sigla} className="border border-stone-150 rounded-xl p-3">
++                      <p className="text-xs font-bold text-stone-800">{sigla} <span className="font-normal text-stone-400">· {gs[0].ucNome}</span></p>
++                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
++                        {gs.map(g => {
++                          const { lista, fallback } = dominioDocente(g, atribDocente, slotKeysMap);
++                          const atrib = atribDocente[g.key] || [];
++                          const cap = capDocsTipo(g.tipo);
++                          const podeAdd = atrib.length < cap;
++                          const semOpcao = atrib.length === 0 && lista.length === 0;
++                          return (
++                            <div key={g.key} className={`flex items-start gap-1.5 text-[11px] py-0.5 ${docentesTravados.has(g.key) ? "bg-amber-50/50 rounded-lg px-1 -mx-1" : ""}`}>
++                              <button onClick={() => toggleTravarTurma(g.key)} title={docentesTravados.has(g.key) ? "Turma bloqueada — o auto-propor não lhe toca. Clica para desbloquear." : "Bloquear: o auto-propor mantém estes docentes e rearranja só as outras turmas."} className="shrink-0 mt-0.5 cursor-pointer">
++                                {docentesTravados.has(g.key) ? <Lock className="w-3 h-3 text-amber-600" /> : <Unlock className="w-3 h-3 text-stone-300 hover:text-stone-500" />}
++                              </button>
++                              <span className="font-mono font-bold text-stone-600 w-12 shrink-0 truncate mt-0.5">{rotuloTurma(g.turma)}</span>
++                              <span className="text-[8.5px] text-stone-400 w-12 shrink-0 mt-0.5 leading-tight">{g.tipo}·{g.slotKeys.size * 2}h<br /><span className="text-stone-300">máx {cap}</span></span>
++                              <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
++                                {atrib.map(nome => {
++                                  const h = horasSemanaisDoc(nome, atribDocente, slotKeysMap);
++                                  const over = h > LIMITE_HORAS_SOFT;
++                                  return (
++                                    <span key={nome} title={over ? `${h}h/semana (acima das ${LIMITE_HORAS_SOFT}h)` : `${h}h/semana`} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold border ${over ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-stone-100 text-stone-700 border-stone-200"}`}>
++                                      {nome}{over ? " ⚠" : ""}
++                                      <button onClick={() => removerDocenteTurma(g.key, nome)} className="text-stone-400 hover:text-rose-600 font-bold">×</button>
++                                    </span>
++                                  );
++                                })}
++                                {podeAdd && (
++                                  <select value="" onChange={(e) => adicionarDocenteTurma(g.key, e.target.value, g.tipo)} onClick={(e) => e.stopPropagation()}
++                                    className={`border rounded-lg px-1.5 py-0.5 text-[10px] cursor-pointer ${semOpcao ? "border-rose-300 bg-rose-50" : "border-stone-200"}`}>
++                                    <option value="">{semOpcao ? "— sem disponível —" : "+ adicionar"}</option>
++                                    {lista.map(d => {
++                                      const h = horasSemanaisDoc(d.nome, atribDocente, slotKeysMap);
++                                      const indisp = !docenteDisponivel(d, g.slots);
++                                      return <option key={d.id} value={d.nome}>{d.nome}{indisp ? " (fora disp.)" : ""}{h >= LIMITE_HORAS_SOFT ? ` · ${h}h ⚠` : ""}</option>;
++                                    })}
++                                  </select>
++                                )}
++                                {fallback && <span title="Nenhum docente configurado para esta UC — a mostrar todos. Configura em Docentes." className="text-amber-500">⚠</span>}
++                              </div>
++                            </div>
++                          );
++                        })}
++                      </div>
++                    </div>
++                  );
++                })}
++                {selGrupos.length === 0 && <p className="text-[11px] text-stone-400 italic">Sem UCs selecionadas, ou a proposta ainda não tem sessões. Gera o horário primeiro.</p>}
++              </div>
++
++              <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
++                <button onClick={() => setShowDistDocentes(false)} className="px-4 py-2 bg-stone-900 text-white text-xs font-semibold rounded-xl hover:bg-stone-800 cursor-pointer">Concluir</button>
++              </div>
++            </div>
++          </div>
++        );
++      })()}
++
++      {regraEmEdicao && (
++        <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
++          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 space-y-4 max-h-[90vh] overflow-y-auto">
++            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
++              <h3 className="text-base font-serif font-semibold text-stone-900">{editProveniencia === "ia" ? "Validar regra sugerida pela IA" : "Editar regra"}</h3>
++              <button onClick={() => setRegraEmEdicao(null)} className="text-stone-400 hover:text-stone-700 cursor-pointer"><X className="w-5 h-5" /></button>
++            </div>
++
++            <div className="space-y-3 text-xs">
++              <div>
++                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Nome</label>
++                <input value={regraEmEdicao.nome} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, nome: e.target.value })} className="w-full border border-stone-200 rounded-xl px-3 py-2 focus:outline-none" />
++              </div>
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Severidade</label>
++                  <select value={regraEmEdicao.tipo} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, tipo: e.target.value as any })} className="w-full border border-stone-200 rounded-xl px-2 py-2 bg-white">
++                    <option value="hard">Hard (inviolável)</option>
++                    <option value="soft">Soft (preferência)</option>
++                  </select>
++                </div>
++                <div>
++                  <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Peso (1-10)</label>
++                  <input type="number" min={1} max={10} value={regraEmEdicao.peso} disabled={regraEmEdicao.tipo === "hard"} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, peso: Number(e.target.value) })} className="w-full border border-stone-200 rounded-xl px-3 py-2 disabled:bg-stone-100" />
++                </div>
++              </div>
++              <div>
++                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Descrição</label>
++                <textarea value={regraEmEdicao.descricao} onChange={(e) => setRegraEmEdicao({ ...regraEmEdicao!, descricao: e.target.value })} className="w-full h-16 border border-stone-200 rounded-xl p-2.5 focus:outline-none" />
++              </div>
++              <div>
++                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Anos a que se aplica</label>
++                <div className="flex flex-wrap gap-2">
++                  {(ehDiretor ? [1, 2, 3, 4] : ([anoDoPerfil].filter(Boolean) as number[])).map(ano => {
++                    const sel = anosDaRegra(regraEmEdicao!).includes(ano);
++                    return (
++                      <button key={ano} onClick={() => toggleDraftAno(ano)} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${sel ? "bg-emerald-600 text-white border-emerald-700" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"}`}>{ano}.º ano</button>
++                    );
++                  })}
++                </div>
++                <p className="text-[9px] text-stone-400 mt-1">Sem anos selecionados = <strong>transversal</strong> (todos os anos).</p>
++              </div>
++              <div>
++                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Cursos a que se aplica</label>
++                <div className="flex flex-wrap gap-2">
++                  {cursos.map(c => {
++                    const sel = cursosDaRegra(regraEmEdicao!).includes(c.id);
++                    return (
++                      <button key={c.id} onClick={() => toggleDraftCurso(c.id)} title={c.nome} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${sel ? "bg-sky-600 text-white border-sky-700" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"}`}>{c.sigla}</button>
++                    );
++                  })}
++                </div>
++                <p className="text-[9px] text-stone-400 mt-1">Sem cursos selecionados = <strong>todos os cursos</strong>. (Por agora só o CLE; PG/mestrados quando os criares.)</p>
++              </div>
++            </div>
++
++            <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
++              <button onClick={() => setRegraEmEdicao(null)} className="px-4 py-2 bg-stone-100 text-stone-600 text-xs font-semibold rounded-xl hover:bg-stone-200 cursor-pointer">Cancelar</button>
++              <button onClick={guardarRegraEditada} className="px-4 py-2 bg-stone-900 text-white text-xs font-semibold rounded-xl hover:bg-stone-800 cursor-pointer flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> {editProveniencia === "ia" ? "Ativar regra" : "Guardar"}</button>
++            </div>
++          </div>
++        </div>
++      )}
++
+       {showDuplicarSemestreModal && (
+         <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
+@@ -3190,31 +3907,61 @@
+           </div>
+ 
+           <div className="flex gap-4 items-center shrink-0 w-full md:w-auto justify-between md:justify-end">
+-            <div className="space-y-0.5">
++            <div className="space-y-1">
+               <span className="text-4xs font-bold uppercase text-stone-400 block tracking-wider">Proposta Ativa</span>
+-              <select
+-                value={selectedVersaoId}
+-                onChange={(e) => {
+-                  setSelectedVersaoId(e.target.value);
+-                  const ver = versoes.find(v => v.id === e.target.value);
+-                  if (ver) {
+-                    setSelectedSemestreId(ver.anoSemestreId);
+-                  }
+-                }}
+-                className="bg-stone-50 cursor-pointer text-xs font-semibold border border-stone-200 rounded-xl px-3 py-2 focus:outline-none w-56 text-ellipsis"
+-              >
+-                {versoes.filter(v => {
+-                  const s = anosSemestres.find(item => item.id === v.anoSemestreId);
+-                  return s && s.anoLetivo === selectedAnoLetivo;
+-                }).map(v => {
+-                  const s = anosSemestres.find(item => item.id === v.anoSemestreId);
+-                  return (
+-                    <option key={v.id} value={v.id}>
+-                      {v.nome} {s ? `(${s.semestre}º Semestre - ${s.anoLetivo})` : ""}
+-                    </option>
+-                  );
+-                })}
+-              </select>
++              {renomearPropostaId === selectedVersaoId ? (
++                <div className="flex items-center gap-1">
++                  <input
++                    autoFocus
++                    value={nomeRenomear}
++                    onChange={(e) => setNomeRenomear(e.target.value)}
++                    onKeyDown={(e) => { if (e.key === "Enter") renomearProposta(selectedVersaoId, nomeRenomear); if (e.key === "Escape") setRenomearPropostaId(null); }}
++                    className="text-xs border border-stone-300 rounded-xl px-3 py-2 w-44 focus:outline-none"
++                  />
++                  <button onClick={() => renomearProposta(selectedVersaoId, nomeRenomear)} className="px-2.5 py-2 bg-stone-900 text-white rounded-xl text-[10px] font-bold">OK</button>
++                </div>
++              ) : (
++                <select
++                  value={selectedVersaoId}
++                  onChange={(e) => {
++                    setSelectedVersaoId(e.target.value);
++                    const ver = versoes.find(v => v.id === e.target.value);
++                    if (ver) { setSelectedSemestreId(ver.anoSemestreId); }
++                  }}
++                  className="bg-stone-50 cursor-pointer text-xs font-semibold border border-stone-200 rounded-xl px-3 py-2 focus:outline-none w-56 text-ellipsis"
++                >
++                  {versoes.filter(v => {
++                    const s = anosSemestres.find(item => item.id === v.anoSemestreId);
++                    return s && s.anoLetivo === selectedAnoLetivo;
++                  }).map(v => {
++                    const s = anosSemestres.find(item => item.id === v.anoSemestreId);
++                    return (
++                      <option key={v.id} value={v.id}>
++                        {v.nome} {s ? `(${s.semestre}º Semestre - ${s.anoLetivo})` : ""}
++                      </option>
++                    );
++                  })}
++                </select>
++              )}
++              <div className="flex items-center gap-1.5 flex-wrap">
++                <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-150">{rotuloAnosProposta(activeVersao)}</span>
++                <button
++                  onClick={() => { setNomeProposta(""); setEscopoProposta(selectedYearFilter === "todos" ? "todos" : "ano"); setShowGuardarProposta(true); }}
++                  className="text-[10px] font-bold px-2 py-1 bg-white border border-stone-300 rounded-lg hover:bg-stone-100 flex items-center gap-1 cursor-pointer"
++                >
++                  <Save className="w-3 h-3" /> Guardar proposta
++                </button>
++                <button
++                  onClick={() => { setRenomearPropostaId(selectedVersaoId); setNomeRenomear(activeVersao?.nome ?? ""); }}
++                  title="Renomear proposta"
++                  className="text-[10px] font-bold px-2 py-1 bg-white border border-stone-300 rounded-lg hover:bg-stone-100 flex items-center gap-1 cursor-pointer"
++                >
++                  <Edit2 className="w-3 h-3" /> Renomear
++                </button>
++                <button onClick={() => apagarProposta(selectedVersaoId)} title="Apagar proposta" className="text-stone-400 hover:text-rose-600 cursor-pointer">
++                  <Trash2 className="w-3.5 h-3.5" />
++                </button>
++              </div>
+             </div>
+             
+             <div className="bg-stone-50 border border-stone-200/80 rounded-xl p-2 px-3 text-center min-w-[90px]">
+@@ -3369,7 +4116,7 @@
+                             <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-sm bg-stone-100 text-stone-600">
+                               {s.tipoAula}
+                             </span>
+-                            <span className="text-stone-500">• {s.ucNome} (Turma: {s.turma})</span>
++                            <span className="text-stone-500">• {s.ucNome} (Turma: {rotuloTurma(s.turma)})</span>
+                           </div>
+                           <div className="text-stone-500 flex items-center gap-3 font-light text-[11px]">
+                             <span className="flex items-center gap-1">
+@@ -3555,7 +4302,7 @@
+                                 <div className="space-y-0.5 pl-1.5 border-l border-stone-800">
+                                   {diaSess.map(ds => (
+                                     <div key={ds.id} className="text-[9px] text-zinc-350 leading-relaxed">
+-                                      <span className="font-semibold text-white">{ds.horaInicio}</span> - <span className="text-zinc-200 font-medium">{ds.ucSigla}</span> <span className="font-mono text-[7.5px] bg-stone-850 text-stone-400 px-1 rounded">{ds.turmaDescr || ds.turma}</span>
++                                      <span className="font-semibold text-white">{ds.horaInicio}</span> - <span className="text-zinc-200 font-medium">{ds.ucSigla}</span> <span className="font-mono text-[7.5px] bg-stone-850 text-stone-400 px-1 rounded">{rotuloTurma(ds.turmaDescr || ds.turma)}</span>
+                                     </div>
+                                   ))}
+                                 </div>
+@@ -3629,7 +4376,7 @@
+                           win.document.write(`<tr><td class="slot-hora">${bloco.start}–${bloco.end}</td>`);
+                           diasSemanaisP.forEach(dia => {
+                             const slotSess = allSessoes.filter(s => s.semana === w && s.diaSemana === dia && s.horaInicio === bloco.start);
+-                            win.document.write(`<td>${slotSess.map(s => `<div class="card card-${s.tipoAula.toLowerCase()}"><strong>${s.ucSigla}</strong> (${s.tipoAula}) ${s.turma}</div>`).join("")}</td>`);
++                            win.document.write(`<td>${slotSess.map(s => `<div class="card card-${s.tipoAula.toLowerCase()}"><strong>${s.ucSigla}</strong> (${s.tipoAula}) ${rotuloTurma(s.turma)}</div>`).join("")}</td>`);
+                           });
+                           win.document.write(`</tr>`);
+                         });
+@@ -3692,6 +4439,77 @@
+                       </button>
+                     </div>
+                   )}
++
++                  {/* Importar horário feito fora da plataforma (Excel/CSV) */}
++                  {selectedYearFilter !== "todos" && (
++                    <div className="mt-3 border border-dashed border-stone-300 rounded-xl p-3 bg-stone-50/40 space-y-2">
++                      <div className="flex items-center justify-between gap-2 flex-wrap">
++                        <div>
++                          <p className="text-[11px] font-bold text-stone-700">Importar proposta externa (Excel/CSV)</p>
++                          <p className="text-[9px] text-stone-500">Carrega o horário do {selectedYearFilter}.º ano feito fora; é validado e guardado como uma <strong>nova proposta</strong> com nome. Depois podes gerar para o motor completar à volta.</p>
++                        </div>
++                        <div className="flex items-center gap-2">
++                          <button onClick={descarregarTemplate}
++                            className="px-2.5 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 text-[10px]">
++                            <Download className="w-3 h-3" /> Template
++                          </button>
++                          <label className="px-2.5 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 text-[10px] cursor-pointer">
++                            <Upload className="w-3 h-3" /> Escolher ficheiro
++                            <input type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden"
++                              onChange={(e) => { onFicheiroImport(e.target.files?.[0] ?? null); e.target.value = ""; }} />
++                          </label>
++                        </div>
++                      </div>
++
++                      {nomeFicheiroImport && (
++                        <div className="text-[10px] text-stone-600 bg-white rounded-lg border border-stone-200 p-2 space-y-1.5">
++                          <p className="font-semibold">{nomeFicheiroImport}</p>
++                          <p>{sessoesImportadas?.length || 0} linha(s) válida(s){errosImport.length ? ` · ${errosImport.length} com erro` : ""}.</p>
++
++                          {relatorioImport && (
++                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9.5px]">
++                              <span className={relatorioImport.sobreposicoes ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.sobreposicoes ? "✗" : "✓"} Sobreposições: {relatorioImport.sobreposicoes}</span>
++                              <span className={relatorioImport.excedeu8h ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excedeu8h ? "✗" : "✓"} Máx/dia: {relatorioImport.maxBlocosDia * 2}h</span>
++                              <span className={relatorioImport.violacoesAlmoco ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesAlmoco ? "✗" : "✓"} Almoço: {relatorioImport.violacoesAlmoco}</span>
++                              <span className={relatorioImport.violacoesCronologia.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesCronologia.length ? "✗" : "✓"} Cronologia: {relatorioImport.violacoesCronologia.length}</span>
++                              <span className={relatorioImport.tpPlMesmaUC.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.tpPlMesmaUC.length ? "✗" : "✓"} TP+PL mesma UC: {relatorioImport.tpPlMesmaUC.length}</span>
++                              <span className="text-stone-600">Completude: {relatorioImport.completude.pct}%</span>
++                            </div>
++                          )}
++
++                          {errosImport.length > 0 && (
++                            <details className="text-[9px] text-red-700">
++                              <summary className="cursor-pointer font-semibold">Ver {errosImport.length} erro(s) de linha</summary>
++                              <ul className="mt-1 space-y-0.5 max-h-28 overflow-y-auto">
++                                {errosImport.slice(0, 30).map((er, i) => (
++                                  <li key={i}>Linha {er.linha}: {er.motivo}</li>
++                                ))}
++                              </ul>
++                            </details>
++                          )}
++
++                          <div className="pt-1">
++                            <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-400 mb-1">Nome da proposta</label>
++                            <input
++                              value={nomePropostaImport}
++                              onChange={(e) => setNomePropostaImport(e.target.value)}
++                              placeholder={nomeFicheiroImport.replace(/\.[^.]+$/, "") || "Nome da proposta importada"}
++                              className="w-full text-[11px] border border-stone-200 rounded-lg px-2.5 py-1.5 focus:outline-none"
++                            />
++                          </div>
++                          <div className="flex items-center gap-2 pt-1">
++                            <button onClick={confirmarImportacao} disabled={!sessoesImportadas?.length}
++                              className="px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 disabled:opacity-40 text-[10px]">
++                              <Upload className="w-3 h-3 text-amber-300" /> Importar como proposta
++                            </button>
++                            <button onClick={limparImport} className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]">
++                              Cancelar
++                            </button>
++                          </div>
++                        </div>
++                      )}
++                    </div>
++                  )}
+                 </div>
+                 <div className="space-y-1.5">
+                   <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
+@@ -3712,7 +4530,7 @@
+                   <span className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider block">
+                     Preferência da turma teórica (manhã / tarde) por ano do CLE
+                   </span>
+-                  <span className="text-[9px] text-indigo-500/80 font-mono">Turma A = período indicado · Turma B = oposto</span>
++                  <span className="text-[9px] text-indigo-500/80 font-mono">T1 (Turma A) = período indicado · T2 (Turma B) = oposto</span>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                   {[1, 2, 3, 4].map(ano => (
+@@ -3992,18 +4810,43 @@
+                                       </div>
+ 
+                                       <div className="text-[9px] font-bold leading-none truncate mt-0.5 text-black">
+-                                        {sessao.turma}
++                                        {rotuloTurma(sessao.turma)}
+                                       </div>
+ 
+                                       <div className="text-[8px] opacity-80 mt-0.5 truncate leading-none flex items-center gap-1">
+                                         <span className="opacity-60">"</span>
+-                                        <span>{sessao.sala}</span>
++                                        {incluirSalas ? (
++                                          <select
++                                            value={sessao.sala || ""}
++                                            onClick={(e) => e.stopPropagation()}
++                                            onChange={(e) => atribuirCampoSessao(sessao.id, "sala", e.target.value)}
++                                            className="bg-white/80 border border-stone-300 rounded text-[8px] px-0.5 py-0 max-w-[92px] cursor-pointer"
++                                          >
++                                            <option value="">— sala —</option>
++                                            {salasDisponiveis(sessao).map(s => <option key={s.id} value={s.nome}>{s.nome} ({s.capacidade})</option>)}
++                                          </select>
++                                        ) : (
++                                          <span>{sessao.sala}</span>
++                                        )}
++                                        {avisoSala(sessao) && <span title={avisoSala(sessao)!} className="text-rose-500 font-bold shrink-0">⚠</span>}
+                                       </div>
+ 
+-                                      {sessao.docente && (
++                                      {(incluirDocentes || sessao.docente) && (
+                                         <div className="text-[8px] opacity-80 truncate leading-none flex items-center gap-1">
+                                           <span className="opacity-60">'¤</span>
+-                                          <span>{sessao.docente}</span>
++                                          {incluirDocentes ? (
++                                            <select
++                                              value={sessao.docente || ""}
++                                              onClick={(e) => e.stopPropagation()}
++                                              onChange={(e) => atribuirCampoSessao(sessao.id, "docente", e.target.value)}
++                                              className="bg-white/80 border border-stone-300 rounded text-[8px] px-0.5 py-0 max-w-[92px] cursor-pointer"
++                                            >
++                                              <option value="">— docente —</option>
++                                              {docentes.map(d => <option key={d.id} value={d.nome}>{d.nome}</option>)}
++                                            </select>
++                                          ) : (
++                                            <span>{sessao.docente}</span>
++                                          )}
+                                         </div>
+                                       )}
+                                     </div>
+@@ -4038,7 +4881,11 @@
+                 let alvo = 0;
+                 for (const u of ucsAno) {
+                   const tc = u.turmasConfig || [];
+-                  const nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length, nS = tc.filter(t => t.tipo === "Seminário").length;
++                  let nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length;
++                  const nS = tc.filter(t => t.tipo === "Seminário").length;
++                  // UCs de bloco do 2.º ano ("-I" só T1/Turma A nas sem. 8-15, "-II" só T2/Turma B
++                  // nas 16-23): apenas metade das turmas frequenta — o alvo conta só a presente.
++                  if (Number(u.anoCurricular) === 2 && /-(I|II)$/.test(u.sigla)) { nT = Math.ceil(nT / 2); nTP = nTP / 2; nPL = nPL / 2; }
+                   alvo += Math.floor((u.cargaHorariaTeorica || 0) / 2) * nT + Math.floor((u.cargaHorariaTP || 0) / 2) * nTP + Math.floor((u.cargaHorariaPratica || 0) / 2) * nPL + Math.floor((u.cargaHorariaS || 0) / 2) * nS;
+                 }
+                 const sigSet = new Set(ucsAno.map(u => u.sigla));
+@@ -4087,7 +4934,7 @@
+                           const horas = dias.map(d => horasTurmaDia(row.g, d));
+                           return (
+                             <tr key={row.n} className="border-t border-stone-150">
+-                              <td className="py-1 font-bold text-stone-700">{row.n}</td>
++                              <td className="py-1 font-bold text-stone-700">{rotuloTurma(row.n)}</td>
+                               {horas.map((h, i) => <td key={i} className={`text-center font-mono ${corH(h)}`}>{h ? h + "h" : "·"}</td>)}
+                               <td className="text-center font-mono font-bold text-stone-800">{horas.reduce((a, b) => a + b, 0)}h</td>
+                             </tr>
+@@ -4326,82 +5173,39 @@
+                 </div>
+               )}
+ 
+-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-                {regras.filter(regraVisivel).map((reg) => (
+-                  <div
+-                    key={reg.id}
+-                    className={`p-4 rounded-xl border text-left transition-all ${
+-                      reg.ativa
+-                        ? `${themeStyles.borderColor} bg-white shadow-3xs`
+-                        : "border-stone-150 bg-stone-50/40 opacity-60"
+-                    }`}
+-                  >
+-                    <div className="flex items-start justify-between gap-2">
+-                      <div className="space-y-1">
+-                        <div className="flex items-center gap-1.5 flex-wrap">
+-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+-                            reg.tipo === "hard"
+-                              ? "bg-rose-50 text-rose-800 border border-rose-200"
+-                              : "bg-indigo-50 text-indigo-800 border border-indigo-200"
+-                          }`}>
+-                            {reg.tipo === "hard" ? "Inviolável (Hard)" : `Preferencial (Peso: ${reg.peso})`}
+-                          </span>
+-                          <span className="text-[10px] font-semibold text-stone-400">
+-                            • {reg.categoria}
+-                          </span>
+-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-150">
+-                            {reg.escopo === "ano" ? `${reg.anoCurricular}.º ano` : "Transversal"}
+-                          </span>
++              {/* DOIS CONJUNTOS: regras transversais (todos os anos) + regras por ano. */}
++              {(() => {
++                const visiveis = regras.filter(regraVisivel);
++                const transversais = visiveis.filter(r => anosDaRegra(r).length === 0);
++                const porAno = visiveis.filter(r => anosDaRegra(r).length > 0); // pode aparecer em vários anos
++                const anos = [...new Set<number>(porAno.flatMap(r => anosDaRegra(r)))].sort((a, b) => a - b);
++                return (
++                  <div className="space-y-5">
++                    <div className="space-y-2">
++                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
++                        <Layers className="w-3.5 h-3.5 text-[#148A96]" /> Regras transversais (todos os anos) · {transversais.length}
++                      </h4>
++                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                        {transversais.map(cartaoRegra)}
++                        {transversais.length === 0 && <span className="text-[10px] text-stone-400 italic">Sem regras transversais.</span>}
++                      </div>
++                    </div>
++                    {anos.map(ano => (
++                      <div key={ano} className="space-y-2">
++                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
++                          <Calendar className="w-3.5 h-3.5 text-amber-600" /> Regras do {ano}.º ano · {porAno.filter(r => anosDaRegra(r).includes(ano)).length}
++                        </h4>
++                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                          {porAno.filter(r => anosDaRegra(r).includes(ano)).map(cartaoRegra)}
+                         </div>
+-                        <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
+-                        <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
+                       </div>
+-
+-                      <div className="flex flex-col items-end gap-2 shrink-0">
+-                        {regraEditavel(reg) ? (
+-                          <>
+-                            <button
+-                              onClick={() => toggleRegra(reg.id)}
+-                              className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer ${
+-                                reg.ativa
+-                                  ? "bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200"
+-                                  : "bg-stone-200 text-stone-500 hover:bg-stone-300"
+-                              }`}
+-                            >
+-                              {reg.ativa ? "Desativar" : "Ativar"}
+-                            </button>
+-                            <button onClick={() => removeRegra(reg.id)} className="text-stone-400 hover:text-rose-600 transition-colors">
+-                              <Trash2 className="w-3.5 h-3.5" />
+-                            </button>
+-                            <button
+-                              onClick={() => { setTutorRegra(reg); setTutorPrompt(""); setTutorResposta(""); }}
+-                              className="px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1"
+-                              title="Melhorar ou validar esta regra com o tutor IA"
+-                            >
+-                              <Sparkles className="w-3 h-3" /> Tutor IA
+-                            </button>
+-                          </>
+-                        ) : (
+-                          <span className="text-[8.5px] text-stone-400 font-bold uppercase tracking-wide" title="Regra transversal — gerida pela Direção">
+-                            Só leitura
+-                          </span>
+-                        )}
+-                      </div>
+-                    </div>
+-
+-                    {/* Simple IA Friendly Translation Display. ABSOLUTELY HIDING SQL */}
+-                    <div className="mt-3 pt-2 border-t border-stone-100 bg-stone-50/70 p-2.5 rounded-xl space-y-1">
+-                      <span className="text-[9px] font-bold text-indigo-700 flex items-center gap-1">
+-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+-                        ª„ Proteção Activa da IA:
+-                      </span>
+-                      <p className="text-stone-600 text-[10.5px] leading-relaxed font-light">
+-                        {reg.config?.traducaoSimples || "A IA monitoriza esta regra em tempo real, impedindo conflitos físicos durante a computação de horários."}
+-                      </p>
+-                    </div>
++                    ))}
++                    {porAno.length === 0 && (
++                      <p className="text-[10px] text-stone-400 italic">Ainda não há regras específicas por ano. Cria uma com âmbito "Específica de um ano" (ou muda o âmbito de uma transversal acima).</p>
++                    )}
+                   </div>
+-                ))}
+-              </div>
++                );
++              })()}
+             </div>
+           </div>
+         )}
+@@ -4555,6 +5359,38 @@
+             {/* ADMINISTRAÇÃO — convites (só para administradores) */}
+             {perfil?.isAdmin && <AdminConvites />}
+ 
++            {/* FASES DO FLUXO — atribuição manual de salas e docentes */}
++            <div className="bg-white rounded-2xl p-5 border border-stone-150 shadow-3xs space-y-3">
++              <div>
++                <h3 className="text-base font-serif font-bold text-stone-900 flex items-center gap-1.5"><Layers className="w-4 h-4 text-[#148A96]" /> Fases da distribuição</h3>
++                <p className="text-[11px] text-stone-500 mt-0.5">O horário constrói-se por fases que controlas à mão: <strong>1.º as UCs</strong> (sempre); depois, quando ativares abaixo, atribuis <strong>salas</strong> e <strong>docentes</strong> sessão a sessão, diretamente no grid do horário.</p>
++              </div>
++              <label className="flex items-center justify-between gap-3 bg-stone-50/70 border border-stone-150 rounded-xl px-3 py-2.5 cursor-pointer">
++                <div>
++                  <span className="text-xs font-bold text-stone-800">2.ª fase — Distribuição de salas</span>
++                  <p className="text-[10px] text-stone-500">O sistema <strong>propõe</strong> as salas; depois trocas no grid só entre as <strong>disponíveis</strong> (tipo certo, capacidade, sem choque). Ativa quando tiveres as salas todas no sistema.</p>
++                </div>
++                <input type="checkbox" checked={incluirSalas} onChange={(e) => setIncluirSalas(e.target.checked)} className="w-4 h-4 rounded text-[#148A96] focus:ring-[#148A96] cursor-pointer shrink-0" />
++              </label>
++              {incluirSalas && (
++                <button onClick={proporSalas} className="w-fit px-3 py-1.5 bg-[#148A96] text-white hover:bg-[#0f6f78] font-bold rounded-lg text-[11px] flex items-center gap-1.5 cursor-pointer">
++                  <Sparkles className="w-3.5 h-3.5" /> Propor salas para a proposta ativa
++                </button>
++              )}
++              <label className="flex items-center justify-between gap-3 bg-stone-50/70 border border-stone-150 rounded-xl px-3 py-2.5 cursor-pointer">
++                <div>
++                  <span className="text-xs font-bold text-stone-800">3.ª fase — Distribuição de docentes</span>
++                  <p className="text-[10px] text-stone-500">Selecionas UCs e atribuis docentes por turma — só entre os <strong>elegíveis e disponíveis</strong>, com as opções a encolher (o "sorteio"). E mostra um seletor por sessão no grid.</p>
++                </div>
++                <input type="checkbox" checked={incluirDocentes} onChange={(e) => setIncluirDocentes(e.target.checked)} className="w-4 h-4 rounded text-[#148A96] focus:ring-[#148A96] cursor-pointer shrink-0" />
++              </label>
++              {incluirDocentes && (
++                <button onClick={abrirDistDocentes} className="w-fit px-3 py-1.5 bg-[#148A96] text-white hover:bg-[#0f6f78] font-bold rounded-lg text-[11px] flex items-center gap-1.5 cursor-pointer">
++                  <Sparkles className="w-3.5 h-3.5" /> Abrir distribuição de docentes
++                </button>
++              )}
++            </div>
++
+             {/* CALENDÁRIO E DISTRIBUIÇÃO SEMANAL */}
+             <ConfiguracaoCalendario
+               anosSemestres={anosSemestres}
+@@ -4796,16 +5632,17 @@
+                     Manutenção e Limpeza da Base de Dados Académica (Cloud)
+                   </h4>
+                   <p className="text-[10.5px] text-stone-500 font-light max-w-xl leading-relaxed">
+-                    Precisa de redefinir o planeamento ou começar as turmas do zero? Use estes controlos para limpar completamente a base de dados do semestre corrente (zerando disciplinas, docentes, salas e propostas) ou repor instantaneamente os modelos de demonstração predefinidos da ESEUC.
++                    A base de dados (Supabase) é a única fonte de verdade — não há modelos no código. Exporte uma cópia de segurança do estado atual em JSON, ou limpe completamente a base de dados do semestre corrente (zerando disciplinas, docentes, salas e propostas). Para repor os dados-base, importe um modelo (ou aplique o <code>seed-supabase.sql</code>).
+                   </p>
+                 </div>
+                 <div className="flex items-center gap-2 shrink-0">
+                   <button
+-                    onClick={handleRestoreDatabaseMock}
+-                    className="px-3 py-1.5 hover:bg-stone-100 text-stone-700 hover:text-stone-950 border border-stone-250 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
++                    onClick={handleExportarTudo}
++                    className="px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
++                    title="Descarrega um JSON com TODO o estado atual (carregado do Supabase + edições): UCs, docentes, salas, turmas, regras e propostas."
+                   >
+-                    <RefreshCw className="w-3.5 h-3.5 text-stone-500" />
+-                    Repor Modelos Pedagogicos
++                    <Download className="w-3.5 h-3.5 text-emerald-600" />
++                    Exportar tudo (JSON)
+                   </button>
+                   <button
+                     onClick={handleClearDatabase}
+@@ -5616,7 +6453,16 @@
+                   </div>
+                 </div>
+ 
+-                <div className="flex gap-2">
++                <div className="flex gap-2 items-center">
++                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${geminiApiKey ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
++                    {geminiApiKey ? "✓ Chave configurada" : "Sem chave — modo demonstração"}
++                  </span>
++                  <button
++                    onClick={() => { setGeminiKeyDraft(geminiApiKey); setShowGeminiKeyPanel(v => !v); }}
++                    className="px-2.5 py-1 hover:bg-stone-200 text-stone-600 rounded-lg text-[10px] font-semibold border border-stone-200 flex items-center gap-1"
++                  >
++                    <Settings className="w-3 h-3" /> Chave API
++                  </button>
+                   <button
+                     onClick={() => {
+                       setChatMessages([
+@@ -5635,6 +6481,50 @@
+                 </div>
+               </div>
+ 
++              {showGeminiKeyPanel && (
++                <div className="p-4 border-b border-stone-100 bg-amber-50/40 space-y-2">
++                  <label className="text-[10px] font-bold text-stone-700 block">Chave da API Google (Gemini)</label>
++                  <p className="text-[9px] text-stone-500 leading-snug">
++                    Cola a tua chave do Google AI Studio. Fica guardada apenas neste browser e é usada para o assistente responder com IA real. Sem chave, o assistente fica em modo de demonstração.
++                  </p>
++                  <div className="flex flex-wrap items-center gap-2">
++                    <input
++                      type="password"
++                      value={geminiKeyDraft}
++                      onChange={(e) => setGeminiKeyDraft(e.target.value)}
++                      placeholder="AIza…"
++                      className="flex-1 min-w-[200px] px-2.5 py-1.5 border border-stone-300 rounded-lg text-[11px] font-mono"
++                    />
++                    <button
++                      onClick={() => { guardarGeminiKey(geminiKeyDraft); setShowGeminiKeyPanel(false); showToast("Chave Gemini guardada neste browser."); }}
++                      className="px-3 py-1.5 bg-stone-900 text-white hover:bg-stone-800 font-bold rounded-lg text-[10px]"
++                    >
++                      Guardar
++                    </button>
++                    <button
++                      onClick={() => { guardarGeminiKey(""); setGeminiKeyDraft(""); showToast("Chave Gemini removida."); }}
++                      className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]"
++                    >
++                      Limpar
++                    </button>
++                  </div>
++
++                  <label className="text-[10px] font-bold text-stone-700 block pt-1">Modelo</label>
++                  <p className="text-[9px] text-stone-500 leading-snug">
++                    Se um modelo der erro de quota (429), experimenta outro. Modelos <em>preview</em> e 3.x podem exigir billing ativo no Google; o <strong>2.5 Flash</strong> costuma ter tier gratuito.
++                  </p>
++                  <select
++                    value={geminiModel}
++                    onChange={(e) => { guardarGeminiModel(e.target.value); showToast(`Modelo: ${e.target.value}`); }}
++                    className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-[11px] font-mono bg-white"
++                  >
++                    {["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
++                      .concat([geminiModel].filter(m => ![ "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"].includes(m)))
++                      .map(m => <option key={m} value={m}>{m}</option>)}
++                  </select>
++                </div>
++              )}
++
+               {/* Discussion thread logs */}
+               <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                 {chatMessages.map((msg) => (
+@@ -5738,10 +6628,10 @@
+                         Rejeitar
+                       </button>
+                       <button
+-                        onClick={handleAcceptAiRule}
++                        onClick={() => abrirEdicaoRegra(pendingAiRule, "ia")}
+                         className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-lg text-xs cursor-pointer"
+                       >
+-                        Aceitar e Ativar Regra
++                        Validar anos e ativar
+                       </button>
+                     </div>
+                   </div>

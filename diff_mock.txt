@@ -1,0 +1,25 @@
+--- src/mockData.ts	2026-06-25 07:42:59.607307012 +0000
++++ gestor_github/src/mockData.ts	2026-06-25 08:24:18.687805011 +0000
+@@ -1,4 +1,4 @@
+-﻿/**
++/**
+  * @license
+  * SPDX-License-Identifier: Apache-2.0
+  */
+@@ -75,11 +75,11 @@
+ });
+ 
+ export const ucsIniciais: UC[] = [
+-  createUcEseuc("uc_mi", "Metodologia de Investigação", "MI", 4, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-10", "2026-10-23", 16, 30, 6, "2 turmas T; TP e PL por subdivisão de cada turma."),
+-  createUcEseuc("uc_eig", "Enfermagem do Idoso e Geriatria", "EIG", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-10", "2026-10-23", 8, 38, 0, "Inclui interrupção da Latada e feriado de 5/10."),
+-  createUcEseuc("uc_ft", "Farmacologia e Terapêutica", "FT", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-10", "2026-10-23", 8, 10, 20, "Aulas T sujeitas à restrição do auditório."),
+-  createUcEseuc("uc_esdac", "Enfermagem em Situações de Dependência no Autocuidado", "ESDAC", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-10", "2026-10-23", 8, 6, 24, "2 turmas T; 4 TP e 12 PL por turma."),
+-  createUcEseuc("uc_es", "Educação em Saúde", "ES", 2, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-10", "2026-10-23", 16, 10, 0, "Apesar de surgir na lista como 2.º semestre, foi adequada à calendarização indicada."),
++  createUcEseuc("uc_mi", "Metodologia de Investigação", "MI", 4, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 16, 30, 6, "2 turmas T; TP e PL por subdivisão de cada turma."),
++  createUcEseuc("uc_eig", "Enfermagem do Idoso e Geriatria", "EIG", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 8, 38, 0, "Inclui interrupção da Latada e feriado de 5/10."),
++  createUcEseuc("uc_ft", "Farmacologia e Terapêutica", "FT", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 8, 10, 20, "Aulas T sujeitas à restrição do auditório."),
++  createUcEseuc("uc_esdac", "Enfermagem em Situações de Dependência no Autocuidado", "ESDAC", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 8, 6, 24, "2 turmas T; 4 TP e 12 PL por turma."),
++  createUcEseuc("uc_es", "Educação em Saúde", "ES", 2, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 16, 10, 0, "Apesar de surgir na lista como 2.º semestre, foi adequada à calendarização indicada."),
+   createUcEseuc("uc_ps_i", "Patologia Sistémica - 1.º Bloco", "PS-I", 3, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 32, 6, 0, "Inclui feriados de 1 e 8 de dezembro."),
+   createUcEseuc("uc_er_i", "Enfermagem de Reabilitação - 1.º Bloco", "ER-I", 2, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 8, 8, 10, "UC organizada em bloco de 8 semanas."),
+   createUcEseuc("uc_escf_i", "Enfermagem de Saúde Comunitária e Familiar - 1.º Bloco", "ESCF-I", 6, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 36, 28, 12, "UC organizada em bloco de 8 semanas."),
