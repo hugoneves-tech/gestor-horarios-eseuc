@@ -151,9 +151,9 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
   };
 
   return (
-    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-start justify-center pt-10 pb-10 px-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col my-auto shrink-0">
-        <div className="flex items-center justify-between p-5 border-b border-stone-100 bg-stone-50/50">
+    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 flex items-start justify-center p-4 sm:p-6 lg:p-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col max-h-[calc(100vh-2rem)] md:max-h-[calc(100vh-4rem)]">
+        <div className="flex items-center justify-between p-5 border-b border-stone-100 bg-stone-50/50 shrink-0">
           <div>
             <h2 className="text-lg font-serif font-bold text-stone-800 flex items-center gap-2">
               <CalIcon className="w-5 h-5 text-teal-600" />
@@ -166,7 +166,7 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
           </button>
         </div>
 
-        <div className="p-6 overflow-y-visible bg-stone-50/30 space-y-6">
+        <div className="p-6 overflow-y-auto bg-stone-50/30 space-y-6">
           <div className="flex flex-col md:flex-row gap-6 p-4 bg-white border border-stone-200 rounded-xl shadow-sm">
             <div className="flex-1 space-y-1">
               <label className="text-[10px] uppercase font-bold text-stone-500 tracking-wide">Data de Início Global - 1º Semestre</label>

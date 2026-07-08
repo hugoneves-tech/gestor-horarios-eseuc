@@ -158,10 +158,10 @@ export function ModalAlocacaoSemanas({
   });
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-10 pb-10 px-4 bg-stone-950/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 space-y-4 relative flex flex-col my-auto shrink-0">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center p-4 sm:p-6 lg:p-8 bg-stone-950/60 backdrop-blur-xs animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[calc(100vh-2rem)] md:max-h-[calc(100vh-4rem)] relative flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-start border-b border-stone-100 pb-3">
+        <div className="flex justify-between items-start border-b border-stone-100 p-6 shrink-0">
           <div>
             <span className="text-[10px] uppercase font-bold tracking-wider text-amber-700 font-mono">
               Calendário Académico
@@ -181,6 +181,9 @@ export function ModalAlocacaoSemanas({
             <X className="w-5 h-5" />
           </button>
         </div>
+        
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-4">
 
         {/* Info Alerts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
@@ -307,9 +310,10 @@ export function ModalAlocacaoSemanas({
             </tbody>
           </table>
         </div>
+        </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
+        <div className="flex items-center justify-end gap-2 p-6 border-t border-stone-100 shrink-0 bg-stone-50 rounded-b-2xl">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
