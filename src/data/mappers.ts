@@ -15,10 +15,12 @@ export const rowToCurso = (r: any): Curso => ({ id: r.id, nome: r.nome, sigla: r
 export const anoSemToRow = (a: AnoLetivoSemestre) => ({
   id: a.id, ano_letivo: a.anoLetivo, semestre: a.semestre, edicao: a.edicao,
   ativo: a.ativo, data_inicio_semestre: a.dataInicioSemestre ?? null,
+  semanas_personalizadas: a.semanasPersonalizadas ?? null,
 });
 export const rowToAnoSem = (r: any): AnoLetivoSemestre => ({
   id: r.id, anoLetivo: r.ano_letivo, semestre: r.semestre, edicao: r.edicao ?? "",
   ativo: !!r.ativo, dataInicioSemestre: r.data_inicio_semestre ?? undefined,
+  semanasPersonalizadas: r.semanas_personalizadas ?? undefined,
 });
 
 // --- UC ------------------------------------------------------------------

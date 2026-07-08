@@ -23,6 +23,7 @@ create table if not exists anos_semestres (
   edicao                text,
   ativo                 boolean default false,
   data_inicio_semestre  date,
+  semanas_personalizadas jsonb,
   created_at            timestamptz default now()
 );
 
