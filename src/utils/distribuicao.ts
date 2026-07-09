@@ -219,7 +219,7 @@ function poolDoTipo(
   manha: boolean,
   rotacao: number = 0,   // roda a ordem dos períodos por semana (Regra B: não estar sempre cedo/tarde)
   flexivel: boolean = false, // PL de MI: qualquer dia, no período da família (tapa-buracos)
-  isSemestre1: boolean = true // Só se aplica a regras de arranque do 1º semestre (ex. 4ª feira)
+  isFirstWeekS1: boolean = false // Só se aplica à semana 1 do 1º semestre
 ): Slot[] {
   const rotN = (a: string[], off: number) => { const n = ((off % a.length) + a.length) % a.length; return a.slice(n).concat(a.slice(0, n)); };
   const baseMetade = manha ? PERIODOS_MANHA : PERIODOS_TARDE;
@@ -267,19 +267,37 @@ function poolDoTipo(
   } else {
     ordemDias = ["Quinta", "Terça", "Segunda", "Quarta", "Sexta"].filter(d => avail.includes(d));
   }
-  if (!ordemDias.length) return [];
+    // SEMANA PARCIAL S1 (ex.: arranque à 4ª ou 5ª) → 6ª de manhã T (ambas as turmas) e TODAS
+  // as TP no bloco 16-18 (admitindo 2 UCs diferentes nesse bloco). Sem quinta, sem PL.
+  if (isFirstWeekS1 && !avail.includes("Segunda") && !avail.includes("Terça")) {
+    if (!avail.includes("Quarta")) {
+      if (!avail.includes("Sexta")) return [];
+      if (tipo === "T") {
+        const slotsP: Slot[] = [];
+        for (const hora of periodosTDia("Sexta")) slotsP.push({ dia: "Sexta", hora });
+        return slotsP;
+      }
+      if (tipo === "TP") return [{ dia: "Sexta", hora: "16:00" }];
+      return [];
+    }
+  }
 
+  if (!ordemDias.length) return [];
   const slots: Slot[] = [];
-  
+  const parcialSem = isFirstWeekS1 && !avail.includes("Segunda") && !avail.includes("Terça");
+
   for (const dia of ordemDias) {
     let periodos = tipo === "T" ? periodosTDia(dia) : (dia === "Sexta" ? PERIODOS_MANHA : periodosPrefDia(dia));
-    
+    if (dia === "Quarta" && parcialSem) {
+        if (tipo !== "T") continue;
+        periodos = PERIODOS_MANHA;
+    }
     for (const hora of periodos) slots.push({ dia, hora });
   }
-  // Bloco de ajuste (metade oposta) — só para PL e TP, nunca para T.
+
   if (tipo === "PL" || tipo === "TP") {
     for (const dia of ordemDias) {
-       
+       if (dia === "Quarta" && parcialSem) continue;
        for (const hora of periodosOver) slots.push({ dia, hora });
     }
   }
@@ -500,7 +518,7 @@ export function gerarSessoes(
 
     const tryPlace = (semana: SemanaInfo): boolean => {
       const semanaGlobal = semana.numero + semanaGlobalOffset;
-      const pool = poolDoTipo(tipoAula, semana.diasBloqueados, manha, 0, false, uc.semestre === 1);
+      const pool = poolDoTipo(tipoAula, semana.diasBloqueados, manha, 0, false, uc.semestre === 1 && semanaGlobal === 1);
       const slot = encontrarSlotLivre(pool, ano, semanaGlobal, turmaNome, tipoAula, ocupacao, plCount, 0);
       if (!slot) return false;
       registarSlot(ocupacao, ano, semanaGlobal, turmaNome, slot.dia, slot.hora);
@@ -970,7 +988,7 @@ export function gerarSessoesConjunto(
     // com a tarde disponível em ajuste para a carga alta destas semanas (bloco 2/4).
     // Semana PARCIAL (1.ª semana do 2.º ano): permite 2 UCs no bloco de TP (16-18 da 6ª).
     const manhaEf = soUmaTurma(t.ano, wk.semanaGlobal) ? true : t.manha;
-    let pool = poolDoTipo(t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel, semestre === 1);
+    let pool = poolDoTipo(t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel, semestre === 1 && wk.semanaGlobal === 1);
     // MODO SEM REGRAS: SEM nenhuma regra — todos os dias úteis e TODOS os períodos (08-18),
     // sem turnos, sem almoço, sem teto de 8h. Só não duplica a mesma turma. Para comparar.
     if (opts.semRegras) {
