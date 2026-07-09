@@ -23,7 +23,14 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
   const sem2 = draftAnoSem.find(s => s.anoLetivo === activeAnoLetivo && s.semestre === 2);
 
   const updateGlobalDate = (id: string, date: string) => {
-    setDraftAnoSem(prev => prev.map(a => a.id === id ? { ...a, dataInicioSemestre: date } : a));
+    setDraftAnoSem(prev => prev.map(a => a.id === id ? {
+      ...a,
+      dataInicioSemestre: date,
+      dataInicioAno1: date,
+      dataInicioAno2: date,
+      dataInicioAno3: date,
+      dataInicioAno4: date
+    } : a));
   };
 
   const updateMotor = (key: string, value: any) => {

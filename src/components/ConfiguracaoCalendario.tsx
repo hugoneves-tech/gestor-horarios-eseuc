@@ -33,7 +33,14 @@ export function ConfiguracaoCalendario({
   const [modalAlocacaoId, setModalAlocacaoId] = useState<string | null>(null);
 
   const handleSetDataInicio = (id: string, value: string) => {
-    setAnosSemestres(anosSemestres.map(a => a.id === id ? { ...a, dataInicioSemestre: value } : a));
+    setAnosSemestres(anosSemestres.map(a => a.id === id ? {
+      ...a,
+      dataInicioSemestre: value,
+      dataInicioAno1: value,
+      dataInicioAno2: value,
+      dataInicioAno3: value,
+      dataInicioAno4: value
+    } : a));
   };
 
   const ucsPorSemestre = (anoSem: AnoLetivoSemestre) =>
@@ -326,7 +333,9 @@ function DistribuicaoDetalhe({ anoSem, ucsDeste, ucs, setUcs, feriados, motorReg
     if (!uc || !anoSem.dataInicioSemestre) return [];
     
     const prop = `dataInicioAno${uc.anoCurricular}` as keyof typeof anoSem;
-    const specificDate = (anoSem as any)?.[prop] || motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`];
+    const specificDate = anoSem.semestre === 2
+      ? anoSem.dataInicioSemestre
+      : ((anoSem as any)?.[prop] || motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`]);
     const startDateToUse = uc.dataInicio || specificDate || anoSem.dataInicioSemestre;
 
     const startWeek = uc.semanaInicio ?? 1;

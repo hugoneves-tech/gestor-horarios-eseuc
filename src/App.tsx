@@ -1582,12 +1582,15 @@ export default function App() {
         // mesma a toda a distribuição). Com "todos", entram todas como antes.
         if (selectedYearFilter !== "todos" && Number(uc.anoCurricular) !== Number(selectedYearFilter)) continue;
 
-        const anoSem = anosSemestres.find(s => s.semestre === uc.semestre);
+        const anoSem = anosSemestres.find(s => s.anoLetivo === selectedAnoLetivo && s.semestre === uc.semestre);
         if (!anoSem?.dataInicioSemestre) continue;
 
         // Use UC-specific start date if set (e.g. year 2 starts on Thursday Sept 10).
+        // No 2º semestre, todas as UCs arrancam na data global do semestre, não havendo desfasamentos específicos.
         const prop = `dataInicioAno${uc.anoCurricular}` as keyof typeof anoSem;
-        const anoDataInicio = (anoSem as any)?.[prop] || motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`];
+        const anoDataInicio = uc.semestre === 2
+          ? anoSem.dataInicioSemestre
+          : ((anoSem as any)?.[prop] || motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`]);
         const dataInicio = uc.dataInicio || anoDataInicio || anoSem.dataInicioSemestre;
         const semanaGlobalOffset = uc.semestre === 2 ? 15 : 0;
         const semStart = uc.semanaInicio || 1;
@@ -4814,7 +4817,7 @@ export default function App() {
               </div>
 
               {/* FILTRO DE ANO/SEMESTRE — acima do explorador semanal */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/75 p-4 rounded-xl border border-stone-150">
+              <div className="bg-stone-50/75 p-4 rounded-xl border border-stone-150">
                 <div className="space-y-1.5">
                   <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Ano Curricular (CLE)</span>
                   <div className="flex flex-wrap gap-1.5">
@@ -4923,17 +4926,6 @@ export default function App() {
                       )}
                     </div>
                   )}
-                </div>
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[{ id: "todos", label: "Ambos Semestres" }, { id: 1, label: "1.º Semestre" }, { id: 2, label: "2.º Semestre" }].map(btn => (
-                      <button key={btn.id} onClick={() => setSelectedSemesterFilter(btn.id as any)}
-                        className={`px-3 py-1.5 rounded-lg text-2xs font-semibold cursor-pointer transition-all ${selectedSemesterFilter === btn.id ? "bg-stone-900 text-white shadow-3xs" : "bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100"}`}>
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 
