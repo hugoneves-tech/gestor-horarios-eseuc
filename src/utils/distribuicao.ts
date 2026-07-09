@@ -274,11 +274,11 @@ function poolDoTipo(
   if (tipo === "T") {
     ordemDias = ["Sexta", "Segunda", "Quarta"].filter(d => avail.includes(d));
   } else if (tipo === "TP") {
-    ordemDias = ["Sexta", "Quarta", "Quinta", "Terça", "Segunda"].filter(d => avail.includes(d));
+    ordemDias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"].filter(d => avail.includes(d));
   } else if (tipo === "PL") {
-    ordemDias = ["Sexta", "Quinta", "Quarta", "Terça", "Segunda"].filter(d => avail.includes(d));
+    ordemDias = ["Terça", "Quinta", "Segunda", "Quarta", "Sexta"].filter(d => avail.includes(d));
   } else {
-    ordemDias = ["Sexta", "Terça", "Quinta"].filter(d => avail.includes(d));
+    ordemDias = ["Quinta", "Terça", "Segunda", "Quarta", "Sexta"].filter(d => avail.includes(d));
   }
   if (!ordemDias.length) return [];
 
