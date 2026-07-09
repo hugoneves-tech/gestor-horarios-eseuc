@@ -323,7 +323,8 @@ function DistribuicaoDetalhe({ anoSem, ucsDeste, ucs, setUcs, feriados, motorReg
   const semanas = useMemo<SemanaInfo[]>(() => {
     if (!uc || !anoSem.dataInicioSemestre) return [];
     
-    const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`];
+    const prop = `dataInicioAno${uc.anoCurricular}` as keyof typeof anoSem;
+    const specificDate = (anoSem as any)?.[prop] || motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`];
     const startDateToUse = uc.dataInicio || specificDate || anoSem.dataInicioSemestre;
 
     const startWeek = uc.semanaInicio ?? 1;

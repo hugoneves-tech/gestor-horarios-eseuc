@@ -11,8 +11,8 @@ export const cursosIniciais: Curso[] = [
 ];
 
 export const anosSemestresIniciais: AnoLetivoSemestre[] = [
-  { id: "as1", anoLetivo: "2026/2027", semestre: 1, edicao: "Regular", ativo: true,  dataInicioSemestre: "2026-09-08" },
-  { id: "as2", anoLetivo: "2026/2027", semestre: 2, edicao: "Regular", ativo: false, dataInicioSemestre: "2027-02-01" },
+  { id: "as1", anoLetivo: "2026/2027", semestre: 1, edicao: "Regular", ativo: true,  dataInicioSemestre: "2026-09-08", dataInicioAno1: "2026-09-08", dataInicioAno2: "2026-09-08", dataInicioAno3: "2026-09-08", dataInicioAno4: "2026-09-08" },
+  { id: "as2", anoLetivo: "2026/2027", semestre: 2, edicao: "Regular", ativo: false, dataInicioSemestre: "2027-02-01", dataInicioAno1: "2027-02-01", dataInicioAno2: "2027-02-01", dataInicioAno3: "2027-02-01", dataInicioAno4: "2027-02-01" },
 ];
 
 export const generateEseucTurmas = (sigla: string, cargaT: number, cargaTP: number, cargaPratica: number, cargaS: number = 0) => {

@@ -1568,7 +1568,8 @@ export default function App() {
         if (!anoSem?.dataInicioSemestre) continue;
 
         // Use UC-specific start date if set (e.g. year 2 starts on Thursday Sept 10).
-        const anoDataInicio = motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`];
+        const prop = `dataInicioAno${uc.anoCurricular}` as keyof typeof anoSem;
+        const anoDataInicio = (anoSem as any)?.[prop] || motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`];
         const dataInicio = uc.dataInicio || anoDataInicio || anoSem.dataInicioSemestre;
         const semanaGlobalOffset = uc.semestre === 2 ? 15 : 0;
         const semStart = uc.semanaInicio || 1;

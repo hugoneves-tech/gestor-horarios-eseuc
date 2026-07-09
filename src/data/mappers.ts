@@ -16,11 +16,19 @@ export const anoSemToRow = (a: AnoLetivoSemestre) => ({
   id: a.id, ano_letivo: a.anoLetivo, semestre: a.semestre, edicao: a.edicao,
   ativo: a.ativo, data_inicio_semestre: a.dataInicioSemestre ?? null,
   semanas_personalizadas: a.semanasPersonalizadas ?? null,
+  data_inicio_ano1: a.dataInicioAno1 ?? null,
+  data_inicio_ano2: a.dataInicioAno2 ?? null,
+  data_inicio_ano3: a.dataInicioAno3 ?? null,
+  data_inicio_ano4: a.dataInicioAno4 ?? null,
 });
 export const rowToAnoSem = (r: any): AnoLetivoSemestre => ({
   id: r.id, anoLetivo: r.ano_letivo, semestre: r.semestre, edicao: r.edicao ?? "",
   ativo: !!r.ativo, dataInicioSemestre: r.data_inicio_semestre ?? undefined,
   semanasPersonalizadas: r.semanas_personalizadas ?? undefined,
+  dataInicioAno1: r.data_inicio_ano1 ?? undefined,
+  dataInicioAno2: r.data_inicio_ano2 ?? undefined,
+  dataInicioAno3: r.data_inicio_ano3 ?? undefined,
+  dataInicioAno4: r.data_inicio_ano4 ?? undefined,
 });
 
 // --- UC ------------------------------------------------------------------

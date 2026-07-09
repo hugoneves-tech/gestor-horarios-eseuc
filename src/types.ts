@@ -25,6 +25,10 @@ export interface AnoLetivoSemestre {
   edicao: string; // e.g. "Regular" or "Pós-Laboral"
   ativo: boolean;
   dataInicioSemestre?: string; // YYYY-MM-DD — Monday of academic week 1
+  dataInicioAno1?: string;
+  dataInicioAno2?: string;
+  dataInicioAno3?: string;
+  dataInicioAno4?: string;
   semanasPersonalizadas?: SemanaPersonalizada[];
 }
 

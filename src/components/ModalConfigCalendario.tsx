@@ -94,8 +94,9 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
   };
 
   const CurricularYearCard = ({ ano }: { ano: number }) => {
-    const s1Date = draftMotor[`ano${ano}_dataInicioSem1`] || sem1?.dataInicioSemestre || "";
-    const s2Date = draftMotor[`ano${ano}_dataInicioSem2`] || sem2?.dataInicioSemestre || "";
+    const prop = `dataInicioAno${ano}` as keyof typeof sem1;
+    const s1Date = (sem1 as any)?.[prop] || sem1?.dataInicioSemestre || "";
+    const s2Date = (sem2 as any)?.[prop] || sem2?.dataInicioSemestre || "";
     const wksA = formatWeeks(draftMotor[`ano${ano}_semanasSoTurmaA`] ?? draftMotor.semanasSoTurmaA ?? (ano === 2 ? Array.from({length:8},(_,i)=>8+i) : []));
     const wksB = formatWeeks(draftMotor[`ano${ano}_semanasSoTurmaB`] ?? draftMotor.semanasSoTurmaB ?? (ano === 2 ? Array.from({length:8},(_,i)=>16+i) : []));
 
@@ -111,7 +112,9 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
             <h4 className="text-xs font-bold text-stone-800">1º Semestre</h4>
             <div className="space-y-1">
               <label className="text-[10px] uppercase font-bold text-stone-500 tracking-wide">Data de Início Específica</label>
-              <input type="date" value={s1Date} onChange={e => updateMotor(`ano${ano}_dataInicioSem1`, e.target.value)}
+              <input type="date" value={s1Date} onChange={e => {
+                  if (sem1) setDraftAnoSem(prev => prev.map(a => a.id === sem1.id ? { ...a, [prop]: e.target.value } : a));
+                }}
                 className="w-full px-2 py-1.5 border border-stone-200 rounded-md text-xs focus:ring-1 focus:ring-teal-500 outline-none" />
             </div>
             <div className="space-y-1">
@@ -128,7 +131,9 @@ export function ModalConfigCalendario({ anosSemestres, onSave, onClose, prefManh
             <h4 className="text-xs font-bold text-stone-800">2º Semestre</h4>
             <div className="space-y-1">
               <label className="text-[10px] uppercase font-bold text-stone-500 tracking-wide">Data de Início Específica</label>
-              <input type="date" value={s2Date} onChange={e => updateMotor(`ano${ano}_dataInicioSem2`, e.target.value)}
+              <input type="date" value={s2Date} onChange={e => {
+                  if (sem2) setDraftAnoSem(prev => prev.map(a => a.id === sem2.id ? { ...a, [prop]: e.target.value } : a));
+                }}
                 className="w-full px-2 py-1.5 border border-stone-200 rounded-md text-xs focus:ring-1 focus:ring-teal-500 outline-none" />
             </div>
             <div className="space-y-1">
