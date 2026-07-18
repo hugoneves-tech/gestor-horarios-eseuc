@@ -49,7 +49,7 @@ export interface ErroBloco100 {
 
 export interface UCAtivaBlocos100 {
   uc: UC;
-  semanas: { numero: number }[];
+  semanas: { numero: number; diasBloqueados?: string[] }[];
   semanaGlobalOffset: number;
 }
 
@@ -97,7 +97,12 @@ function criarBloco(itens: Item[], padrao: PadraoBloco100Id): Bloco {
 type Consumo = { tipo: "TP" | "PL"; ucId: string; quarto: number; quantidade: number };
 type CandidatoBloco = { padrao: PadraoBloco100Id; consumos: Consumo[] };
 
-function resolverPoolExato(poolOriginal: Item[], ativos: Set<PadraoBloco100Id>, evitar: PadraoBloco100Id): { blocos: Bloco[]; sobras: Item[] } {
+function resolverPoolExato(
+  poolOriginal: Item[],
+  ativos: Set<PadraoBloco100Id>,
+  evitar: PadraoBloco100Id,
+  slotsPermitidosPorUc: Map<string, Set<string>> | null,
+): { blocos: Bloco[]; sobras: Item[] } {
   const recursos = new Map<string, { tipo: "TP" | "PL"; ucId: string; quarto: number; quantidade: number }>();
   const chaveRecurso = (tipo: "TP" | "PL", ucId: string, quarto: number) => `${tipo}|${ucId}|${quarto}`;
   for (const item of poolOriginal) {
@@ -110,7 +115,13 @@ function resolverPoolExato(poolOriginal: Item[], ativos: Set<PadraoBloco100Id>, 
   const plUcs = [...new Set(poolOriginal.filter(x => x.tipo === "PL").map(x => x.ucId))];
   const candidatos: CandidatoBloco[] = [];
   const adicionar = (padrao: PadraoBloco100Id, consumos: Consumo[]) => {
-    if (consumos.every(c => recursos.has(chaveRecurso(c.tipo, c.ucId, c.quarto)))) candidatos.push({ padrao, consumos });
+    if (!consumos.every(c => recursos.has(chaveRecurso(c.tipo, c.ucId, c.quarto)))) return;
+    const ids = [...new Set(consumos.map(c => c.ucId))];
+    if (slotsPermitidosPorUc && ids.length > 1) {
+      const primeiro = slotsPermitidosPorUc.get(ids[0]);
+      if (!primeiro || ![...primeiro].some(slot => ids.slice(1).every(id => slotsPermitidosPorUc.get(id)?.has(slot)))) return;
+    }
+    candidatos.push({ padrao, consumos });
   };
 
   if (ativos.has("TP4_MESMA_UC")) for (const ucId of tpUcs) adicionar("TP4_MESMA_UC", [0, 1, 2, 3].map(quarto => ({ tipo: "TP", ucId, quarto, quantidade: 1 })));
@@ -283,11 +294,21 @@ export function organizarBlocos100(
   sessoes: SessaoHorario[],
   ucsCatalogo: UC[],
   config: Partial<ConfiguracaoBlocos100> = {},
+  entradasAtivas: UCAtivaBlocos100[] = [],
 ): ResultadoBlocos100 {
   const cfg = { ...CONFIGURACAO_BLOCOS_100_DEFAULT, ...config };
   if (!cfg.exigirCoberturaTotal) return { sessoes, naoAlocadas: [], blocosPorPadrao: {}, avisos: [] };
 
   const ucPorSigla = new Map(ucsCatalogo.map(u => [u.sigla, u]));
+  const slotsPermitidosPorUc = entradasAtivas.length ? new Map<string, Set<string>>() : null;
+  if (slotsPermitidosPorUc) for (const entrada of entradasAtivas) {
+    const slots = new Set<string>();
+    for (const semana of entrada.semanas) {
+      const global = semana.numero + entrada.semanaGlobalOffset;
+      for (const dia of DIAS) if (!semana.diasBloqueados?.includes(dia)) slots.add(`${global}|${dia}`);
+    }
+    slotsPermitidosPorUc.set(entrada.uc.id, slots);
+  }
   const preservadas = sessoes.filter(s => s.tipoAula !== "TP" && s.tipoAula !== "PL");
   const naoReconhecidas: SessaoHorario[] = [];
   const grupos = new Map<string, Item[]>();
@@ -308,7 +329,7 @@ export function organizarBlocos100(
   const ativos = new Set(cfg.padroesAtivos);
 
   for (const poolOriginal of grupos.values()) {
-    const resolvido = resolverPoolExato(poolOriginal, ativos, cfg.padraoAEvitar);
+    const resolvido = resolverPoolExato(poolOriginal, ativos, cfg.padraoAEvitar, slotsPermitidosPorUc);
     blocos.push(...resolvido.blocos);
     sobras.push(...resolvido.sobras.map(x => x.sessao));
   }
@@ -328,6 +349,7 @@ export function organizarBlocos100(
     || Number(a.padrao === cfg.padraoAEvitar) - Number(b.padrao === cfg.padraoAEvitar))) {
     const uc = ucPorSigla.get(bloco.sessoes[0].ucSigla)!;
     const fam = familiaTeorica(bloco.sessoes[0].turma)!;
+    const idsUcsBloco = [...new Set(bloco.sessoes.map(s => ucPorSigla.get(s.ucSigla)?.id).filter((id): id is string => !!id))];
     const semInicio = bloco.semanaPreferida <= 15 ? 1 : 16;
     const semFim = bloco.semanaPreferida <= 15 ? 15 : 30;
     const semanas = Array.from({ length: semFim - semInicio + 1 }, (_, i) => semInicio + i)
@@ -335,6 +357,7 @@ export function organizarBlocos100(
     let escolhido: { semana: number; dia: string; hora: string } | null = null;
     procurarSlot: for (const semana of semanas) for (const dia of ordemDias) for (const hora of HORAS) {
       if (dia === "Sexta" && hora === "18:00") continue;
+      if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (!ocupados.has(k)) { escolhido = { semana, dia, hora }; ocupados.add(k); break procurarSlot; }
     }

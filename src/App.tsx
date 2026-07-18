@@ -1759,7 +1759,7 @@ export default function App() {
           ...(motorAI.blocos100 || {}),
         };
         allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);
-        const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos);
+        const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos, [...entradasS1, ...entradasS2]);
         if (resultadoBlocos.naoAlocadas.length > 0) {
           const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
           throw new Error(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). Reveja as regras de blocos no Supabase.`);
@@ -7591,4 +7591,3 @@ export default function App() {
     </div>
   );
 }
-

@@ -36,4 +36,13 @@ executar([
 const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
 assert.equal(incompleto.sessoes.length, 0);
 assert.equal(incompleto.naoAlocadas.length, 1);
-console.log("blocos100: 5 cenários validados");
+
+const semanaParcial = organizarBlocos100(
+  [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`)),
+  catalogo,
+  {},
+  [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça"] }], semanaGlobalOffset: 0 }],
+);
+assert.equal(semanaParcial.naoAlocadas.length, 0);
+assert.ok(semanaParcial.sessoes.every(x => x.diaSemana !== "Segunda" && x.diaSemana !== "Terça"));
+console.log("blocos100: 6 cenários validados");
