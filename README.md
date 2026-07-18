@@ -29,7 +29,7 @@ Servidor (secretas, nunca no cliente):
 ## Base de dados (Supabase)
 
 Correr no SQL Editor, por ordem: `supabase/schema.sql`, `supabase/auth_profiles.sql`,
-`supabase/migracao_semanas_e_regras.sql`.
+`supabase/migracao_semanas_e_regras.sql` e `supabase/migracao_blocos_ocupacao_100.sql`.
 
 ## Deploy (Netlify)
 

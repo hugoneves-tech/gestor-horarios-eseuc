@@ -70,6 +70,7 @@ import { AdminConvites } from "./auth/AdminConvites";
 import { gerarSessoesConjunto, calcularSemanas, type EntradaUC } from "./utils/distribuicao";
 import { parseHorarioCSV, gerarTemplateCSV, type ErroLinha } from "./utils/importacao";
 import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
+import { organizarBlocos100, validarBlocos100, CONFIGURACAO_BLOCOS_100_DEFAULT, DESCRICAO_PADROES_BLOCOS_100 } from "./utils/blocos100";
 import { repo } from "./data/supabaseRepo";
 
 export default function App() {
@@ -148,13 +149,17 @@ export default function App() {
     const c = (r.config as any)?.cursoIds;
     return Array.isArray(c) ? c.filter((x: any) => typeof x === "string") : [];
   };
+  const anosLetivosDaRegra = (r: RegraHorario): string[] => {
+    const a = (r.config as any)?.anosLetivos;
+    return Array.isArray(a) ? a.filter((x: any) => typeof x === "string") : [];
+  };
   // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
   // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
-  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC"] as const;
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "blocos100"] as const;
   const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
     const m = (r.config as any)?.motor;
     if (!m || typeof m !== "object") return false;
-    return MOTOR_PARAMS_SUPORTADOS.some(k => { const v = (m as any)[k]; return Array.isArray(v) ? v.length > 0 : typeof v === "number" ? v > 0 : false; });
+    return MOTOR_PARAMS_SUPORTADOS.some(k => { const v = (m as any)[k]; return Array.isArray(v) ? v.length > 0 : typeof v === "number" ? v > 0 : !!v && typeof v === "object"; });
   };
 
   // Helper to generate a reliable week label based on the academic calendar (ignoring holidays for display purpose simply)
@@ -1504,9 +1509,11 @@ export default function App() {
       // pela última regra ativa que os defina.
       const regraNoAmbito = (r: RegraHorario) => {
         const anos = anosDaRegra(r);
-        return anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
+        const anosLetivos = anosLetivosDaRegra(r);
+        const anoCurricularOk = anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
+        return anoCurricularOk && (anosLetivos.length === 0 || anosLetivos.includes(selectedAnoLetivo));
       };
-      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: Record<number, number[]>; semanasSoTurmaB?: Record<number, number[]>; restricoesUC?: any[]; [key: string]: any } = {
+      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: Record<number, number[]>; semanasSoTurmaB?: Record<number, number[]>; restricoesUC?: any[]; blocos100?: any; [key: string]: any } = {
         semanasSoTurmaA: { 2: Array.from({ length: 8 }, (_, i) => 8 + i) },
         semanasSoTurmaB: { 2: Array.from({ length: 8 }, (_, i) => 16 + i) }
       };
@@ -1519,6 +1526,7 @@ export default function App() {
         if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
         if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
         if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
+        if (m.blocos100 && typeof m.blocos100 === "object") motorAI.blocos100 = m.blocos100;
         
         // Semanas exclusivas por ano
         for (const ano of [1, 2, 3, 4]) {
@@ -1627,7 +1635,21 @@ export default function App() {
       // Schedule each semester fairly across its UCs (round-robin per week).
       const sessoesS1 = gerarSessoesConjunto(entradasS1, 1, 0, ocupacaoGlobal, plCount, opcoes);
       const sessoesS2 = gerarSessoesConjunto(entradasS2, 2, sessoesS1.length, ocupacaoGlobal, plCount, opcoes);
-      const allSessoes: SessaoHorario[] = [...sessoesS1, ...sessoesS2];
+      let allSessoes: SessaoHorario[] = [...sessoesS1, ...sessoesS2];
+      const regraBlocos100 = regras.find(r => r.id === "h_blocos_ocupacao_100" && r.ativa && regraNoAmbito(r));
+      if (!semRegras && regraBlocos100) {
+        const configBlocos = {
+          ...CONFIGURACAO_BLOCOS_100_DEFAULT,
+          ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
+          ...(motorAI.blocos100 || {}),
+        };
+        const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos);
+        if (resultadoBlocos.naoAlocadas.length > 0) {
+          const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
+          throw new Error(`Não é possível formar blocos a 100% com a carga atual: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). Ajuste as cargas/turmas no Supabase.`);
+        }
+        allSessoes = resultadoBlocos.sessoes;
+      }
 
       // Preservar (1) as SEMANAS validadas/bloqueadas inteiras e (2) as sessões fixadas
       // individualmente nas restantes semanas.
@@ -1655,6 +1677,14 @@ export default function App() {
         ),
       ].map((s, i) => ({ ...s, id: i + 1 }));  // IDs ÚNICOS (evita colisões: eliminar/desbloquear afetava o registo errado, ex.: semana 1)
 
+      if (!semRegras && regraBlocos100) {
+        const errosBlocos = validarBlocos100(merged.filter(mesmoAnoGen), ucs);
+        if (errosBlocos.length) {
+          const e0 = errosBlocos[0];
+          throw new Error(`A proposta final contém ${errosBlocos.length} bloco(s) fora das combinações de 100%. Primeiro caso: ${e0.chave}, cobertura ${e0.cobertura}%. Reveja também as sessões importadas ou fixadas.`);
+        }
+      }
+
       const durationMs = Math.round(performance.now() - t0);
       const score = Math.min(100, Math.max(60, 100 - Math.round(allSessoes.length / 50)));
 
@@ -1680,7 +1710,7 @@ export default function App() {
       showToast(` ${allSessoes.length} sessões distribuídas pelas 30 semanas letivas!`);
     } catch (e) {
       console.error(e);
-      alert("Erro no motor de distribuição. Verifique as configurações das UCs.");
+      alert(e instanceof Error ? e.message : "Erro no motor de distribuição. Verifique as configurações das UCs.");
     } finally {
       setIsSolving(false);
     }
@@ -1895,6 +1925,12 @@ export default function App() {
     const next = cur.includes(id) ? cur.filter(c => c !== id) : [...cur, id];
     return { ...r, config: { ...(r.config || {}), cursoIds: next } };
   });
+  const toggleDraftAnoLetivo = (anoLetivo: string) => setRegraEmEdicao(r => {
+    if (!r) return r;
+    const cur: string[] = Array.isArray((r.config as any)?.anosLetivos) ? (r.config as any).anosLetivos : [];
+    const next = cur.includes(anoLetivo) ? cur.filter(a => a !== anoLetivo) : [...cur, anoLetivo].sort();
+    return { ...r, config: { ...(r.config || {}), anosLetivos: next } };
+  });
   const guardarRegraEditada = () => {
     if (!regraEmEdicao) return;
     const anos: number[] = Array.isArray((regraEmEdicao.config as any)?.anos) ? (regraEmEdicao.config as any).anos : [];
@@ -1941,12 +1977,20 @@ export default function App() {
                 {cursosDaRegra(reg).map(id => cursos.find(c => c.id === id)?.sigla || id).join(", ")}
               </span>
             )}
+            {anosLetivosDaRegra(reg).length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-150">{anosLetivosDaRegra(reg).join(", ")}</span>}
             {regraAplicadaAoMotor(reg)
               ? <span title="Esta regra traduz-se num parâmetro do motor e É aplicada na geração." className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">⚙ Aplicada</span>
               : <span title="O motor ainda não sabe aplicar esta restrição (config.motor vazio). Fica documental — visível mas não influencia a geração." className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-200 text-stone-600 border border-stone-300">📄 Documental</span>}
           </div>
            <h4 className="font-serif font-bold text-stone-900 pt-0.5">{reg.nome}</h4>
           <p className="text-stone-500 text-[11px] leading-relaxed font-light">{reg.descricao}</p>
+          {reg.id === "h_blocos_ocupacao_100" && (
+            <ol className="mt-2 grid gap-1 text-[10px] text-stone-600 list-decimal list-inside">
+              {((reg.config as any)?.motor?.blocos100?.padroesAtivos || CONFIGURACAO_BLOCOS_100_DEFAULT.padroesAtivos).map((id: keyof typeof DESCRICAO_PADROES_BLOCOS_100) => (
+                <li key={id}>{DESCRICAO_PADROES_BLOCOS_100[id]}{id === "TP3_PL3" ? " — a evitar" : ""}</li>
+              ))}
+            </ol>
+          )}
           {(() => {
             const motor = reg.config?.motor || {};
             const restricoes = Array.isArray(motor.restricoesUC) ? motor.restricoesUC : [];
@@ -3969,6 +4013,16 @@ export default function App() {
                   })}
                 </div>
                 <p className="text-[9px] text-stone-400 mt-1">Sem cursos selecionados = <strong>todos os cursos</strong>. (Por agora só o CLE; PG/mestrados quando os criares.)</p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Anos letivos a que se aplica</label>
+                <div className="flex flex-wrap gap-2">
+                  {([...(new Set(anosSemestres.map(a => String(a.anoLetivo))))] as string[]).sort().map(anoLetivo => {
+                    const sel = anosLetivosDaRegra(regraEmEdicao!).includes(anoLetivo);
+                    return <button key={anoLetivo} onClick={() => toggleDraftAnoLetivo(anoLetivo)} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${sel ? "bg-indigo-600 text-white border-indigo-700" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"}`}>{anoLetivo}</button>;
+                  })}
+                </div>
+                <p className="text-[9px] text-stone-400 mt-1">Sem seleção = todos os anos letivos. Permite rever os padrões anualmente sem alterar código.</p>
               </div>
 
               <div>

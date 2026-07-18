@@ -1,0 +1,39 @@
+import { strict as assert } from "node:assert";
+import { organizarBlocos100, validarBlocos100, type PadraoBloco100Id } from "./src/utils/blocos100";
+import type { SessaoHorario, UC } from "./src/types";
+
+const uc = (id: string): UC => ({
+  id, nome: id, sigla: id, cursoId: "CLE", anoCurricular: 1,
+  cargaHorariaTeorica: 0, cargaHorariaPratica: 0, cargaHorariaTP: 0,
+  cargaHorariaE: 0, ects: 1, semestre: 1, numSemanas: 15,
+});
+const catalogo = ["U1", "U2", "U3"].map(uc);
+let id = 0;
+const s = (ucSigla: string, tipoAula: "TP" | "PL", turma: string): SessaoHorario => ({
+  id: ++id, ucNome: ucSigla, ucSigla, tipoAula, turma, docente: "", sala: "", salaTipo: "",
+  diaSemana: "Sexta", horaInicio: "16:00", horaFim: "18:00", bloqueado: false, semana: 1,
+});
+const executar = (sessoes: SessaoHorario[], esperado: PadraoBloco100Id) => {
+  const r = organizarBlocos100(sessoes, catalogo);
+  assert.equal(r.naoAlocadas.length, 0);
+  assert.equal(r.blocosPorPadrao[esperado], 1);
+  assert.ok(r.sessoes.every(x => x.diaSemana !== "Sexta"));
+  assert.deepEqual(validarBlocos100(r.sessoes, catalogo), []);
+};
+
+executar([1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`)), "TP4_MESMA_UC");
+executar([s("U1", "TP", "TP1"), s("U1", "TP", "TP2"), s("U2", "TP", "TP3"), s("U2", "TP", "TP4")], "TP2_DUAS_UCS");
+executar([
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
+  ...[4, 5, 6].map(n => s("U3", "PL", `PL${n}`)),
+], "TP2_PL3_PL3");
+executar([
+  s("U1", "TP", "TP2"), s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
+], "TP3_PL3");
+
+const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
+assert.equal(incompleto.sessoes.length, 0);
+assert.equal(incompleto.naoAlocadas.length, 1);
+console.log("blocos100: 5 cenários validados");
