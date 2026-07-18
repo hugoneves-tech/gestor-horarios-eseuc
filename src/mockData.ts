@@ -11,8 +11,8 @@ export const cursosIniciais: Curso[] = [
 ];
 
 export const anosSemestresIniciais: AnoLetivoSemestre[] = [
-  { id: "as1", anoLetivo: "2026/2027", semestre: 1, edicao: "Regular", ativo: true,  dataInicioSemestre: "2026-09-08" },
-  { id: "as2", anoLetivo: "2026/2027", semestre: 2, edicao: "Regular", ativo: false, dataInicioSemestre: "2027-02-01" },
+  { id: "as1", anoLetivo: "2026/2027", semestre: 1, edicao: "Regular", ativo: true,  dataInicioSemestre: "2026-09-08", dataInicioAno1: "2026-09-08", dataInicioAno2: "2026-09-08", dataInicioAno3: "2026-09-08", dataInicioAno4: "2026-09-08" },
+  { id: "as2", anoLetivo: "2026/2027", semestre: 2, edicao: "Regular", ativo: false, dataInicioSemestre: "2027-02-01", dataInicioAno1: "2027-02-01", dataInicioAno2: "2027-02-01", dataInicioAno3: "2027-02-01", dataInicioAno4: "2027-02-01" },
 ];
 
 export const generateEseucTurmas = (sigla: string, cargaT: number, cargaTP: number, cargaPratica: number, cargaS: number = 0) => {
@@ -80,18 +80,18 @@ export const ucsIniciais: UC[] = [
   createUcEseuc("uc_ft", "Farmacologia e Terapêutica", "FT", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 8, 10, 20, "Aulas T sujeitas à restrição do auditório."),
   createUcEseuc("uc_esdac", "Enfermagem em Situações de Dependência no Autocuidado", "ESDAC", 3, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 8, 6, 24, "2 turmas T; 4 TP e 12 PL por turma."),
   createUcEseuc("uc_es", "Educação em Saúde", "ES", 2, 1, "1.º semestre, fase inicial", 1, 7, "2026-09-09", "2026-10-23", 16, 10, 0, "Apesar de surgir na lista como 2.º semestre, foi adequada à calendarização indicada."),
-  createUcEseuc("uc_ps_i", "Patologia Sistémica - 1.º Bloco", "PS-I", 3, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 32, 6, 0, "Inclui feriados de 1 e 8 de dezembro."),
-  createUcEseuc("uc_er_i", "Enfermagem de Reabilitação - 1.º Bloco", "ER-I", 2, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 8, 8, 10, "UC organizada em bloco de 8 semanas."),
-  createUcEseuc("uc_escf_i", "Enfermagem de Saúde Comunitária e Familiar - 1.º Bloco", "ESCF-I", 6, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 36, 28, 12, "UC organizada em bloco de 8 semanas."),
-  createUcEseuc("uc_esip_i", "Enfermagem de Saúde Infantil e Pediátrica - 1.º Bloco", "ESIP-I", 4, 1, "1.º semestre, bloco final", 8, 15, "2026-10-26", "2026-12-18", 16, 28, 8, "UC organizada em bloco de 8 semanas."),
+  createUcEseuc("uc_ps_i", "Patologia Sistémica - 1.º Bloco", "PS-I", 3, 1, "1.º semestre, bloco final", 8, 14, "2026-10-26", "2026-12-18", 32, 6, 0, "Inclui feriados de 1 e 8 de dezembro."),
+  createUcEseuc("uc_er_i", "Enfermagem de Reabilitação - 1.º Bloco", "ER-I", 2, 1, "1.º semestre, bloco final", 8, 14, "2026-10-26", "2026-12-18", 8, 8, 10, "UC organizada em bloco de 8 semanas."),
+  createUcEseuc("uc_escf_i", "Enfermagem de Saúde Comunitária e Familiar - 1.º Bloco", "ESCF-I", 6, 1, "1.º semestre, bloco final", 8, 14, "2026-10-26", "2026-12-18", 36, 28, 12, "UC organizada em bloco de 8 semanas."),
+  createUcEseuc("uc_esip_i", "Enfermagem de Saúde Infantil e Pediátrica - 1.º Bloco", "ESIP-I", 4, 1, "1.º semestre, bloco final", 8, 14, "2026-10-26", "2026-12-18", 16, 28, 8, "UC organizada em bloco de 8 semanas."),
   createUcEseuc("uc_ps_ii", "Patologia Sistémica - 2.º Bloco", "PS-II", 3, 2, "2.º semestre, bloco inicial", 1, 8, "2027-02-01", "2027-03-26", 32, 6, 0, "Corresponde às primeiras 8 semanas do 2.º semestre."),
   createUcEseuc("uc_er_ii", "Enfermagem de Reabilitação - 2.º Bloco", "ER-II", 2, 2, "2.º semestre, bloco inicial", 1, 8, "2027-02-01", "2027-03-26", 8, 8, 10, "Corresponde às primeiras 8 semanas do 2.º semestre."),
   createUcEseuc("uc_escf_ii", "Enfermagem de Saúde Comunitária e Familiar - 2.º Bloco", "ESCF-II", 6, 2, "2.º semestre, bloco inicial", 1, 8, "2027-02-01", "2027-03-26", 36, 28, 12, "Corresponde às primeiras 8 semanas do 2.º semestre."),
   createUcEseuc("uc_esip_ii", "Enfermagem de Saúde Infantil e Pediátrica - 2.º Bloco", "ESIP-II", 4, 2, "2.º semestre, bloco inicial", 1, 8, "2027-02-01", "2027-03-26", 16, 28, 8, "Corresponde às primeiras 8 semanas do 2.º semestre."),
-  createUcEseuc("uc_emc", "Enfermagem Médico-Cirúrgica", "EMC", 4, 2, "2.º semestre, bloco final", 9, 15, "2027-03-30", "2027-05-20", 26, 8, 18, "360 estudantes; 2 turmas; mesma restrição do auditório. Semana 15 + fecho até 20/05/2027."),
-  createUcEseuc("uc_essr", "Enfermagem de Saúde Sexual e Reprodutiva", "ESSR", 4, 2, "2.º semestre, bloco final", 9, 15, "2027-03-30", "2027-05-20", 16, 28, 8, "Corresponde à Saúde materna indicada. Semana 15 + fecho até 20/05/2027."),
-  createUcEseuc("uc_esmp", "Enfermagem de Saúde Mental e Psiquiátrica", "ESMP", 4, 2, "2.º semestre, bloco final", 9, 15, "2027-03-30", "2027-05-20", 16, 20, 16, "2 turmas T; 4 TP e 12 PL por turma quando aplicável. Semana 15 + fecho até 20/05/2027."),
-  createUcEseuc("uc_psis", "Psicologia da Saúde", "PsiS", 3, 2, "2.º semestre, bloco final", 9, 15, "2027-03-30", "2027-05-20", 20, 18, 0, "Mantida no 2.º semestre por adequação à informação indicada. Semana 15 + fecho até 20/05/2027.")
+  createUcEseuc("uc_emc", "Enfermagem Médico-Cirúrgica", "EMC", 4, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 26, 8, 18, "360 estudantes; 2 turmas; mesma restrição do auditório. Semana 15 + fecho até 20/05/2027."),
+  createUcEseuc("uc_essr", "Enfermagem de Saúde Sexual e Reprodutiva", "ESSR", 4, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 16, 28, 8, "Corresponde à Saúde materna indicada. Semana 15 + fecho até 20/05/2027."),
+  createUcEseuc("uc_esmp", "Enfermagem de Saúde Mental e Psiquiátrica", "ESMP", 4, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 16, 20, 16, "2 turmas T; 4 TP e 12 PL por turma quando aplicável. Semana 15 + fecho até 20/05/2027."),
+  createUcEseuc("uc_psis", "Psicologia da Saúde", "PsiS", 3, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 20, 18, 0, "Mantida no 2.º semestre por adequação à informação indicada. Semana 15 + fecho até 20/05/2027.")
 ];
 export const docentesIniciais: Docente[] = [
   {
@@ -448,5 +448,6 @@ export const versoesIniciais: VersaoHorario[] = [
   }
 ];
 export const solverRunsIniciais: SolverRun[] = [];
+
 
 

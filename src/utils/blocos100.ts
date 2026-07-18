@@ -1,4 +1,5 @@
 import type { SessaoHorario, UC } from "../types";
+import solver, { type Model, type SolveResult } from "javascript-lp-solver";
 
 export type PadraoBloco100Id =
   | "T1"
@@ -13,6 +14,7 @@ export interface ConfiguracaoBlocos100 {
   padroesAtivos: PadraoBloco100Id[];
   padraoAEvitar: PadraoBloco100Id;
 }
+
 export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   exigirCoberturaTotal: true,
   preferirSextaLivre: true,
@@ -43,6 +45,12 @@ export interface ErroBloco100 {
   chave: string;
   cobertura: number;
   motivo: string;
+}
+
+export interface UCAtivaBlocos100 {
+  uc: UC;
+  semanas: { numero: number }[];
+  semanaGlobalOffset: number;
 }
 
 const DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
@@ -81,17 +89,144 @@ function take(pool: Item[], tipo: "TP" | "PL", ucId: string, quarto: number, qua
   return encontrados;
 }
 
-function tem(pool: Item[], tipo: "TP" | "PL", ucId: string, quarto: number, quantidade: number): boolean {
-  return pool.filter(x => x.tipo === tipo && x.ucId === ucId && x.quarto === quarto).length >= quantidade;
-}
-
-function ucs(pool: Item[], tipo: "TP" | "PL"): string[] {
-  return [...new Set(pool.filter(x => x.tipo === tipo).map(x => x.ucId))];
-}
-
 function criarBloco(itens: Item[], padrao: PadraoBloco100Id): Bloco {
   const sessoes = itens.map(x => x.sessao);
   return { sessoes, padrao, semanaPreferida: modaSemana(sessoes) };
+}
+
+type Consumo = { tipo: "TP" | "PL"; ucId: string; quarto: number; quantidade: number };
+type CandidatoBloco = { padrao: PadraoBloco100Id; consumos: Consumo[] };
+
+function resolverPoolExato(poolOriginal: Item[], ativos: Set<PadraoBloco100Id>, evitar: PadraoBloco100Id): { blocos: Bloco[]; sobras: Item[] } {
+  const recursos = new Map<string, { tipo: "TP" | "PL"; ucId: string; quarto: number; quantidade: number }>();
+  const chaveRecurso = (tipo: "TP" | "PL", ucId: string, quarto: number) => `${tipo}|${ucId}|${quarto}`;
+  for (const item of poolOriginal) {
+    const chave = chaveRecurso(item.tipo, item.ucId, item.quarto);
+    const atual = recursos.get(chave);
+    if (atual) atual.quantidade++;
+    else recursos.set(chave, { tipo: item.tipo, ucId: item.ucId, quarto: item.quarto, quantidade: 1 });
+  }
+  const tpUcs = [...new Set(poolOriginal.filter(x => x.tipo === "TP").map(x => x.ucId))];
+  const plUcs = [...new Set(poolOriginal.filter(x => x.tipo === "PL").map(x => x.ucId))];
+  const candidatos: CandidatoBloco[] = [];
+  const adicionar = (padrao: PadraoBloco100Id, consumos: Consumo[]) => {
+    if (consumos.every(c => recursos.has(chaveRecurso(c.tipo, c.ucId, c.quarto)))) candidatos.push({ padrao, consumos });
+  };
+
+  if (ativos.has("TP4_MESMA_UC")) for (const ucId of tpUcs) adicionar("TP4_MESMA_UC", [0, 1, 2, 3].map(quarto => ({ tipo: "TP", ucId, quarto, quantidade: 1 })));
+  if (ativos.has("TP2_DUAS_UCS")) for (let a = 0; a < tpUcs.length; a++) for (let b = a + 1; b < tpUcs.length; b++) {
+    for (let mascara = 1; mascara < 15; mascara++) {
+      const qsA = [0, 1, 2, 3].filter(q => mascara & (1 << q));
+      if (qsA.length !== 2) continue;
+      const qsB = [0, 1, 2, 3].filter(q => !qsA.includes(q));
+      adicionar("TP2_DUAS_UCS", [
+        ...qsA.map(quarto => ({ tipo: "TP" as const, ucId: tpUcs[a], quarto, quantidade: 1 })),
+        ...qsB.map(quarto => ({ tipo: "TP" as const, ucId: tpUcs[b], quarto, quantidade: 1 })),
+      ]);
+    }
+  }
+  if (ativos.has("TP2_PL3_PL3")) for (const ucTp of tpUcs) for (let a = 0; a < plUcs.length; a++) for (let b = a + 1; b < plUcs.length; b++) {
+    if (ucTp === plUcs[a] || ucTp === plUcs[b]) continue;
+    for (let qA = 0; qA < 4; qA++) for (let qB = 0; qB < 4; qB++) {
+      if (qA === qB) continue;
+      const restantes = [0, 1, 2, 3].filter(q => q !== qA && q !== qB);
+      adicionar("TP2_PL3_PL3", [
+        { tipo: "PL", ucId: plUcs[a], quarto: qA, quantidade: 3 },
+        { tipo: "PL", ucId: plUcs[b], quarto: qB, quantidade: 3 },
+        ...restantes.map(quarto => ({ tipo: "TP" as const, ucId: ucTp, quarto, quantidade: 1 })),
+      ]);
+    }
+  }
+  if (ativos.has("TP3_PL3")) for (const ucTp of tpUcs) for (const ucPl of plUcs) {
+    if (ucTp === ucPl) continue;
+    for (let qPl = 0; qPl < 4; qPl++) adicionar("TP3_PL3", [
+      { tipo: "PL", ucId: ucPl, quarto: qPl, quantidade: 3 },
+      ...[0, 1, 2, 3].filter(q => q !== qPl).map(quarto => ({ tipo: "TP" as const, ucId: ucTp, quarto, quantidade: 1 })),
+    ]);
+  }
+
+  const nomesRecursos = new Map([...recursos.keys()].map((chave, i) => [chave, `r${i}`]));
+  const constraints: Model["constraints"] = {};
+  for (const [chave, recurso] of recursos) constraints[nomesRecursos.get(chave)!] = { equal: recurso.quantidade };
+  const variables: Model["variables"] = {};
+  const ints: NonNullable<Model["ints"]> = {};
+  candidatos.forEach((candidato, i) => {
+    const nome = `b${i}`;
+    const coeficientes: Record<string, number> = { custo: candidato.padrao === evitar ? 1001 : 1 };
+    for (const consumo of candidato.consumos) coeficientes[nomesRecursos.get(chaveRecurso(consumo.tipo, consumo.ucId, consumo.quarto))!] = consumo.quantidade;
+    variables[nome] = coeficientes;
+    ints[nome] = 1;
+  });
+  const modelo: Model = { optimize: "custo", opType: "min", constraints, variables, ints, options: { timeout: 15000, presolve: true } };
+  const solucao = solver.Solve(modelo) as SolveResult;
+  if (!solucao.feasible) return { blocos: [], sobras: [...poolOriginal] };
+
+  const pool = [...poolOriginal];
+  const blocos: Bloco[] = [];
+  candidatos.forEach((candidato, i) => {
+    const repeticoes = Math.round(Number(solucao[`b${i}`] ?? 0));
+    for (let n = 0; n < repeticoes; n++) {
+      const itens = candidato.consumos.flatMap(c => take(pool, c.tipo, c.ucId, c.quarto, c.quantidade) ?? []);
+      if (itens.length === candidato.consumos.reduce((total, c) => total + c.quantidade, 0)) blocos.push(criarBloco(itens, candidato.padrao));
+    }
+  });
+  return { blocos, sobras: pool };
+}
+
+/**
+ * O distribuidor geral tenta colocar cada sessão imediatamente num horário e,
+ * quando não encontra espaço, pode devolver menos sessões numa turma do que a
+ * carga curricular exige. Isso desequilibra os quartos da turma teórica e torna
+ * impossível fechar blocos, apesar de a carga configurada estar correta.
+ *
+ * Antes de formar os blocos, repomos apenas essas sessões em falta. A colocação
+ * provisória não é relevante: `organizarBlocos100` atribui depois um slot único
+ * e completo a todo o bloco.
+ */
+export function completarCargaParaBlocos100(
+  sessoesGeradas: SessaoHorario[],
+  entradasAtivas: UCAtivaBlocos100[],
+  sessoesFixas: SessaoHorario[] = [],
+): SessaoHorario[] {
+  const resultado = [...sessoesGeradas];
+  let proximoId = Math.max(0, ...resultado.map(s => Number(s.id) || 0), ...sessoesFixas.map(s => Number(s.id) || 0)) + 1;
+  const contar = (lista: SessaoHorario[], sigla: string, tipo: "TP" | "PL", turma: string) =>
+    lista.filter(s => s.ucSigla === sigla && s.tipoAula === tipo && s.turma === turma).length;
+
+  for (const entrada of entradasAtivas) {
+    const { uc } = entrada;
+    const semanas = entrada.semanas.map(s => s.numero + entrada.semanaGlobalOffset);
+    if (!semanas.length) continue;
+    for (const turma of uc.turmasConfig ?? []) {
+      const tipo: "TP" | "PL" | null = turma.tipo === "TeoricoPratica" ? "TP" : turma.tipo === "Prática" ? "PL" : null;
+      if (!tipo) continue;
+      const horas = tipo === "TP" ? Number(uc.cargaHorariaTP || 0) : Number(uc.cargaHorariaPratica || 0);
+      const esperadas = Math.floor(horas / 2);
+      const existentes = contar(resultado, uc.sigla, tipo, turma.nome) + contar(sessoesFixas, uc.sigla, tipo, turma.nome);
+      const emFalta = Math.max(0, esperadas - existentes);
+      if (!emFalta) continue;
+      const modelo = resultado.find(s => s.ucSigla === uc.sigla && s.tipoAula === tipo && s.turma === turma.nome)
+        ?? sessoesFixas.find(s => s.ucSigla === uc.sigla && s.tipoAula === tipo && s.turma === turma.nome);
+      for (let i = 0; i < emFalta; i++) {
+        resultado.push({
+          id: proximoId++,
+          ucNome: uc.nome,
+          ucSigla: uc.sigla,
+          tipoAula: tipo,
+          docente: modelo?.docente ?? "",
+          sala: modelo?.sala ?? "",
+          salaTipo: modelo?.salaTipo ?? turma.tipologiaSalaDesejada ?? (tipo === "PL" ? "Laboratório" : "Teórico-prática"),
+          turma: turma.nome,
+          diaSemana: modelo?.diaSemana ?? "Segunda",
+          horaInicio: modelo?.horaInicio ?? "08:00",
+          horaFim: modelo?.horaFim ?? "10:00",
+          bloqueado: false,
+          semana: semanas[(existentes + i) % semanas.length],
+        });
+      }
+    }
+  }
+  return resultado;
 }
 
 /** Validação independente para horários importados, fixados ou já persistidos. */
@@ -173,77 +308,9 @@ export function organizarBlocos100(
   const ativos = new Set(cfg.padroesAtivos);
 
   for (const poolOriginal of grupos.values()) {
-    const pool = [...poolOriginal];
-
-    // As PL têm menos alternativas: são empacotadas primeiro em 3+3+2TP;
-    // o padrão 3TP+3PL fica apenas para quando não existe um par PL compatível.
-    if (ativos.has("TP2_PL3_PL3")) {
-      let progresso = true;
-      while (progresso) {
-        progresso = false;
-        externo: for (const ucPl1 of ucs(pool, "PL")) for (let q1 = 0; q1 < 4; q1++) {
-          if (!tem(pool, "PL", ucPl1, q1, 3)) continue;
-          for (const ucPl2 of ucs(pool, "PL")) for (let q2 = 0; q2 < 4; q2++) {
-            if (ucPl2 === ucPl1 || q2 === q1 || !tem(pool, "PL", ucPl2, q2, 3)) continue;
-            const restantes = [0, 1, 2, 3].filter(q => q !== q1 && q !== q2);
-            const ucTp = ucs(pool, "TP").find(u => u !== ucPl1 && u !== ucPl2 && restantes.every(q => tem(pool, "TP", u, q, 1)));
-            if (!ucTp) continue;
-            const itens = [
-              ...take(pool, "PL", ucPl1, q1, 3)!, ...take(pool, "PL", ucPl2, q2, 3)!,
-              ...restantes.flatMap(q => take(pool, "TP", ucTp, q, 1)!),
-            ];
-            blocos.push(criarBloco(itens, "TP2_PL3_PL3"));
-            progresso = true;
-            break externo;
-          }
-        }
-      }
-    }
-
-    if (ativos.has("TP3_PL3")) {
-      let progresso = true;
-      while (progresso) {
-        progresso = false;
-        externo: for (const ucPl of ucs(pool, "PL")) for (let qPl = 0; qPl < 4; qPl++) {
-          if (!tem(pool, "PL", ucPl, qPl, 3)) continue;
-          const restantes = [0, 1, 2, 3].filter(q => q !== qPl);
-          const ucTp = ucs(pool, "TP").find(u => u !== ucPl && restantes.every(q => tem(pool, "TP", u, q, 1)));
-          if (!ucTp) continue;
-          const itens = [...take(pool, "PL", ucPl, qPl, 3)!, ...restantes.flatMap(q => take(pool, "TP", ucTp, q, 1)!)];
-          blocos.push(criarBloco(itens, "TP3_PL3"));
-          progresso = true;
-          break externo;
-        }
-      }
-    }
-
-    if (ativos.has("TP4_MESMA_UC")) {
-      for (const uc of ucs(pool, "TP")) {
-        while ([0, 1, 2, 3].every(q => tem(pool, "TP", uc, q, 1))) {
-          blocos.push(criarBloco([0, 1, 2, 3].flatMap(q => take(pool, "TP", uc, q, 1)!), "TP4_MESMA_UC"));
-        }
-      }
-    }
-
-    if (ativos.has("TP2_DUAS_UCS")) {
-      let progresso = true;
-      while (progresso) {
-        progresso = false;
-        externo: for (const uc1 of ucs(pool, "TP")) for (const uc2 of ucs(pool, "TP")) {
-          if (uc1 === uc2) continue;
-          for (const qs1 of [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]) {
-            const qs2 = [0, 1, 2, 3].filter(q => !qs1.includes(q));
-            if (!qs1.every(q => tem(pool, "TP", uc1, q, 1)) || !qs2.every(q => tem(pool, "TP", uc2, q, 1))) continue;
-            const itens = [...qs1.flatMap(q => take(pool, "TP", uc1, q, 1)!), ...qs2.flatMap(q => take(pool, "TP", uc2, q, 1)!)];
-            blocos.push(criarBloco(itens, "TP2_DUAS_UCS"));
-            progresso = true;
-            break externo;
-          }
-        }
-      }
-    }
-
-    sobras.push(...pool.map(x => x.sessao));
+    const resolvido = resolverPoolExato(poolOriginal, ativos, cfg.padraoAEvitar);
+    blocos.push(...resolvido.blocos);
+    sobras.push(...resolvido.sobras.map(x => x.sessao));
   }
 
   // Cada bloco usa a turma teórica completa; por isso recebe um slot exclusivo por

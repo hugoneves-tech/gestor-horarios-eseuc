@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Calendar, ChevronDown, ChevronRight, Zap, AlertTriangle, CheckCircle, Info, Clock, Settings } from "lucide-react";
 import type { AnoLetivoSemestre, UC, FeriadoInterrupcao, VersaoHorario, RegraHorario } from "../types";
-import { calcularSemanas, calcularPlano, gerarSessoesConjunto, distribuirBlocos, type SemanaInfo, type PlanoSemanal, type EntradaUC } from "../utils/distribuicao";
+import { calcularSemanas, calcularPlano, gerarSessoesConjunto, distribuirBlocos, calcularEndWeek, mapearSemanasPedagogicasParaFisicas, type SemanaInfo, type PlanoSemanal, type EntradaUC } from "../utils/distribuicao";
 import { ModalConfigCalendario } from "./ModalConfigCalendario";
 import { ModalAlocacaoSemanas } from "./ModalAlocacaoSemanas";
 
@@ -33,7 +33,14 @@ export function ConfiguracaoCalendario({
   const [modalAlocacaoId, setModalAlocacaoId] = useState<string | null>(null);
 
   const handleSetDataInicio = (id: string, value: string) => {
-    setAnosSemestres(anosSemestres.map(a => a.id === id ? { ...a, dataInicioSemestre: value } : a));
+    setAnosSemestres(anosSemestres.map(a => a.id === id ? {
+      ...a,
+      dataInicioSemestre: value,
+      dataInicioAno1: value,
+      dataInicioAno2: value,
+      dataInicioAno3: value,
+      dataInicioAno4: value
+    } : a));
   };
 
   const ucsPorSemestre = (anoSem: AnoLetivoSemestre) =>
@@ -63,8 +70,11 @@ export function ConfiguracaoCalendario({
       // Schedule all UCs of this semester together (round-robin) for fair slot sharing.
       const entradas: EntradaUC[] = ucsDeste.map(uc => {
         const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSemestre.semestre}`];
-        const startWeek = uc.semanaInicio ?? 1;
-        const endWeek = uc.semanaFim ?? (startWeek + uc.numSemanas - 1);
+        const startWeekPed = uc.semanaInicio ?? 1;
+        const endWeekPed = uc.semanaFim ?? (startWeekPed + (uc.numSemanas || 15) - 1);
+        const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startWeekPed, endWeekPed, anoSemestre.semanasPersonalizadas);
+        const startWeek = mappedWeeks.start;
+        const endWeek = mappedWeeks.end;
         return {
           uc,
           semanas: calcularSemanas(
@@ -189,13 +199,15 @@ export function ConfiguracaoCalendario({
                   </span>
                   <span className="ml-1.5 text-stone-400 text-[10px]">({anoSem.edicao})</span>
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold border ${
+                    <button 
+                      onClick={() => setAnosSemestres(anosSemestres.map(a => a.id === anoSem.id ? { ...a, ativo: !a.ativo } : a))}
+                      className={`cursor-pointer px-1.5 py-0.5 rounded text-[8.5px] font-bold border transition-all ${
                       anoSem.ativo
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                        : "bg-stone-50 text-stone-400 border-stone-200"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                        : "bg-stone-50 text-stone-400 border-stone-200 hover:bg-stone-100"
                     }`}>
                       {anoSem.ativo ? "Ativo" : "Inativo"}
-                    </span>
+                    </button>
                     <span className="text-[9px] text-stone-400">{ucsDeste.length} UC(s)</span>
                     {jaGerado && (
                       <span className="px-1.5 py-0.5 rounded text-[8.5px] font-bold border bg-teal-50 text-teal-700 border-teal-200">
@@ -323,11 +335,17 @@ function DistribuicaoDetalhe({ anoSem, ucsDeste, ucs, setUcs, feriados, motorReg
   const semanas = useMemo<SemanaInfo[]>(() => {
     if (!uc || !anoSem.dataInicioSemestre) return [];
     
-    const specificDate = motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`];
+    const prop = `dataInicioAno${uc.anoCurricular}` as keyof typeof anoSem;
+    const specificDate = anoSem.semestre === 2
+      ? anoSem.dataInicioSemestre
+      : ((anoSem as any)?.[prop] || motorRegra?.parametros?.[`ano${uc.anoCurricular}_dataInicioSem${anoSem.semestre}`]);
     const startDateToUse = uc.dataInicio || specificDate || anoSem.dataInicioSemestre;
 
-    const startWeek = uc.semanaInicio ?? 1;
-    const endWeek = uc.semanaFim ?? (startWeek + uc.numSemanas - 1);
+    const startWeekPed = uc.semanaInicio ?? 1;
+    const endWeekPed = uc.semanaFim ?? (startWeekPed + (uc.numSemanas || 15) - 1);
+    const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startWeekPed, endWeekPed, anoSem.semanasPersonalizadas);
+    const startWeek = mappedWeeks.start;
+    const endWeek = mappedWeeks.end;
 
     return calcularSemanas(
       startDateToUse,
@@ -377,9 +395,12 @@ function DistribuicaoDetalhe({ anoSem, ucsDeste, ucs, setUcs, feriados, motorReg
           onChange={e => setSelectedUcId(e.target.value)}
           className="px-2 py-1 border border-stone-200 rounded-lg text-xs bg-white"
         >
-          {ucs.map(u => {
-            const sStart = u.semanaInicio ?? 1;
-            const sEnd = u.semanaFim ?? (sStart + u.numSemanas - 1);
+          {ucsDeste.map(u => {
+            const startWeekPed = u.semanaInicio ?? 1;
+            const endWeekPed = u.semanaFim ?? (startWeekPed + (u.numSemanas || 15) - 1);
+            const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startWeekPed, endWeekPed, anoSem.semanasPersonalizadas);
+            const sStart = mappedWeeks.start;
+            const sEnd = mappedWeeks.end;
             return (
             <option key={u.id} value={u.id}>
               {u.sigla} — {u.nome} (sem. {sStart}–{sEnd})
@@ -520,3 +541,4 @@ function DistribuicaoDetalhe({ anoSem, ucsDeste, ucs, setUcs, feriados, motorReg
     </div>
   );
 }
+

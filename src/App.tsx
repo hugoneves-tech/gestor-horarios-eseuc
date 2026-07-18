@@ -1,4 +1,32 @@
 import React, { useState, useEffect } from "react";
+
+function calcCoverage(sessoes: import('./types').SessaoHorario[]) {
+  const plCovered = new Set<string>();
+  for (const s of sessoes) {
+    let tStr = s.turma || "";
+    // If it's a T class, it might cover multiple groups separated by comma
+    const groups = tStr.split(',').map(x => x.trim());
+    for (const g of groups) {
+      if (g === "Turma A") {
+        for(let i=1; i<=12; i++) plCovered.add("PL"+i);
+      } else if (g === "Turma B") {
+        for(let i=13; i<=24; i++) plCovered.add("PL"+i);
+      } else if (g.startsWith("TP")) {
+        const n = parseInt(g.slice(2));
+        const start = (n-1)*3 + 1;
+        for(let i=start; i<start+3; i++) plCovered.add("PL"+i);
+      } else if (g.startsWith("PL")) {
+        plCovered.add(g);
+      }
+    }
+  }
+  let aCount = 0;
+  for(let i=1; i<=12; i++) if(plCovered.has("PL"+i)) aCount++;
+  let bCount = 0;
+  for(let i=13; i<=24; i++) if(plCovered.has("PL"+i)) bCount++;
+  return { a: Math.round(aCount / 12 * 100), b: Math.round(bCount / 12 * 100) };
+}
+
 import * as XLSX from "xlsx";
 import { useAuth } from "./auth/AuthProvider";
 import {
@@ -67,10 +95,10 @@ import {
 import { TechnicalArchitecture } from "./components/TechnicalArchitecture";
 import { ConfiguracaoCalendario } from "./components/ConfiguracaoCalendario";
 import { AdminConvites } from "./auth/AdminConvites";
-import { gerarSessoesConjunto, calcularSemanas, type EntradaUC } from "./utils/distribuicao";
+import { gerarSessoesConjunto, calcularSemanas, calcularEndWeek, mapearSemanasPedagogicasParaFisicas, type EntradaUC } from "./utils/distribuicao";
 import { parseHorarioCSV, gerarTemplateCSV, type ErroLinha } from "./utils/importacao";
 import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
-import { organizarBlocos100, validarBlocos100, CONFIGURACAO_BLOCOS_100_DEFAULT, DESCRICAO_PADROES_BLOCOS_100 } from "./utils/blocos100";
+import { completarCargaParaBlocos100, organizarBlocos100, validarBlocos100, CONFIGURACAO_BLOCOS_100_DEFAULT, DESCRICAO_PADROES_BLOCOS_100 } from "./utils/blocos100";
 import { repo } from "./data/supabaseRepo";
 
 export default function App() {
@@ -131,10 +159,28 @@ export default function App() {
   const [podeGravar, setPodeGravar] = useState<boolean>(false);
 
   const [selectedYearFilter, setSelectedYearFilter] = useState<number | "todos">("todos");
-  const [selectedSemesterFilter, setSelectedSemesterFilter] = useState<number | "todos">(1);
   const [selectedWeekFilter, setSelectedWeekFilter] = useState<number>(1);
   const [selectedVersaoId, setSelectedVersaoId] = useState<string>("v1");
   const [activeVersao, setActiveVersao] = useState<VersaoHorario | null>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const askConfirmation = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDialog(null);
+      }
+    });
+  };
 
   // Âmbito de uma regra (multi-ano + cursos), guardado no config (sem migração no Supabase).
   // config.anos: number[] (vazio = transversal/todos os anos). config.cursoIds: string[]
@@ -163,13 +209,59 @@ export default function App() {
   };
 
   // Helper to generate a reliable week label based on the academic calendar (ignoring holidays for display purpose simply)
+  
+  const getPedagogicalWeekNumber = (w, semestre, customWeeks) => {
+    let count = 0;
+    const start = semestre === 1 ? 1 : 16;
+    for (let i = start; i <= w; i++) {
+       const relativeWeek = semestre === 1 ? i : i - 15;
+       const isPausa = customWeeks?.find(c => c.numero === relativeWeek)?.isPausa;
+       if (!isPausa) count++;
+    }
+    return semestre === 1 ? count : count + 15;
+  };
+
   const getWeekLabel = (week: number) => {
-    const start = new Date(2025, 8, 8); // Sep 8, 2025 (Monday)
-    start.setDate(start.getDate() + (week - 1) * 7);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 4); // Friday
+    const isSem2 = week >= 16;
+    const s = isSem2 ? 2 : 1;
+    const weekNumberInSem = isSem2 ? week - 15 : week;
+    
+    const matchS = anosSemestres.find(item => item.anoLetivo === selectedAnoLetivo && item.semestre === s);
+    const custom = matchS?.semanasPersonalizadas?.find(cp => cp.numero === weekNumberInSem);
+    
+    let start: Date;
+    let end: Date;
+    
+    if (custom?.dataSegunda && custom?.dataSexta) {
+      start = new Date(custom.dataSegunda);
+      end = new Date(custom.dataSexta);
+    } else {
+      let startDateStr = matchS?.dataInicioSemestre;
+      if (matchS && selectedYearFilter !== "todos") {
+         const prop = `dataInicioAno${selectedYearFilter}` as keyof typeof matchS;
+         const yearDate = (matchS as any)?.[prop];
+         if (yearDate) startDateStr = yearDate;
+      }
+      
+      if (!startDateStr) startDateStr = isSem2 ? "2026-02-09" : "2025-09-08";
+      
+      start = new Date(startDateStr);
+      const dow = start.getDay();
+      const daysFromMonday = dow === 0 ? 6 : dow - 1;
+      start.setDate(start.getDate() - daysFromMonday);
+      
+      start.setDate(start.getDate() + (weekNumberInSem - 1) * 7);
+      end = new Date(start);
+      end.setDate(end.getDate() + 4);
+    }
+    
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    return `${start.getDate()} a ${end.getDate()} de ${months[end.getMonth()]}`;
+    const dateLabel = `${start.getDate()} ${months[start.getMonth()]} a ${end.getDate()} ${months[end.getMonth()]}`;
+    
+    if (custom?.isPausa) {
+      return `${dateLabel} (Pausa: ${custom.motivoPausa || "Férias"})`;
+    }
+    return dateLabel;
   };
 
   // Rótulo de VISUALIZAÇÃO das turmas: Turma A→T1, Turma B→T2, com a derivação (TP/PL) e a
@@ -1145,7 +1237,13 @@ export default function App() {
         setTurmas(d.turmas);
         setFeriados(d.feriados);
         setRegras(d.regras);
-        setVersoes(d.versoes);
+        // Sanitizar propostas carregadas: remover quaisquer sessões órfãs (UCs que já não existem)
+        const existingUcSiglas = new Set(d.ucs.map(u => u.sigla));
+        const sanitizedVersoes = d.versoes.map(v => ({
+          ...v,
+          sessoes: v.sessoes.filter(s => existingUcSiglas.has(s.ucSigla))
+        }));
+        setVersoes(sanitizedVersoes);
         setSolverRuns(d.solverRuns);
         if (d.ucs.length === 0 && d.cursos.length === 0) {
           showToast("Base de dados Supabase vazia. Importe um modelo ou crie os dados pela aplicação.");
@@ -1392,17 +1490,20 @@ export default function App() {
     showToast(`Docente "${item.nome}" integrado com sucesso!`);
   };
 
-  const handleClearDatabase = async () => {
-    if (!window.confirm("âš  Tem a certeza absoluta que deseja LIMPAR todos os dados da base de dados académica (UCs, Docentes, Salas, Regras e Propostas) para o semestre ativo? Esta ação é irreversível na Cloud!")) {
-      return;
-    }
-    setUcs([]);
-    setDocentes([]);
-    setSalas([]);
-    setRegras([]);
-    setVersoes([]);
-    setSolverRuns([]);
-    showToast("Base de dados académica limpa (sincronizado com o Supabase).");
+  const handleClearDatabase = () => {
+    askConfirmation(
+      "Limpar Base de Dados",
+      "⚠️ Tem a certeza absoluta que deseja LIMPAR todos os dados da base de dados académica (UCs, Docentes, Salas, Regras e Propostas) para o semestre ativo? Esta ação é irreversível na Cloud!",
+      () => {
+        setUcs([]);
+        setDocentes([]);
+        setSalas([]);
+        setRegras([]);
+        setVersoes([]);
+        setSolverRuns([]);
+        showToast("Base de dados académica limpa (sincronizado com o Supabase).");
+      }
+    );
   };
 
   // Exporta o ESTADO ATUAL (ao vivo — o que está carregado do Supabase + edições desta sessão)
@@ -1492,7 +1593,7 @@ export default function App() {
   };
 
   // Distribuição local pelas 30 semanas letivas usando o motor de distribuição (distribuicao.ts).
-  // S1 = semanas 1-15; S2 = semanas 16-30 (offset +15 aplicado automaticamente).
+  // S1 = semanas 1-15; S2 = semanas 16-29 (offset +15 aplicado automaticamente).
   const handleTriggerSolver = (semRegras = false, sessoesFixasImport: SessaoHorario[] = []) => {
     setIsSolving(true);
     setLastSolverVerdict(null);
@@ -1514,8 +1615,8 @@ export default function App() {
         return anoCurricularOk && (anosLetivos.length === 0 || anosLetivos.includes(selectedAnoLetivo));
       };
       const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: Record<number, number[]>; semanasSoTurmaB?: Record<number, number[]>; restricoesUC?: any[]; blocos100?: any; [key: string]: any } = {
-        semanasSoTurmaA: { 2: Array.from({ length: 8 }, (_, i) => 8 + i) },
-        semanasSoTurmaB: { 2: Array.from({ length: 8 }, (_, i) => 16 + i) }
+        semanasSoTurmaA: {},
+        semanasSoTurmaB: {}
       };
       for (const r of regras) {
         if (!regraNoAmbito(r) || !r.ativa) continue;
@@ -1572,15 +1673,23 @@ export default function App() {
         // mesma a toda a distribuição). Com "todos", entram todas como antes.
         if (selectedYearFilter !== "todos" && Number(uc.anoCurricular) !== Number(selectedYearFilter)) continue;
 
-        const anoSem = anosSemestres.find(s => s.semestre === uc.semestre);
+        const anoSem = anosSemestres.find(s => s.anoLetivo === selectedAnoLetivo && s.semestre === uc.semestre);
         if (!anoSem?.dataInicioSemestre) continue;
 
         // Use UC-specific start date if set (e.g. year 2 starts on Thursday Sept 10).
-        const anoDataInicio = motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`];
+        // No 2º semestre, todas as UCs arrancam na data global do semestre, não havendo desfasamentos específicos.
+        const prop = `dataInicioAno${uc.anoCurricular}` as keyof typeof anoSem;
+        const anoDataInicio = uc.semestre === 2
+          ? anoSem.dataInicioSemestre
+          : ((anoSem as any)?.[prop] || motorAI[`ano${uc.anoCurricular}_dataInicioSem${uc.semestre}`]);
         const dataInicio = uc.dataInicio || anoDataInicio || anoSem.dataInicioSemestre;
         const semanaGlobalOffset = uc.semestre === 2 ? 15 : 0;
-        const semStart = uc.semanaInicio || 1;
-        const semEnd = uc.semanaFim ?? (semStart + (uc.numSemanas || 15) - 1);
+        const semStartPed = uc.semanaInicio || 1;
+        const semEndPed = uc.semanaFim ?? (semStartPed + (uc.numSemanas || 15) - 1);
+
+        const mappedWeeks = mapearSemanasPedagogicasParaFisicas(semStartPed, semEndPed, anoSem.semanasPersonalizadas);
+        const semStart = mappedWeeks.start;
+        const semEnd = mappedWeeks.end;
 
         const semanas = calcularSemanas(dataInicio, semStart, semEnd, feriados, anoSem.semanasPersonalizadas);
         const entrada: EntradaUC = { uc, semanas, semanaGlobalOffset };
@@ -1594,7 +1703,8 @@ export default function App() {
       for (let ano = 1; ano <= 4; ano++) for (const sem of [1, 2]) prefTurmaAManha[`${ano}|${sem}`] = prefManhaDe(ano, sem);
       // Conflitos entre UCs (não podem estar na mesma mancha por partilharem docentes).
       // ESDAC ∦ EIG (indicado), + pares derivados de docentes partilhados (quando atribuídos).
-      const ucConflitos: string[][] = [["ESDAC", "EIG"]];
+      const ucConflitos: string[][] = [];
+      /*
       const docPorUC: Record<string, Set<string>> = {};
       for (const u of ucs) {
         const ds = new Set((u.turmasConfig || []).map(t => t.docenteId).filter(Boolean) as string[]);
@@ -1604,11 +1714,16 @@ export default function App() {
       for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++) {
         if ([...docPorUC[sigs[i]]].some(d => docPorUC[sigs[j]].has(d))) ucConflitos.push([sigs[i], sigs[j]]);
       }
+      */
       // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
       // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
       // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
+      // Filtrar apenas sessões que pertencem a UCs ativas/existentes
+      const existingUcSiglas = new Set(ucs.map(u => u.sigla));
+      const activeSessoesValidas = (activeVersao?.sessoes ?? []).filter(s => existingUcSiglas.has(s.ucSigla));
+
       const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
-      const fixasExistentes = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
+      const fixasExistentes = activeSessoesValidas.filter(s => s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
       const sessoesFixas = [...sessoesFixasImport, ...fixasExistentes];
 
       const opcoes = {
@@ -1620,7 +1735,7 @@ export default function App() {
         prefTurmaAManha,
         ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
         // Estrutura ESEUC: 8-15 só T1 (Turma A) presente, UCs "-I"; 16-23 só T2 (Turma B), UCs
-        // "-II". Tudo de manhã. Assim T1 está de manhã nas semanas 1-15 e T2 nas 16-30.
+        // "-II". Tudo de manhã. Assim T1 está de manhã nas semanas 1-15 e T2 nas 16-29.
         semanasSoTurmaA: motorAI.semanasSoTurmaA,
         semanasSoTurmaB: motorAI.semanasSoTurmaB,
         // Modo "sem regras": ignora todas as regras pedagógicas, mantendo só os turnos da
@@ -1643,10 +1758,11 @@ export default function App() {
           ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
           ...(motorAI.blocos100 || {}),
         };
+        allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);
         const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos);
         if (resultadoBlocos.naoAlocadas.length > 0) {
           const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
-          throw new Error(`Não é possível formar blocos a 100% com a carga atual: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). Ajuste as cargas/turmas no Supabase.`);
+          throw new Error(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). Reveja as regras de blocos no Supabase.`);
         }
         allSessoes = resultadoBlocos.sessoes;
       }
@@ -1660,12 +1776,12 @@ export default function App() {
         const uc = ucs.find(u => u.sigla === s.ucSigla);
         return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
       };
-      const outrosAnos = (activeVersao?.sessoes ?? []).filter(s => !mesmoAnoGen(s));
+      const outrosAnos = activeSessoesValidas.filter(s => !mesmoAnoGen(s));
 
       const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
       const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
-      const sessoesCongeladas = (activeVersao?.sessoes ?? []).filter(s => ehBloqueada(s) && mesmoAnoGen(s));
-      const fixadas = (activeVersao?.sessoes ?? []).filter(s => s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s));
+      const sessoesCongeladas = activeSessoesValidas.filter(s => ehBloqueada(s) && mesmoAnoGen(s));
+      const fixadas = activeSessoesValidas.filter(s => s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s));
       const merged: SessaoHorario[] = [
         ...outrosAnos,                    // anos não selecionados → intactos
         ...sessoesCongeladas,            // semanas validadas → ficam exatamente como estão
@@ -1807,11 +1923,43 @@ export default function App() {
   };
   const apagarProposta = (id: string) => {
     if (versoes.length <= 1) { showToast("Tem de existir pelo menos uma proposta."); return; }
-    if (!window.confirm("Apagar esta proposta? Esta ação não se desfaz.")) return;
-    const restantes = versoes.filter(v => v.id !== id);
-    setVersoes(restantes);
-    if (selectedVersaoId === id) setSelectedVersaoId(restantes[0].id);
-    showToast("Proposta apagada.");
+    askConfirmation(
+      "Apagar Proposta",
+      "Apagar esta proposta? Esta ação não se desfaz.",
+      () => {
+        const restantes = versoes.filter(v => v.id !== id);
+        setVersoes(restantes);
+        if (selectedVersaoId === id) setSelectedVersaoId(restantes[0].id);
+        showToast("Proposta apagada.");
+      }
+    );
+  };
+
+  const handleApagarHorario = (year: number | "todos") => {
+    if (!activeVersao) return;
+    
+    const confirmMessage = year === "todos"
+      ? "Tem a certeza que deseja apagar COMPLETAMENTE todas as sessões deste horário? Esta ação não pode ser desfeita."
+      : `Tem a certeza que deseja apagar o horário do ${year}.º Ano desta proposta? Esta ação não pode ser desfeita.`;
+      
+    askConfirmation(
+      "Apagar Horário",
+      confirmMessage,
+      () => {
+        let updatedSessoes: SessaoHorario[] = [];
+        if (year !== "todos") {
+          updatedSessoes = activeVersao.sessoes.filter(s => {
+            const uc = ucs.find(u => u.sigla === s.ucSigla);
+            return !!uc && Number(uc.anoCurricular) !== Number(year);
+          });
+        } else {
+          updatedSessoes = [];
+        }
+
+        setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updatedSessoes, score: 0 } : v));
+        showToast(year === "todos" ? "Horário completo apagado." : `Horário do ${year}.º Ano apagado.`);
+      }
+    );
   };
 
   // Handles Gemini custom chat messages safely converting SQL-less prompts
@@ -1896,7 +2044,16 @@ export default function App() {
     }
   };
 
-  const removeUc = (id: string) => setUcs(ucs.filter(u => u.id !== id));
+  const removeUc = (id: string) => {
+    const ucToRemove = ucs.find(u => u.id === id);
+    if (!ucToRemove) return;
+    setUcs(ucs.filter(u => u.id !== id));
+    setVersoes(versoes.map(v => ({
+      ...v,
+      sessoes: v.sessoes.filter(s => s.ucSigla !== ucToRemove.sigla)
+    })));
+    showToast(`UC ${ucToRemove.sigla} removida e as suas sessões foram eliminadas do calendário.`);
+  };
   const removeDocente = (id: string) => setDocentes(docentes.filter(d => d.id !== id));
   const removeSala = (id: string) => setSalas(salas.filter(s => s.id !== id));
   const removeFeriado = (id: string) => setFeriados(feriados.filter(f => f.id !== id));
@@ -2257,9 +2414,9 @@ export default function App() {
   };
 
   // Eliminar uma aula do horário (edição manual para reajustar).
-  const deleteSession = (sessionId: number) => {
+  const deleteSession = (sessionId: number | string) => {
     if (!activeVersao) return;
-    const updated = activeVersao.sessoes.filter(s => s.id !== sessionId);
+    const updated = activeVersao.sessoes.filter(s => String(s.id) !== String(sessionId));
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: updated } : v));
   };
 
@@ -4540,12 +4697,15 @@ export default function App() {
                         const matchingUc = ucs.find(u => u.sigla === s.ucSigla);
                         if (!matchingUc) return true;
                         if (selectedYearFilter !== "todos" && Number(matchingUc.anoCurricular) !== Number(selectedYearFilter)) return false;
-                        if (selectedSemesterFilter !== "todos" && Number(matchingUc.semestre) !== Number(selectedSemesterFilter)) return false;
+                        
 
                         // Filter by selected active week
+                        const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === matchingUc.semestre);
                         const startWeek = matchingUc.semanaInicio || 1;
-                        const endWeek = startWeek + (matchingUc.numSemanas || 15) - 1;
-                        if (selectedWeekFilter < startWeek || selectedWeekFilter > endWeek) {
+                        const endWeek = matchingUc.semanaFim ?? calcularEndWeek(startWeek, matchingUc.numSemanas || 15, anoSem?.semanasPersonalizadas);
+                        
+                        const relWeek = matchingUc.semestre === 2 ? selectedWeekFilter - 15 : selectedWeekFilter;
+                        if (relWeek < startWeek || relWeek > endWeek) {
                           return false;
                         }
 
@@ -4788,7 +4948,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       // Build a print window with one week per page
-                      const weeks = Array.from({ length: 30 }, (_, i) => i + 1);
+                      const weeks = Array.from({ length: 50 }, (_, i) => i + 1);
                       const diasSemanaisP = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
                       const blocosP = [
                         { start: "08:00", end: "10:00" }, { start: "10:00", end: "12:00" },
@@ -4849,7 +5009,7 @@ export default function App() {
               </div>
 
               {/* FILTRO DE ANO/SEMESTRE — acima do explorador semanal */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-stone-50/75 p-4 rounded-xl border border-stone-150">
+              <div className="bg-stone-50/75 p-4 rounded-xl border border-stone-150">
                 <div className="space-y-1.5">
                   <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Ano Curricular (CLE)</span>
                   <div className="flex flex-wrap gap-1.5">
@@ -4873,20 +5033,32 @@ export default function App() {
                   {!perfilAtivo.startsWith("diretor") && (
                     <p className="text-[9px] text-stone-400 italic">Acesso restrito ao {parseInt(perfilAtivo.replace(/\D/g, "")) || ""}º ano — perfil {getPerfilLabel(perfilAtivo)}.</p>
                   )}
-                  {selectedYearFilter === "todos" ? (
-                    <p className="text-[9px] text-stone-400 italic">Escolhe um ano para validar e gerar.</p>
-                  ) : (
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <button onClick={() => handleTriggerSolver(false)} disabled={isSolving}
-                        className="px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
-                        {isSolving ? (<><RefreshCw className="w-3 h-3 animate-spin" /> A Gerar...</>) : (<><Zap className="w-3 h-3 text-amber-300" /> Validar e Gerar Distribuição</>)}
-                      </button>
-                      <button onClick={() => handleTriggerSolver(true)} disabled={isSolving} title="Distribui sem nenhuma regra pedagógica — mantém apenas os turnos da tarde e o espaço para almoço. Para comparar cenários."
-                        className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
-                        <Zap className="w-3 h-3 text-stone-400" /> Gerar sem regras
-                      </button>
-                    </div>
-                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {selectedYearFilter !== "todos" ? (
+                      <>
+                        <button onClick={() => handleTriggerSolver(false)} disabled={isSolving}
+                          className="px-3 py-1.5 bg-[#1E1C19] text-white hover:bg-stone-850 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
+                          {isSolving ? (<><RefreshCw className="w-3 h-3 animate-spin" /> A Gerar...</>) : (<><Zap className="w-3 h-3 text-amber-300" /> Validar e Gerar Distribuição</>)}
+                        </button>
+                        <button onClick={() => handleTriggerSolver(true)} disabled={isSolving} title="Distribui sem nenhuma regra pedagógica — mantém apenas os turnos da tarde e o espaço para almoço. Para comparar cenários."
+                          className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
+                          <Zap className="w-3 h-3 text-stone-400" /> Gerar sem regras
+                        </button>
+                        <button onClick={() => handleApagarHorario(selectedYearFilter)} disabled={isSolving || !activeVersao?.sessoes.length}
+                          className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:border-rose-300 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit ml-auto">
+                          <Trash2 className="w-3 h-3 animate-pulse" /> Apagar Horário ({selectedYearFilter}.º Ano)
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 w-full flex-wrap">
+                        <p className="text-[9px] text-stone-400 italic">Escolhe um ano para validar e gerar.</p>
+                        <button onClick={() => handleApagarHorario("todos")} disabled={isSolving || !activeVersao?.sessoes.length}
+                          className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:border-rose-300 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs">
+                          <Trash2 className="w-3 h-3" /> Apagar Horário Completo
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Importar horário feito fora da plataforma (Excel/CSV) */}
                   {selectedYearFilter !== "todos" && (
@@ -4959,17 +5131,6 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">Semestre Académico</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[{ id: "todos", label: "Ambos Semestres" }, { id: 1, label: "1.º Semestre" }, { id: 2, label: "2.º Semestre" }].map(btn => (
-                      <button key={btn.id} onClick={() => setSelectedSemesterFilter(btn.id as any)}
-                        className={`px-3 py-1.5 rounded-lg text-2xs font-semibold cursor-pointer transition-all ${selectedSemesterFilter === btn.id ? "bg-stone-900 text-white shadow-3xs" : "bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100"}`}>
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               {/* DYNAMIC WEEK TIMELINE SELECTOR */}
@@ -5008,23 +5169,49 @@ export default function App() {
                     <div className="flex-1 h-px bg-[#148A96]/20" />
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {Array.from({ length: 15 }, (_, i) => i + 1).map(w => {
+                    {Array.from({ length: calcularEndWeek(1, 15, anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === 1)?.semanasPersonalizadas) }, (_, i) => i + 1).map(w => {
                       const activeCount = ucs.filter(u => {
                         if (u.semestre !== 1) return false;
-                        const start = u.semanaInicio || 1;
-                        return w >= start && w <= start + (u.numSemanas || 15) - 1;
+                        const startPed = u.semanaInicio || 1;
+                        const endPed = u.semanaFim ?? (startPed + (u.numSemanas || 15) - 1);
+                        const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === 1);
+                        const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startPed, endPed, anoSem?.semanasPersonalizadas);
+                        return w >= mappedWeeks.start && w <= mappedWeeks.end;
                       }).length;
+                      const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === 1);
+                      const customWeek = anoSem?.semanasPersonalizadas?.find(cp => cp.numero === w);
+                      const isPausa = !!customWeek?.isPausa;
                       const bloqueada = semanasBloqueadas.includes(w);
+                      
+                      const countToDisplay = isPausa ? 0 : activeCount;
                       return (
                         <button key={w}
-                          onClick={() => { setSelectedWeekFilter(w); setSelectedSemesterFilter(1); }}
-                          className={`flex flex-col items-center px-2.5 py-1 rounded-lg border text-center cursor-pointer transition-all min-w-[62px] ${selectedWeekFilter === w ? "bg-[#148A96] text-white border-[#148A96] scale-105" : bloqueada ? "bg-emerald-50 text-stone-700 border-emerald-300" : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"}`}
+                          onClick={() => { setSelectedWeekFilter(w);  }}
+                          className={`flex flex-col items-center px-2.5 py-1 rounded-lg border text-center cursor-pointer transition-all min-w-[62px] ${
+                            selectedWeekFilter === w 
+                              ? isPausa 
+                                ? "bg-rose-600 text-white border-rose-600 scale-105" 
+                                : "bg-[#148A96] text-white border-[#148A96] scale-105" 
+                              : isPausa 
+                                ? "bg-rose-50/50 text-rose-700 border-rose-200/60 hover:bg-rose-50" 
+                                : bloqueada 
+                                  ? "bg-emerald-50 text-stone-700 border-emerald-300" 
+                                  : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
+                          }`}
                         >
                           <span className="text-[10px] font-bold font-mono flex items-center gap-0.5">
                             {bloqueada && <Lock className={`w-2.5 h-2.5 ${selectedWeekFilter === w ? "text-white" : "text-emerald-600"}`} />}
-                            Sem. {w}
+                            {isPausa ? "Pausa" : `Sem. ${getPedagogicalWeekNumber(w, w < 16 ? 1 : 2, anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === (w < 16 ? 1 : 2))?.semanasPersonalizadas)}`}
                           </span>
-                          <span className={`text-[8px] ${selectedWeekFilter === w ? "text-stone-100" : "text-stone-400"}`}>{activeCount} UC{activeCount !== 1 ? "s" : ""}</span>
+                          <span className={`text-[8px] font-medium ${
+                            selectedWeekFilter === w 
+                              ? "text-stone-100" 
+                              : isPausa 
+                                ? "text-rose-500 font-bold" 
+                                : "text-stone-400"
+                          }`}>
+                            {isPausa ? "Pausa" : `${countToDisplay} UC${countToDisplay !== 1 ? "s" : ""}`}
+                          </span>
                         </button>
                       );
                     })}
@@ -5037,23 +5224,51 @@ export default function App() {
                     <div className="flex-1 h-px bg-amber-400/30" />
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {Array.from({ length: 15 }, (_, i) => i + 16).map(w => {
+                    {Array.from({ length: calcularEndWeek(1, 15, anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === 2)?.semanasPersonalizadas) }, (_, i) => i + 16).map(w => {
                       const activeCount = ucs.filter(u => {
                         if (u.semestre !== 2) return false;
-                        const start = (u.semanaInicio || 1) + 15;
-                        return w >= start && w <= start + (u.numSemanas || 15) - 1;
+                        const startPed = u.semanaInicio || 1;
+                        const endPed = u.semanaFim ?? (startPed + (u.numSemanas || 15) - 1);
+                        const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === 2);
+                        const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startPed, endPed, anoSem?.semanasPersonalizadas);
+                        const wRel = w - 15;
+                        return wRel >= mappedWeeks.start && wRel <= mappedWeeks.end;
                       }).length;
+                      const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === 2);
+                      const wRel = w - 15;
+                      const customWeek = anoSem?.semanasPersonalizadas?.find(cp => cp.numero === wRel);
+                      const isPausa = !!customWeek?.isPausa;
                       const bloqueada = semanasBloqueadas.includes(w);
+                      
+                      const countToDisplay = isPausa ? 0 : activeCount;
                       return (
                         <button key={w}
-                          onClick={() => { setSelectedWeekFilter(w); setSelectedSemesterFilter(2); }}
-                          className={`flex flex-col items-center px-2.5 py-1 rounded-lg border text-center cursor-pointer transition-all min-w-[62px] ${selectedWeekFilter === w ? "bg-amber-600 text-white border-amber-600 scale-105" : bloqueada ? "bg-emerald-50 text-stone-700 border-emerald-300" : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"}`}
+                          onClick={() => { setSelectedWeekFilter(w);  }}
+                          className={`flex flex-col items-center px-2.5 py-1 rounded-lg border text-center cursor-pointer transition-all min-w-[62px] ${
+                            selectedWeekFilter === w 
+                              ? isPausa 
+                                ? "bg-rose-600 text-white border-rose-600 scale-105" 
+                                : "bg-amber-600 text-white border-amber-600 scale-105" 
+                              : isPausa 
+                                ? "bg-rose-50/50 text-rose-700 border-rose-200/60 hover:bg-rose-50" 
+                                : bloqueada 
+                                  ? "bg-emerald-50 text-stone-700 border-emerald-300" 
+                                  : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
+                          }`}
                         >
                           <span className="text-[10px] font-bold font-mono flex items-center gap-0.5">
                             {bloqueada && <Lock className={`w-2.5 h-2.5 ${selectedWeekFilter === w ? "text-white" : "text-emerald-600"}`} />}
-                            Sem. {w}
+                            {isPausa ? "Pausa" : `Sem. ${getPedagogicalWeekNumber(w, w < 16 ? 1 : 2, anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === (w < 16 ? 1 : 2))?.semanasPersonalizadas)}`}
                           </span>
-                          <span className={`text-[8px] ${selectedWeekFilter === w ? "text-stone-100" : "text-stone-400"}`}>{activeCount} UC{activeCount !== 1 ? "s" : ""}</span>
+                          <span className={`text-[8px] font-medium ${
+                            selectedWeekFilter === w 
+                              ? "text-stone-100" 
+                              : isPausa 
+                                ? "text-rose-500 font-bold" 
+                                : "text-stone-400"
+                          }`}>
+                            {isPausa ? "Pausa" : `${countToDisplay} UC${countToDisplay !== 1 ? "s" : ""}`}
+                          </span>
                         </button>
                       );
                     })}
@@ -5066,14 +5281,25 @@ export default function App() {
                   {ucs
                     .filter(u => {
                       const semOffset = u.semestre === 2 ? 15 : 0;
-                      const start = (u.semanaInicio || 1) + semOffset;
-                      const end = start + (u.numSemanas || 15) - 1;
-                      return (selectedWeekFilter as number) >= start && (selectedWeekFilter as number) <= end;
+                      const startPed = u.semanaInicio || 1;
+                      const endPed = u.semanaFim ?? (startPed + (u.numSemanas || 15) - 1);
+                      const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === u.semestre);
+                      const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startPed, endPed, anoSem?.semanasPersonalizadas);
+                      
+                      const gStart = mappedWeeks.start + semOffset;
+                      const gEnd = mappedWeeks.end + semOffset;
+                      
+                      return (selectedWeekFilter as number) >= gStart && (selectedWeekFilter as number) <= gEnd;
                     })
                     .map(u => {
                       const semOffset = u.semestre === 2 ? 15 : 0;
-                      const gStart = (u.semanaInicio || 1) + semOffset;
-                      const gEnd = gStart + (u.numSemanas || 15) - 1;
+                      const startPed = u.semanaInicio || 1;
+                      const endPed = u.semanaFim ?? (startPed + (u.numSemanas || 15) - 1);
+                      const anoSem = anosSemestres.find(asem => asem.anoLetivo === selectedAnoLetivo && asem.semestre === u.semestre);
+                      const mappedWeeks = mapearSemanasPedagogicasParaFisicas(startPed, endPed, anoSem?.semanasPersonalizadas);
+                      
+                      const gStart = mappedWeeks.start + semOffset;
+                      const gEnd = mappedWeeks.end + semOffset;
                       return (
                       <span
                         key={u.id}
@@ -5167,7 +5393,20 @@ export default function App() {
                               onDrop={() => handleDropOnSlot(dia, slot.start, slot.end)}
                               className="p-1.5 min-h-[90px] border-l border-stone-100/80 align-top transition-colors relative group"
                             >
-                              <div className="flex flex-wrap gap-1 content-start">
+
+                              <div className="absolute bottom-1 right-1 text-[9px] font-mono tracking-tighter flex gap-1 z-10 pointer-events-none transition-opacity">
+                                {(() => {
+                                  const c = calcCoverage(slotSessions);
+                                  if (c.a === 0 && c.b === 0) return null;
+                                  return (
+                                    <div className="bg-white/90 px-1 py-0.5 rounded shadow-sm flex gap-1 border border-stone-200">
+                                      {c.a > 0 && <span className={c.a === 100 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold bg-rose-50 px-0.5 rounded"}>A:{c.a}%</span>}
+                                      {c.b > 0 && <span className={c.b === 100 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold bg-rose-50 px-0.5 rounded"}>B:{c.b}%</span>}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                              <div className="flex flex-wrap gap-1 content-start pt-2">
                                 {slotSessions.map((sessao) => {
                                   let bgClass = "bg-white border-stone-250 text-stone-800";
                                   if (sessao.tipoAula === "PL") {
@@ -7098,28 +7337,34 @@ export default function App() {
                 <div className="p-4 border-b border-stone-100 bg-amber-50/40 space-y-2">
                   <label className="text-[10px] font-bold text-stone-700 block">Chave da API Google (Gemini)</label>
                   <p className="text-[9px] text-stone-500 leading-snug">
-                    Cola a tua chave do Google AI Studio. Fica guardada apenas neste browser e é usada para o assistente responder com IA real. Sem chave, o assistente fica em modo de demonstração.
+                    Para obteres uma chave, visita <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium hover:text-blue-800">Google AI Studio</a>, clica em "Get API key" e cria uma nova chave (é gratuito). Cola-a abaixo.
                   </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="password"
-                      value={geminiKeyDraft}
-                      onChange={(e) => setGeminiKeyDraft(e.target.value)}
-                      placeholder="AIza…"
-                      className="flex-1 min-w-[200px] px-2.5 py-1.5 border border-stone-300 rounded-lg text-[11px] font-mono"
-                    />
-                    <button
-                      onClick={() => { guardarGeminiKey(geminiKeyDraft); setShowGeminiKeyPanel(false); showToast("Chave Gemini guardada neste browser."); }}
-                      className="px-3 py-1.5 bg-stone-900 text-white hover:bg-stone-800 font-bold rounded-lg text-[10px]"
-                    >
-                      Guardar
-                    </button>
-                    <button
-                      onClick={() => { guardarGeminiKey(""); setGeminiKeyDraft(""); showToast("Chave Gemini removida."); }}
-                      className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]"
-                    >
-                      Limpar
-                    </button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="password"
+                        value={geminiKeyDraft}
+                        onChange={(e) => setGeminiKeyDraft(e.target.value)}
+                        placeholder="AIza..."
+                        className="flex-1 min-w-[200px] px-2.5 py-1.5 border border-stone-300 rounded-lg text-[11px] font-mono"
+                      />
+                      <button
+                        onClick={testarEGuardarGeminiKey}
+                        disabled={testingGeminiKey}
+                        className="px-3 py-1.5 bg-stone-900 text-white hover:bg-stone-800 font-bold rounded-lg text-[10px] disabled:opacity-50"
+                      >
+                        {testingGeminiKey ? "A testar..." : "Testar e Guardar"}
+                      </button>
+                      <button
+                        onClick={() => { guardarGeminiKey(""); setGeminiKeyDraft(""); showToast("Chave Gemini removida."); setTestGeminiError(null); }}
+                        className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg text-[10px]"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                    {testGeminiError && (
+                      <p className="text-[10px] font-bold text-red-600 mt-1">{testGeminiError}</p>
+                    )}
                   </div>
 
                   <label className="text-[10px] font-bold text-stone-700 block pt-1">Modelo</label>
@@ -7317,6 +7562,32 @@ export default function App() {
         {activeTab === "arch" && <TechnicalArchitecture />}
 
       </main>
+
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-stone-200 p-6 shadow-xl space-y-4 text-xs">
+            <div className="flex items-center gap-2.5 text-stone-850">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+              <h3 className="font-serif font-bold text-sm">{confirmDialog.title}</h3>
+            </div>
+            <p className="text-stone-500 leading-relaxed font-light">{confirmDialog.message}</p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-3 py-1.5 border border-stone-200 rounded-lg text-stone-600 hover:bg-stone-50 font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-750 text-white rounded-lg font-semibold cursor-pointer shadow-xs"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -62,6 +62,8 @@ export function ModalAlocacaoSemanas({
     return preencherSemanasDefault(anoSem.dataInicioSemestre || "");
   });
 
+  const [confirmRecalcular, setConfirmRecalcular] = useState(false);
+
   const handleUpdateWeek = (numero: number, field: keyof SemanaPersonalizada, value: any) => {
     setSemanas(prev =>
       prev.map(s => (s.numero === numero ? { ...s, [field]: value } : s))
@@ -126,15 +128,13 @@ export function ModalAlocacaoSemanas({
   };
 
   const handleRecalcular = () => {
-    if (
-      window.confirm(
-        `Isto irá recalcular as datas de todas as semanas sequencialmente a partir de ${
-          anoSem.dataInicioSemestre || "data de início"
-        }. Deseja continuar?`
-      )
-    ) {
-      setSemanas(preencherSemanasDefault(anoSem.dataInicioSemestre || ""));
+    if (!confirmRecalcular) {
+      setConfirmRecalcular(true);
+      setTimeout(() => setConfirmRecalcular(false), 4000);
+      return;
     }
+    setSemanas(preencherSemanasDefault(anoSem.dataInicioSemestre || ""));
+    setConfirmRecalcular(false);
   };
 
   const handleSave = () => {
@@ -229,10 +229,14 @@ export function ModalAlocacaoSemanas({
 
           <button
             onClick={handleRecalcular}
-            className="px-2.5 py-1.5 bg-white hover:bg-stone-100 text-stone-700 border border-stone-250 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all duration-200 ${
+              confirmRecalcular
+                ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-600 animate-pulse shadow-sm"
+                : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-250"
+            }`}
           >
-            <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
-            Reiniciar Sequência Clássica
+            <RotateCcw className={`w-3.5 h-3.5 ${confirmRecalcular ? "text-white animate-spin-once" : "text-stone-500"}`} />
+            {confirmRecalcular ? "Clique novamente para confirmar" : "Reiniciar Sequência Clássica"}
           </button>
         </div>
 
@@ -332,3 +336,4 @@ export function ModalAlocacaoSemanas({
     document.body
   );
 }
+

@@ -24,6 +24,10 @@ create table if not exists anos_semestres (
   ativo                 boolean default false,
   data_inicio_semestre  date,
   semanas_personalizadas jsonb,
+  data_inicio_ano1      date,
+  data_inicio_ano2      date,
+  data_inicio_ano3      date,
+  data_inicio_ano4      date,
   created_at            timestamptz default now()
 );
 
@@ -178,3 +182,4 @@ end $$;
 --   create policy "auth_write" on ucs for all    to authenticated using (true) with check (true);
 --   -- (repetir por tabela; mais tarde restringir por escola/papel)
 -- ---------------------------------------------------------------------------
+
