@@ -201,7 +201,7 @@ export default function App() {
   };
   // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
   // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
-  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "blocos100"] as const;
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "blocos100", "cargaDiariaEstudante"] as const;
   const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
     const m = (r.config as any)?.motor;
     if (!m || typeof m !== "object") return false;
@@ -1628,6 +1628,7 @@ export default function App() {
         if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
         if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
         if (m.blocos100 && typeof m.blocos100 === "object") motorAI.blocos100 = m.blocos100;
+        if (m.cargaDiariaEstudante && typeof m.cargaDiariaEstudante === "object") motorAI.cargaDiariaEstudante = m.cargaDiariaEstudante;
         
         // Semanas exclusivas por ano
         for (const ano of [1, 2, 3, 4]) {
@@ -1757,9 +1758,10 @@ export default function App() {
           ...CONFIGURACAO_BLOCOS_100_DEFAULT,
           ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
           ...(motorAI.blocos100 || {}),
+          cargaDiariaEstudante: motorAI.cargaDiariaEstudante ?? CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
         };
         allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);
-        const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos, [...entradasS1, ...entradasS2]);
+        const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos, [...entradasS1, ...entradasS2], sessoesFixas);
         if (resultadoBlocos.naoAlocadas.length > 0) {
           const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
           throw new Error(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). Reveja as regras de blocos no Supabase.`);

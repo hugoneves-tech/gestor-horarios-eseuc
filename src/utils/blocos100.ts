@@ -1,5 +1,6 @@
 import type { SessaoHorario, UC } from "../types";
 import solver, { type Model, type SolveResult } from "javascript-lp-solver";
+import { gruposFolha } from "./validacao";
 
 export type PadraoBloco100Id =
   | "T1"
@@ -13,6 +14,11 @@ export interface ConfiguracaoBlocos100 {
   preferirSextaLivre: boolean;
   padroesAtivos: PadraoBloco100Id[];
   padraoAEvitar: PadraoBloco100Id;
+  cargaDiariaEstudante: {
+    alvoHoras: number;
+    maxHoras: number;
+    maxDiasNoMaximoPorSemana: number;
+  };
 }
 
 export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
@@ -20,6 +26,7 @@ export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   preferirSextaLivre: true,
   padroesAtivos: ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
   padraoAEvitar: "TP3_PL3",
+  cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 },
 };
 
 export const DESCRICAO_PADROES_BLOCOS_100: Record<PadraoBloco100Id, string> = {
@@ -295,8 +302,16 @@ export function organizarBlocos100(
   ucsCatalogo: UC[],
   config: Partial<ConfiguracaoBlocos100> = {},
   entradasAtivas: UCAtivaBlocos100[] = [],
+  sessoesExternas: SessaoHorario[] = [],
 ): ResultadoBlocos100 {
-  const cfg = { ...CONFIGURACAO_BLOCOS_100_DEFAULT, ...config };
+  const cfg = {
+    ...CONFIGURACAO_BLOCOS_100_DEFAULT,
+    ...config,
+    cargaDiariaEstudante: {
+      ...CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
+      ...(config.cargaDiariaEstudante || {}),
+    },
+  };
   if (!cfg.exigirCoberturaTotal) return { sessoes, naoAlocadas: [], blocosPorPadrao: {}, avisos: [] };
 
   const ucPorSigla = new Map(ucsCatalogo.map(u => [u.sigla, u]));
@@ -337,9 +352,20 @@ export function organizarBlocos100(
   // Cada bloco usa a turma teórica completa; por isso recebe um slot exclusivo por
   // (ano, semestre, família). Segunda a quinta são sempre tentadas antes de sexta.
   const ocupados = new Set<string>();
-  for (const s of preservadas) {
+  const cargaDia = new Map<string, number>();
+  const chaveCarga = (ano: number, semana: number, dia: string, folha: string) => `${ano}|${semana}|${dia}|${folha}`;
+  const registarCarga = (s: SessaoHorario) => {
+    const uc = ucPorSigla.get(s.ucSigla);
+    if (!uc || s.semana == null) return;
+    for (const folha of gruposFolha(s.turma)) {
+      const chave = chaveCarga(uc.anoCurricular, s.semana, s.diaSemana, folha);
+      cargaDia.set(chave, (cargaDia.get(chave) || 0) + 1);
+    }
+  };
+  for (const s of [...preservadas, ...sessoesExternas]) {
     const uc = ucPorSigla.get(s.ucSigla); const fam = familiaTeorica(s.turma);
     if (uc && fam && s.semana != null) ocupados.add(`${uc.anoCurricular}|${fam}|${s.semana}|${s.diaSemana}|${s.horaInicio}`);
+    registarCarga(s);
   }
   const blocosPorPadrao: Partial<Record<PadraoBloco100Id, number>> = {};
   const alocadas: SessaoHorario[] = [];
@@ -354,18 +380,41 @@ export function organizarBlocos100(
     const semFim = bloco.semanaPreferida <= 15 ? 15 : 30;
     const semanas = Array.from({ length: semFim - semInicio + 1 }, (_, i) => semInicio + i)
       .sort((a, b) => Math.abs(a - bloco.semanaPreferida) - Math.abs(b - bloco.semanaPreferida));
-    let escolhido: { semana: number; dia: string; hora: string } | null = null;
-    procurarSlot: for (const semana of semanas) for (const dia of ordemDias) for (const hora of HORAS) {
+    const folhasBloco = [...new Set(bloco.sessoes.flatMap(s => gruposFolha(s.turma)))];
+    const alvoBlocos = Math.max(1, Math.floor(cfg.cargaDiariaEstudante.alvoHoras / 2));
+    const maxBlocos = Math.max(alvoBlocos, Math.floor(cfg.cargaDiariaEstudante.maxHoras / 2));
+    const candidatosSlot: { semana: number; dia: string; hora: string; custo: number }[] = [];
+    for (const semana of semanas) for (const dia of ordemDias) for (const hora of HORAS) {
       if (dia === "Sexta" && hora === "18:00") continue;
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
-      if (!ocupados.has(k)) { escolhido = { semana, dia, hora }; ocupados.add(k); break procurarSlot; }
+      if (ocupados.has(k)) continue;
+      if (folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= maxBlocos)) continue;
+      const criaDiaMaximo = folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) + 1 === maxBlocos);
+      if (criaDiaMaximo && cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana >= 0) {
+        const excedeDias = folhasBloco.some(folha => {
+          const diasJaNoMaximo = DIAS.filter(d => d !== dia && (cargaDia.get(chaveCarga(uc.anoCurricular, semana, d, folha)) || 0) >= maxBlocos).length;
+          return diasJaNoMaximo >= cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana;
+        });
+        if (excedeDias) continue;
+      }
+      const folhasAcimaAlvo = folhasBloco.filter(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= alvoBlocos).length;
+      const distanciaSemana = Math.abs(semana - bloco.semanaPreferida);
+      const custo = folhasAcimaAlvo * 1_000_000 + Number(dia === "Sexta") * 10_000 + distanciaSemana * 100
+        + DIAS.indexOf(dia) * 10 + HORAS.indexOf(hora);
+      candidatosSlot.push({ semana, dia, hora, custo });
     }
+    const escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;
     if (!escolhido) { sobras.push(...bloco.sessoes); continue; }
+    ocupados.add(`${uc.anoCurricular}|${fam}|${escolhido.semana}|${escolhido.dia}|${escolhido.hora}`);
     for (const s of bloco.sessoes) alocadas.push({
       ...s, semana: escolhido.semana, diaSemana: escolhido.dia, horaInicio: escolhido.hora,
       horaFim: `${String(Number(escolhido.hora.slice(0, 2)) + 2).padStart(2, "0")}:00`,
     });
+    for (const folha of folhasBloco) {
+      const chave = chaveCarga(uc.anoCurricular, escolhido.semana, escolhido.dia, folha);
+      cargaDia.set(chave, (cargaDia.get(chave) || 0) + 1);
+    }
     blocosPorPadrao[bloco.padrao] = (blocosPorPadrao[bloco.padrao] ?? 0) + 1;
   }
 

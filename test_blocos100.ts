@@ -45,4 +45,26 @@ const semanaParcial = organizarBlocos100(
 );
 assert.equal(semanaParcial.naoAlocadas.length, 0);
 assert.ok(semanaParcial.sessoes.every(x => x.diaSemana !== "Segunda" && x.diaSemana !== "Terça"));
-console.log("blocos100: 6 cenários validados");
+
+const cincoBlocos = Array.from({ length: 5 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
+const cargaPreferida = organizarBlocos100(
+  cincoBlocos,
+  catalogo,
+  {},
+  [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Quarta", "Quinta", "Sexta"] }], semanaGlobalOffset: 0 }],
+);
+const cargaPorDia = new Map<string, number>();
+for (const sessao of cargaPreferida.sessoes.filter(x => x.turma === "TP1")) cargaPorDia.set(sessao.diaSemana, (cargaPorDia.get(sessao.diaSemana) || 0) + 1);
+assert.equal(cargaPreferida.naoAlocadas.length, 0);
+assert.ok(Math.max(...cargaPorDia.values()) <= 3, "deve preferir até 6h por dia quando há alternativa");
+
+const quatroBlocos = Array.from({ length: 4 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
+const cargaExcecional = organizarBlocos100(
+  quatroBlocos,
+  catalogo,
+  {},
+  [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça", "Quinta", "Sexta"] }], semanaGlobalOffset: 0 }],
+);
+assert.equal(cargaExcecional.naoAlocadas.length, 0);
+assert.equal(cargaExcecional.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quarta").length, 4);
+console.log("blocos100: 8 cenários validados");
