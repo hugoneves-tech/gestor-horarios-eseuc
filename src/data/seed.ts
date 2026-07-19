@@ -18,5 +18,7 @@ export function dadosIniciais(): DadosAcademicos {
     regras: regrasIniciais,
     versoes: versoesIniciais,
     solverRuns: solverRunsIniciais,
+    cargasDocentesProvisorias: [],
+    atribuicoesAulasDocenteProvisorias: [],
   };
 }

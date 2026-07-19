@@ -4,7 +4,7 @@ import type { VersaoHorario, SolverRun } from "../types";
 import * as M from "./mappers";
 
 /** Ordem de tabelas que respeita as foreign keys ao inserir/apagar. */
-const TABELAS_DEPENDENTES = ["solver_runs", "versoes"] as const;
+const TABELAS_DEPENDENTES = ["atribuicoes_aulas_docente_provisorias", "cargas_docentes_provisorias", "solver_runs", "versoes"] as const;
 const TABELAS_CATALOGO = [
   "cursos", "anos_semestres", "ucs", "turmas", "docentes", "salas", "feriados", "regras",
 ] as const;
@@ -31,9 +31,11 @@ export class SupabaseRepo implements Repositorio {
     };
     const [
       cursos, anosSemestres, ucs, turmas, docentes, salas, feriados, regras, versoes, solverRuns,
+      cargasDocentesProvisorias, atribuicoesAulasDocenteProvisorias,
     ] = await Promise.all([
       sel("cursos"), sel("anos_semestres"), sel("ucs"), sel("turmas"), sel("docentes"),
       sel("salas"), sel("feriados"), sel("regras"), sel("versoes"), sel("solver_runs"),
+      sel("cargas_docentes_provisorias"), sel("atribuicoes_aulas_docente_provisorias"),
     ]);
 
     return {
@@ -47,6 +49,8 @@ export class SupabaseRepo implements Repositorio {
       regras: regras.map(M.rowToRegra),
       versoes: versoes.map(M.rowToVersao),
       solverRuns: solverRuns.map(M.rowToSolverRun),
+      cargasDocentesProvisorias: cargasDocentesProvisorias.map(M.rowToCargaDocenteProvisoria),
+      atribuicoesAulasDocenteProvisorias: atribuicoesAulasDocenteProvisorias.map(M.rowToAtribuicaoAulaDocenteProvisoria),
     };
   }
 
@@ -81,6 +85,8 @@ export class SupabaseRepo implements Repositorio {
     if (d.ucs)           await up("ucs", d.ucs.map(M.ucToRow));
     if (d.turmas)        await up("turmas", d.turmas.map(M.turmaToRow));
     if (d.docentes)      await up("docentes", d.docentes.map(M.docenteToRow));
+    if (d.cargasDocentesProvisorias) await up("cargas_docentes_provisorias", d.cargasDocentesProvisorias.map(M.cargaDocenteProvisoriaToRow));
+    if (d.atribuicoesAulasDocenteProvisorias) await up("atribuicoes_aulas_docente_provisorias", d.atribuicoesAulasDocenteProvisorias.map(M.atribuicaoAulaDocenteProvisoriaToRow));
     if (d.salas)         await up("salas", d.salas.map(M.salaToRow));
     if (d.feriados)      await up("feriados", d.feriados.map(M.feriadoToRow));
     if (d.regras)        await up("regras", d.regras.map(M.regraToRow));
@@ -89,6 +95,8 @@ export class SupabaseRepo implements Repositorio {
 
     // Passo 2 — apagar em falta por ordem inversa (filhos primeiro).
     await apagarEmFalta("solver_runs", d.solverRuns);
+    await apagarEmFalta("atribuicoes_aulas_docente_provisorias", d.atribuicoesAulasDocenteProvisorias);
+    await apagarEmFalta("cargas_docentes_provisorias", d.cargasDocentesProvisorias);
     await apagarEmFalta("versoes", d.versoes);
     await apagarEmFalta("regras", d.regras);
     await apagarEmFalta("feriados", d.feriados);

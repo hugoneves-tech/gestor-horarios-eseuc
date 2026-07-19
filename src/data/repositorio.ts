@@ -1,6 +1,7 @@
 import type {
   Curso, AnoLetivoSemestre, UC, Docente, Sala, Turma,
   FeriadoInterrupcao, RegraHorario, VersaoHorario, SolverRun,
+  CargaDocenteProvisoria, AtribuicaoAulaDocenteProvisoria,
 } from "../types";
 
 /**
@@ -17,6 +18,8 @@ export interface DadosAcademicos {
   regras: RegraHorario[];
   versoes: VersaoHorario[];
   solverRuns: SolverRun[];
+  cargasDocentesProvisorias: CargaDocenteProvisoria[];
+  atribuicoesAulasDocenteProvisorias: AtribuicaoAulaDocenteProvisoria[];
 }
 
 /**

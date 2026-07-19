@@ -5,6 +5,7 @@
 import type {
   Curso, AnoLetivoSemestre, UC, Docente, Sala, Turma,
   FeriadoInterrupcao, RegraHorario, VersaoHorario, SolverRun, SessaoHorario,
+  CargaDocenteProvisoria, AtribuicaoAulaDocenteProvisoria,
 } from "../types";
 
 // --- Curso ---------------------------------------------------------------
@@ -77,6 +78,28 @@ export const rowToDocente = (r: any): Docente => ({
   atribuicoesUcs: r.atribuicoes_ucs ?? {},
 });
 
+// --- Distribuição docente provisória --------------------------------------
+export const cargaDocenteProvisoriaToRow = (c: CargaDocenteProvisoria) => ({
+  id: c.id, docente_id: c.docenteId, uc_id: c.ucId, ano_semestre_id: c.anoSemestreId,
+  tipologia: c.tipologia, numero_turmas: c.numeroTurmas, horas_por_turma: c.horasPorTurma,
+  modo_turmas: c.modoTurmas, turmas_selecionadas: c.turmasSelecionadas ?? [], provisoria: true,
+});
+export const rowToCargaDocenteProvisoria = (r: any): CargaDocenteProvisoria => ({
+  id: r.id, docenteId: r.docente_id, ucId: r.uc_id, anoSemestreId: r.ano_semestre_id,
+  tipologia: r.tipologia, numeroTurmas: r.numero_turmas, horasPorTurma: r.horas_por_turma,
+  modoTurmas: r.modo_turmas, turmasSelecionadas: r.turmas_selecionadas ?? [], provisoria: true,
+});
+export const atribuicaoAulaDocenteProvisoriaToRow = (a: AtribuicaoAulaDocenteProvisoria) => ({
+  id: a.id, carga_id: a.cargaId, docente_id: a.docenteId, uc_id: a.ucId,
+  ano_semestre_id: a.anoSemestreId, tipologia: a.tipologia, turma: a.turma,
+  numero_aula: a.numeroAula, origem: a.origem, bloqueada: a.bloqueada,
+});
+export const rowToAtribuicaoAulaDocenteProvisoria = (r: any): AtribuicaoAulaDocenteProvisoria => ({
+  id: r.id, cargaId: r.carga_id, docenteId: r.docente_id, ucId: r.uc_id,
+  anoSemestreId: r.ano_semestre_id, tipologia: r.tipologia, turma: r.turma,
+  numeroAula: r.numero_aula, origem: r.origem, bloqueada: !!r.bloqueada,
+});
+
 // --- Sala ----------------------------------------------------------------
 export const salaToRow = (s: Sala) => ({
   id: s.id, nome: s.nome, tipo: s.tipo, capacidade: s.capacidade,
@@ -142,4 +165,3 @@ export const rowToSolverRun = (r: any): SolverRun => ({
   duracaoMs: r.duracao_ms ?? 0, tentativas: r.tentativas ?? 0, score: r.score ?? 0,
   conflitosContidos: r.conflitos_contidos ?? 0, detalhes: r.detalhes ?? { iteracoes: 0, log: "" },
 });
-

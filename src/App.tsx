@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 function calcCoverage(sessoes: import('./types').SessaoHorario[]) {
   const plCovered = new Set<string>();
@@ -89,7 +89,9 @@ import {
   SessaoHorario,
   VersaoHorario,
   SolverRun,
-  ChatMessage
+  ChatMessage,
+  CargaDocenteProvisoria,
+  AtribuicaoAulaDocenteProvisoria
 } from "./types";
 
 import { TechnicalArchitecture } from "./components/TechnicalArchitecture";
@@ -128,6 +130,8 @@ export default function App() {
   // (flag podeGravar), para um erro de carregamento nunca disparar uma gravação que apague tudo.
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [anosSemestres, setAnosSemestres] = useState<AnoLetivoSemestre[]>([]);
+  const [cargasDocentesProvisorias, setCargasDocentesProvisorias] = useState<CargaDocenteProvisoria[]>([]);
+  const [atribuicoesAulasDocenteProvisorias, setAtribuicoesAulasDocenteProvisorias] = useState<AtribuicaoAulaDocenteProvisoria[]>([]);
   const [ucs, setUcs] = useState<UC[]>([]);
   const [docentes, setDocentes] = useState<Docente[]>([]);
   const [salas, setSalas] = useState<Sala[]>([]);
@@ -616,6 +620,10 @@ export default function App() {
     maxHorasSemanais: 12,
     unidadesCurriculares: []
   });
+  const [novaCargaDocenteTeste, setNovaCargaDocenteTeste] = useState<{
+    ucId: string; tipologia: "T" | "TP" | "PL" | "S"; numeroTurmas: number;
+    horasPorTurma: number; modoTurmas: "automatico" | "manual" | "misto"; turmasManuais: string[];
+  }>({ ucId: "", tipologia: "TP", numeroTurmas: 1, horasPorTurma: 2, modoTurmas: "automatico", turmasManuais: [] });
 
   const [isAddingSala, setIsAddingSala] = useState(false);
   const [newSala, setNewSala] = useState<Partial<Sala>>({
@@ -1233,6 +1241,8 @@ export default function App() {
         setAnosSemestres(d.anosSemestres);
         setUcs(d.ucs);
         setDocentes(d.docentes);
+        setCargasDocentesProvisorias(d.cargasDocentesProvisorias);
+        setAtribuicoesAulasDocenteProvisorias(d.atribuicoesAulasDocenteProvisorias);
         setSalas(d.salas);
         setTurmas(d.turmas);
         setFeriados(d.feriados);
@@ -1279,12 +1289,69 @@ export default function App() {
     const delayDebounce = setTimeout(() => {
       repo.guardarTudo({
         cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns,
+        cargasDocentesProvisorias, atribuicoesAulasDocenteProvisorias,
       })
         .then(() => setCloudStatus("synced"))
         .catch((err) => { console.error("Erro a gravar no Supabase:", err); setCloudStatus("error"); });
     }, 1500);
     return () => clearTimeout(delayDebounce);
-  }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns, podeGravar]);
+  }, [cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns,
+    cargasDocentesProvisorias, atribuicoesAulasDocenteProvisorias, podeGravar]);
+
+  // Integridade referencial do catálogo em memória. O Supabase repete esta proteção
+  // através de FK/trigger, incluindo alterações feitas diretamente na base de dados.
+  const ucsAnterioresRef = useRef<UC[]>([]);
+  useEffect(() => {
+    const anteriores = ucsAnterioresRef.current;
+    ucsAnterioresRef.current = ucs;
+    if (!anteriores.length) return;
+    const atualPorId = new Map<string, UC>(ucs.map(u => [u.id, u]));
+    const removidas = anteriores.filter(u => !atualPorId.has(u.id));
+    const alteradas = anteriores.flatMap(antiga => {
+      const atual = atualPorId.get(antiga.id); if (!atual) return [];
+      const camposPedagogicos = (u: UC) => JSON.stringify({
+        anoCurricular: u.anoCurricular, semestre: u.semestre,
+        cargaHorariaTeorica: u.cargaHorariaTeorica, cargaHorariaTP: u.cargaHorariaTP,
+        cargaHorariaPratica: u.cargaHorariaPratica, cargaHorariaS: u.cargaHorariaS,
+        semanaInicio: u.semanaInicio, semanaFim: u.semanaFim, numSemanas: u.numSemanas,
+        dataInicio: u.dataInicio, dataFim: u.dataFim, semanasPL: u.semanasPL,
+        turmasConfig: u.turmasConfig, planoDistribucao: u.planoDistribucao,
+      });
+      return [{ antiga, atual, pedagogica: camposPedagogicos(antiga) !== camposPedagogicos(atual) }];
+    }).filter(x => x.pedagogica || x.antiga.sigla !== x.atual.sigla || x.antiga.nome !== x.atual.nome);
+    if (!removidas.length && !alteradas.length) return;
+    const idsInvalidos = new Set([...removidas.map(u => u.id), ...alteradas.filter(x => x.pedagogica).map(x => x.atual.id)]);
+    const siglasInvalidas = new Set([
+      ...removidas.map(u => u.sigla),
+      ...alteradas.filter(x => x.pedagogica).flatMap(x => [x.antiga.sigla, x.atual.sigla]),
+    ]);
+    const renomes = new Map<string, UC>(alteradas.filter(x => !x.pedagogica).map(x => [x.antiga.sigla, x.atual]));
+    const versoesInvalidas = new Set(versoes.filter(v => v.sessoes.some(s => siglasInvalidas.has(s.ucSigla))).map(v => v.id));
+    setVersoes(prev => prev.map(v => {
+      const sessoes = v.sessoes.flatMap(s => {
+        if (siglasInvalidas.has(s.ucSigla)) return [];
+        const nova = renomes.get(s.ucSigla);
+        return [{ ...s, ...(nova ? { ucSigla: nova.sigla, ucNome: nova.nome } : {}) }];
+      });
+      return sessoes.length === v.sessoes.length && !v.sessoes.some(s => renomes.has(s.ucSigla))
+        ? v : { ...v, sessoes, score: siglasInvalidas.size ? 0 : v.score };
+    }));
+    if (versoesInvalidas.size) setSolverRuns(prev => prev.filter(run => !versoesInvalidas.has(run.versaoId)));
+    if (idsInvalidos.size) {
+      setCargasDocentesProvisorias(prev => prev.filter(c => !idsInvalidos.has(c.ucId)));
+      setAtribuicoesAulasDocenteProvisorias(prev => prev.filter(a => !idsInvalidos.has(a.ucId)));
+    }
+    setDocentes(prev => prev.map(d => {
+      let unidades = [...(d.unidadesCurriculares || [])];
+      let legado = { ...(d.atribuicoesUcs || {}) };
+      for (const uc of removidas) { unidades = unidades.filter(s => s !== uc.sigla); delete legado[uc.sigla]; }
+      for (const { antiga, atual } of alteradas) if (antiga.sigla !== atual.sigla) {
+        unidades = unidades.map(s => s === antiga.sigla ? atual.sigla : s);
+        if (legado[antiga.sigla]) { legado[atual.sigla] = legado[antiga.sigla]; delete legado[antiga.sigla]; }
+      }
+      return { ...d, unidadesCurriculares: [...new Set(unidades)], atribuicoesUcs: legado };
+    }));
+  }, [ucs]);
 
   // Sincronização em tempo real das regras (para garantir que criações da IA ou de outros utilizadores migram para todos)
   useEffect(() => {
@@ -1501,6 +1568,8 @@ export default function App() {
         setRegras([]);
         setVersoes([]);
         setSolverRuns([]);
+        setCargasDocentesProvisorias([]);
+        setAtribuicoesAulasDocenteProvisorias([]);
         showToast("Base de dados académica limpa (sincronizado com o Supabase).");
       }
     );
@@ -1513,6 +1582,7 @@ export default function App() {
     const dados = {
       exportadoEm: new Date().toISOString(),
       cursos, anosSemestres, ucs, docentes, salas, turmas, feriados, regras, versoes, solverRuns,
+      cargasDocentesProvisorias, atribuicoesAulasDocenteProvisorias,
     };
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
@@ -1594,6 +1664,45 @@ export default function App() {
 
   // Distribuição local pelas 30 semanas letivas usando o motor de distribuição (distribuicao.ts).
   // S1 = semanas 1-15; S2 = semanas 16-29 (offset +15 aplicado automaticamente).
+  const aplicarPlanoDocenteProvisorio = (sessoes: SessaoHorario[]): SessaoHorario[] => {
+    if (!atribuicoesAulasDocenteProvisorias.length) return sessoes;
+    const ordemDia: Record<string, number> = { Segunda: 1, "Terça": 2, Quarta: 3, Quinta: 4, Sexta: 5 };
+    const resultado = sessoes.map(s => ({ ...s }));
+    const grupos = new Map<string, SessaoHorario[]>();
+    for (const s of resultado) {
+      const uc = ucs.find(u => u.sigla === s.ucSigla); if (!uc) continue;
+      const chave = `${uc.id}|${s.tipoAula}|${s.turma}`;
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave)!.push(s);
+    }
+    for (const [chave, lista] of grupos) {
+      const [ucId, tipologia, turma] = chave.split("|");
+      const uc = ucs.find(u => u.id === ucId); if (!uc) continue;
+      const anoSem = anosSemestres.find(a => a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === Number(uc.semestre));
+      if (!anoSem) continue;
+      lista.sort((a, b) => (a.semana || 0) - (b.semana || 0) || (ordemDia[a.diaSemana] || 9) - (ordemDia[b.diaSemana] || 9) || a.horaInicio.localeCompare(b.horaInicio));
+      lista.forEach((sessao, i) => {
+        const numeroAula = i + 1;
+        sessao.numeroAula = numeroAula;
+        const atribuicao = atribuicoesAulasDocenteProvisorias.find(a => a.anoSemestreId === anoSem.id && a.ucId === ucId
+          && a.tipologia === tipologia && a.turma === turma && a.numeroAula === numeroAula);
+        if (!atribuicao) return;
+        const docente = docentes.find(d => d.id === atribuicao.docenteId);
+        if (docente) { sessao.docente = docente.nome; sessao.atribuicaoDocenteId = atribuicao.id; }
+      });
+    }
+    const ocupacaoDocente = new Map<string, SessaoHorario>();
+    const conflitos: string[] = [];
+    for (const s of resultado.filter(x => x.atribuicaoDocenteId && x.docente)) {
+      const chave = `${s.docente}|${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+      const anterior = ocupacaoDocente.get(chave);
+      if (anterior) conflitos.push(`${s.docente}: ${anterior.ucSigla}/${anterior.turma} e ${s.ucSigla}/${s.turma}`);
+      else ocupacaoDocente.set(chave, s);
+    }
+    if (conflitos.length) throw new Error(`Plano docente provisório com sobreposição: ${conflitos.slice(0, 3).join("; ")}. Ajuste os números de aula selecionados.`);
+    return resultado;
+  };
+
   const handleTriggerSolver = (semRegras = false, sessoesFixasImport: SessaoHorario[] = []) => {
     setIsSolving(true);
     setLastSolverVerdict(null);
@@ -1768,6 +1877,7 @@ export default function App() {
         }
         allSessoes = resultadoBlocos.sessoes;
       }
+      allSessoes = aplicarPlanoDocenteProvisorio(allSessoes);
 
       // Preservar (1) as SEMANAS validadas/bloqueadas inteiras e (2) as sessões fixadas
       // individualmente nas restantes semanas.
@@ -2046,17 +2156,98 @@ export default function App() {
     }
   };
 
+  const tipoConfigDaTipologia = (tipo: "T" | "TP" | "PL" | "S") =>
+    tipo === "T" ? "Teórica" : tipo === "TP" ? "TeoricoPratica" : tipo === "PL" ? "Prática" : "Seminário";
+  const horasDaTipologia = (uc: UC, tipo: "T" | "TP" | "PL" | "S") =>
+    tipo === "T" ? uc.cargaHorariaTeorica : tipo === "TP" ? uc.cargaHorariaTP : tipo === "PL" ? uc.cargaHorariaPratica : (uc.cargaHorariaS || 0);
+  const idSeguro = (...partes: (string | number)[]) => partes.join("_").replace(/[^a-zA-Z0-9_-]/g, "-");
+
+  const criarCargaDocenteProvisoria = (docente: Docente) => {
+    const draft = novaCargaDocenteTeste;
+    const uc = ucs.find(u => u.id === draft.ucId);
+    if (!uc) { showToast("Selecione uma UC."); return; }
+    if (draft.horasPorTurma <= 0 || draft.horasPorTurma % 2 !== 0) { showToast("As horas por turma devem ser positivas e múltiplas de 2h."); return; }
+    const totalHorasTurma = horasDaTipologia(uc, draft.tipologia);
+    const totalAulas = Math.floor(totalHorasTurma / 2);
+    const aulasNecessarias = draft.horasPorTurma / 2;
+    if (!totalAulas || aulasNecessarias > totalAulas) { showToast(`A carga disponível por turma é ${totalHorasTurma}h.`); return; }
+    const turmasPossiveis = (uc.turmasConfig || []).filter(t => t.tipo === tipoConfigDaTipologia(draft.tipologia)).map(t => t.nome);
+    if (draft.numeroTurmas < 1 || draft.numeroTurmas > turmasPossiveis.length) { showToast(`Existem ${turmasPossiveis.length} turmas desta tipologia.`); return; }
+    const anoSemestre = anosSemestres.find(a => a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === Number(uc.semestre));
+    if (!anoSemestre) { showToast("Não existe semestre configurado para esta UC e ano letivo."); return; }
+    const ocupacaoTurma = (turma: string) => atribuicoesAulasDocenteProvisorias.filter(a =>
+      a.anoSemestreId === anoSemestre.id && a.ucId === uc.id && a.tipologia === draft.tipologia && a.turma === turma).length;
+    const manuaisValidas = draft.turmasManuais.filter(t => turmasPossiveis.includes(t));
+    let escolhidas = draft.modoTurmas === "automatico" ? [] : manuaisValidas.slice(0, draft.numeroTurmas);
+    const restantes = turmasPossiveis.filter(t => !escolhidas.includes(t)).sort((a, b) => ocupacaoTurma(a) - ocupacaoTurma(b) || a.localeCompare(b, "pt"));
+    escolhidas = [...escolhidas, ...restantes.slice(0, draft.numeroTurmas - escolhidas.length)];
+    if (escolhidas.length !== draft.numeroTurmas) { showToast("Não foi possível propor o número de turmas pedido."); return; }
+
+    const cargaId = idSeguro("carga-teste", docente.id, uc.id, draft.tipologia, Date.now());
+    const novasAtribuicoes: AtribuicaoAulaDocenteProvisoria[] = [];
+    for (const [indiceTurma, turma] of escolhidas.entries()) {
+      const ocupadas = new Set(atribuicoesAulasDocenteProvisorias.filter(a =>
+        a.anoSemestreId === anoSemestre.id && a.ucId === uc.id && a.tipologia === draft.tipologia && a.turma === turma
+      ).map(a => a.numeroAula));
+      const inicioRotacao = (indiceTurma * aulasNecessarias) % totalAulas;
+      const livres = Array.from({ length: totalAulas }, (_, i) => ((inicioRotacao + i) % totalAulas) + 1).filter(n => !ocupadas.has(n));
+      if (livres.length < aulasNecessarias) { showToast(`${turma} não tem ${aulasNecessarias} aulas livres.`); return; }
+      for (const numeroAula of livres.slice(0, aulasNecessarias)) novasAtribuicoes.push({
+        id: idSeguro("aula-teste", anoSemestre.id, uc.id, draft.tipologia, turma, numeroAula),
+        cargaId, docenteId: docente.id, ucId: uc.id, anoSemestreId: anoSemestre.id,
+        tipologia: draft.tipologia, turma, numeroAula,
+        origem: draft.modoTurmas === "automatico" ? "automatica" : "manual", bloqueada: draft.modoTurmas !== "automatico",
+      });
+    }
+    const carga: CargaDocenteProvisoria = {
+      id: cargaId, docenteId: docente.id, ucId: uc.id, anoSemestreId: anoSemestre.id,
+      tipologia: draft.tipologia, numeroTurmas: draft.numeroTurmas, horasPorTurma: draft.horasPorTurma,
+      modoTurmas: draft.modoTurmas, turmasSelecionadas: escolhidas, provisoria: true,
+    };
+    setCargasDocentesProvisorias(prev => [...prev, carga]);
+    setAtribuicoesAulasDocenteProvisorias(prev => [...prev, ...novasAtribuicoes]);
+    if (!docente.unidadesCurriculares.includes(uc.sigla)) setDocentes(prev => prev.map(d => d.id === docente.id
+      ? { ...d, unidadesCurriculares: [...d.unidadesCurriculares, uc.sigla] } : d));
+    setNovaCargaDocenteTeste({ ucId: "", tipologia: "TP", numeroTurmas: 1, horasPorTurma: 2, modoTurmas: "automatico", turmasManuais: [] });
+    showToast(`Proposta provisória criada: ${escolhidas.join(", ")} · ${draft.horasPorTurma}h por turma.`);
+  };
+
+  const removerCargaDocenteProvisoria = (id: string) => {
+    setAtribuicoesAulasDocenteProvisorias(prev => prev.filter(a => a.cargaId !== id));
+    setCargasDocentesProvisorias(prev => prev.filter(c => c.id !== id));
+  };
+
+  const alternarNumeroAulaProvisorio = (carga: CargaDocenteProvisoria, turma: string, numeroAula: number) => {
+    const existente = atribuicoesAulasDocenteProvisorias.find(a => a.anoSemestreId === carga.anoSemestreId && a.ucId === carga.ucId
+      && a.tipologia === carga.tipologia && a.turma === turma && a.numeroAula === numeroAula);
+    if (existente?.cargaId === carga.id) {
+      setAtribuicoesAulasDocenteProvisorias(prev => prev.filter(a => a.id !== existente.id)); return;
+    }
+    if (existente) { showToast("Esta aula já está atribuída a outro professor."); return; }
+    const alvo = carga.horasPorTurma / 2;
+    const atuais = atribuicoesAulasDocenteProvisorias.filter(a => a.cargaId === carga.id && a.turma === turma);
+    if (atuais.length >= alvo) { showToast(`Retire primeiro uma das ${alvo} aulas já selecionadas.`); return; }
+    setAtribuicoesAulasDocenteProvisorias(prev => [...prev, {
+      id: idSeguro("aula-teste", carga.anoSemestreId, carga.ucId, carga.tipologia, turma, numeroAula),
+      cargaId: carga.id, docenteId: carga.docenteId, ucId: carga.ucId, anoSemestreId: carga.anoSemestreId,
+      tipologia: carga.tipologia, turma, numeroAula, origem: "manual", bloqueada: true,
+    }]);
+  };
+
   const removeUc = (id: string) => {
     const ucToRemove = ucs.find(u => u.id === id);
     if (!ucToRemove) return;
-    setUcs(ucs.filter(u => u.id !== id));
-    setVersoes(versoes.map(v => ({
-      ...v,
-      sessoes: v.sessoes.filter(s => s.ucSigla !== ucToRemove.sigla)
-    })));
-    showToast(`UC ${ucToRemove.sigla} removida e as suas sessões foram eliminadas do calendário.`);
+    askConfirmation("Eliminar UC e dependências", `Eliminar definitivamente ${ucToRemove.sigla}? Serão removidas as suas sessões de todas as propostas, atribuições docentes provisórias e resultados do motor.`, () => {
+      setUcs(prev => prev.filter(u => u.id !== id));
+      showToast(`UC ${ucToRemove.sigla} eliminada; horários e atribuições relacionados serão sincronizados no Supabase.`);
+    });
   };
-  const removeDocente = (id: string) => setDocentes(docentes.filter(d => d.id !== id));
+  const removeDocente = (id: string) => {
+    const cargas = new Set(cargasDocentesProvisorias.filter(c => c.docenteId === id).map(c => c.id));
+    setAtribuicoesAulasDocenteProvisorias(prev => prev.filter(a => a.docenteId !== id && !cargas.has(a.cargaId)));
+    setCargasDocentesProvisorias(prev => prev.filter(c => c.docenteId !== id));
+    setDocentes(prev => prev.filter(d => d.id !== id));
+  };
   const removeSala = (id: string) => setSalas(salas.filter(s => s.id !== id));
   const removeFeriado = (id: string) => setFeriados(feriados.filter(f => f.id !== id));
   const removeRegra = (id: string) => setRegras(regras.filter(r => r.id !== id));
@@ -3613,118 +3804,110 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Atribuições de Cargas e Turmas por UC */}
-                {activeEditingDocente.unidadesCurriculares && activeEditingDocente.unidadesCurriculares.length > 0 && (
-                  <div className="space-y-2 border border-stone-150 p-4 rounded-xl bg-amber-50/15">
-                    <label className="block text-[10px] font-bold text-[#148A96] uppercase tracking-wider">
-                      Atribuição de Carga e Turma por Disciplina (T, TP, PL)
-                    </label>
-                    <p className="text-[10px] text-stone-500 mt-0.5">
-                      Configure a tipologia, carga horária e indique as turmas/turnos previstos para este docente.
-                    </p>
-                    <div className="space-y-3.5 mt-2">
-                      {activeEditingDocente.unidadesCurriculares.map(sig => {
-                        const ucObj = ucs.find(u => u.sigla === sig);
-                        if (!ucObj) return null;
+                {/* Módulo experimental de distribuição docente */}
+                {(() => {
+                  const cargasDoDocente = cargasDocentesProvisorias.filter(c => c.docenteId === activeEditingDocente.id);
+                  const ucDraft = ucs.find(u => u.id === novaCargaDocenteTeste.ucId);
+                  const turmasDraft = (ucDraft?.turmasConfig || [])
+                    .filter(t => t.tipo === tipoConfigDaTipologia(novaCargaDocenteTeste.tipologia)).map(t => t.nome);
+                  return (
+                    <div className="space-y-3 border-2 border-dashed border-amber-300 p-4 rounded-xl bg-amber-50/50">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <label className="block text-[10px] font-bold text-amber-900 uppercase tracking-wider">Distribuição por número de aula</label>
+                            <span className="text-[8px] font-bold uppercase bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">Provisório · apenas para testes</span>
+                          </div>
+                          <p className="text-[10px] text-stone-600 mt-1">Indique número de turmas e horas por turma. A proposta automática pode depois ser personalizada aula a aula.</p>
+                        </div>
+                      </div>
 
-                        const currentAtrib = (activeEditingDocente.atribuicoesUcs || {})[sig] || { tipos: [], horas: 0, turmas: [] };
-
-                        const updateAtribuicao = (field: string, val: any) => {
-                          const existingAtribs = activeEditingDocente.atribuicoesUcs || {};
-                          const newAtribObj = {
-                            ...existingAtribs,
-                            [sig]: {
-                              ...currentAtrib,
-                              [field]: val
-                            }
-                          };
-                          const updatedDocentes = docentes.map(d => d.id === editingDocenteId ? { ...d, atribuicoesUcs: newAtribObj } : d);
-                          setDocentes(updatedDocentes);
-                        };
-
+                      {cargasDoDocente.map(carga => {
+                        const uc = ucs.find(u => u.id === carga.ucId);
+                        if (!uc) return null;
+                        const totalAulas = Math.floor(horasDaTipologia(uc, carga.tipologia) / 2);
+                        const alvoPorTurma = carga.horasPorTurma / 2;
                         return (
-                          <div key={sig} className="p-3 bg-white border border-stone-200 rounded-xl space-y-2.5 shadow-3xs">
-                            <div className="flex items-center justify-between border-b border-stone-100 pb-1.5">
-                              <span className="font-bold text-stone-800 text-[11px]">{sig} - {ucObj.nome}</span>
-                              <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded font-mono">Ano Letivo {ucObj.anoCurricular}?</span>
+                          <div key={carga.id} className="bg-white border border-amber-200 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <span className="font-bold text-stone-800">{uc.sigla} · {carga.tipologia}</span>
+                                <span className="ml-2 text-[9px] text-stone-500">{carga.numeroTurmas} turma(s) × {carga.horasPorTurma}h · {carga.modoTurmas}</span>
+                              </div>
+                              <button onClick={() => removerCargaDocenteProvisoria(carga.id)} className="text-rose-500 hover:bg-rose-50 p-1 rounded" title="Eliminar proposta de teste"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                              {/* Tipologias */}
-                              <div>
-                                <span className="block text-[8px] uppercase tracking-wide font-bold text-stone-400 mb-1">Tipologia</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {["T", "TP", "PL"].map(type => {
-                                    const isChecked = currentAtrib.tipos.includes(type as any);
-                                    return (
-                                      <label key={type} className="flex items-center gap-1 text-[10px] text-stone-700 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={() => {
-                                            const updatedTypes = isChecked
-                                              ? currentAtrib.tipos.filter(t => t !== type)
-                                              : [...currentAtrib.tipos, type as any];
-                                            updateAtribuicao("tipos", updatedTypes);
-                                          }}
-                                          className="rounded text-[#148A96] focus:ring-[#148A96] w-3 h-3 cursor-pointer"
-                                        />
-                                        <span>{type}</span>
-                                      </label>
-                                    );
-                                  })}
+                            {carga.turmasSelecionadas.map(turma => {
+                              const selecionadas = atribuicoesAulasDocenteProvisorias.filter(a => a.cargaId === carga.id && a.turma === turma);
+                              return (
+                                <div key={turma} className="border-t border-stone-100 pt-2">
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <span className="font-bold text-[10px] text-stone-700">{turma}</span>
+                                    <span className={`text-[9px] font-mono ${selecionadas.length === alvoPorTurma ? "text-emerald-700" : "text-amber-700"}`}>{selecionadas.length}/{alvoPorTurma} aulas</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {Array.from({ length: totalAulas }, (_, i) => i + 1).map(numero => {
+                                      const ocupada = atribuicoesAulasDocenteProvisorias.find(a => a.anoSemestreId === carga.anoSemestreId && a.ucId === carga.ucId && a.tipologia === carga.tipologia && a.turma === turma && a.numeroAula === numero);
+                                      const destaCarga = ocupada?.cargaId === carga.id;
+                                      return (
+                                        <button key={numero} disabled={!!ocupada && !destaCarga} onClick={() => alternarNumeroAulaProvisorio(carga, turma, numero)}
+                                          title={ocupada && !destaCarga ? "Já atribuída a outro professor" : `Aula ${numero}`}
+                                          className={`w-7 h-7 rounded border text-[9px] font-bold ${destaCarga ? "bg-[#148A96] text-white border-[#148A96]" : ocupada ? "bg-stone-100 text-stone-300 border-stone-150 cursor-not-allowed" : "bg-white text-stone-600 border-stone-200 hover:border-[#148A96]"}`}>
+                                          {numero}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                              </div>
-
-                              {/* Horas */}
-                              <div>
-                                <span className="block text-[8px] uppercase tracking-wide font-bold text-stone-400 mb-1">Carga Horária (h)</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={currentAtrib.horas || 0}
-                                  onChange={(e) => updateAtribuicao("horas", Number(e.target.value) || 0)}
-                                  className="w-full bg-stone-50 border border-stone-200 rounded px-2 py-0.5 text-xs text-stone-800 focus:outline-none focus:bg-white"
-                                />
-                              </div>
-
-                              {/* Turmas Multi Select */}
-                              <div>
-                                <span className="block text-[8px] uppercase tracking-wide font-bold text-stone-400 mb-1">Proposta de Turma</span>
-                                <div className="max-h-[85px] overflow-y-auto border border-stone-150 bg-stone-50 p-1 rounded space-y-0.5">
-                                  {[
-                                    ...((currentAtrib.tipos.includes("T") || currentAtrib.tipos.length === 0) ? ["Turma A", "Turma B"] : []),
-                                    ...((currentAtrib.tipos.includes("TP") || currentAtrib.tipos.length === 0) ? ["TP1", "TP2", "TP3", "TP4", "TP5", "TP6", "TP7", "TP8"] : []),
-                                    ...((currentAtrib.tipos.includes("PL") || currentAtrib.tipos.length === 0) ? Array.from({ length: 24 }, (_, i) => `PL${i + 1}`) : [])
-                                  ].map(t => {
-                                    const isAssigned = (currentAtrib.turmas || []).includes(t);
-                                    return (
-                                      <label key={t} className="flex items-center gap-1.5 p-0.5 hover:bg-white rounded text-[9px] cursor-pointer block select-none">
-                                        <input
-                                          type="checkbox"
-                                          checked={isAssigned}
-                                          onChange={() => {
-                                            const updatedTurmas = isAssigned
-                                              ? (currentAtrib.turmas || []).filter(item => item !== t)
-                                              : [...(currentAtrib.turmas || []), t];
-                                            updateAtribuicao("turmas", updatedTurmas);
-                                          }}
-                                          className="rounded text-[#148A96] focus:ring-[#148A96] w-2.5 h-2.5 cursor-pointer"
-                                        />
-                                        <span>{t}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
-                    </div>
-                  </div>
-                )}
 
+                      <div className="bg-white/80 border border-amber-200 rounded-xl p-3 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="text-[9px] font-bold text-stone-500">UC
+                            <select value={novaCargaDocenteTeste.ucId} onChange={e => setNovaCargaDocenteTeste(p => ({ ...p, ucId: e.target.value, turmasManuais: [] }))} className="mt-1 w-full border border-stone-200 rounded px-2 py-1.5 bg-white text-[10px]">
+                              <option value="">Selecionar...</option>
+                              {ucs.map(uc => <option key={uc.id} value={uc.id}>{uc.sigla} — {uc.nome}</option>)}
+                            </select>
+                          </label>
+                          <label className="text-[9px] font-bold text-stone-500">Tipologia
+                            <select value={novaCargaDocenteTeste.tipologia} onChange={e => setNovaCargaDocenteTeste(p => ({ ...p, tipologia: e.target.value as any, turmasManuais: [] }))} className="mt-1 w-full border border-stone-200 rounded px-2 py-1.5 bg-white text-[10px]">
+                              {(["T", "TP", "PL", "S"] as const).map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </label>
+                          <label className="text-[9px] font-bold text-stone-500">Número de turmas
+                            <input type="number" min={1} max={turmasDraft.length || 1} value={novaCargaDocenteTeste.numeroTurmas} onChange={e => setNovaCargaDocenteTeste(p => ({ ...p, numeroTurmas: Math.max(1, Number(e.target.value) || 1) }))} className="mt-1 w-full border border-stone-200 rounded px-2 py-1.5 text-[10px]" />
+                          </label>
+                          <label className="text-[9px] font-bold text-stone-500">Horas por cada turma
+                            <input type="number" min={2} step={2} value={novaCargaDocenteTeste.horasPorTurma} onChange={e => setNovaCargaDocenteTeste(p => ({ ...p, horasPorTurma: Number(e.target.value) || 2 }))} className="mt-1 w-full border border-stone-200 rounded px-2 py-1.5 text-[10px]" />
+                          </label>
+                          <label className="text-[9px] font-bold text-stone-500 sm:col-span-2">Escolha das turmas
+                            <select value={novaCargaDocenteTeste.modoTurmas} onChange={e => setNovaCargaDocenteTeste(p => ({ ...p, modoTurmas: e.target.value as any, turmasManuais: [] }))} className="mt-1 w-full border border-stone-200 rounded px-2 py-1.5 bg-white text-[10px]">
+                              <option value="automatico">Automática</option><option value="manual">Manual</option><option value="misto">Mista (preferências + completar)</option>
+                            </select>
+                          </label>
+                        </div>
+                        {novaCargaDocenteTeste.modoTurmas !== "automatico" && ucDraft && (
+                          <div>
+                            <span className="text-[9px] font-bold text-stone-500">Turmas preferidas</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {turmasDraft.map(t => {
+                                const ativa = novaCargaDocenteTeste.turmasManuais.includes(t);
+                                return <button key={t} onClick={() => setNovaCargaDocenteTeste(p => ({ ...p, turmasManuais: ativa ? p.turmasManuais.filter(x => x !== t) : [...p.turmasManuais, t] }))}
+                                  className={`px-2 py-1 rounded border text-[9px] font-bold ${ativa ? "bg-amber-600 text-white border-amber-600" : "bg-white border-stone-200 text-stone-600"}`}>{t}</button>;
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        <button onClick={() => criarCargaDocenteProvisoria(activeEditingDocente)} className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px]">
+                          Criar proposta provisória e abrir números de aula
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* Disponibilidade Semanal por Turno */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">

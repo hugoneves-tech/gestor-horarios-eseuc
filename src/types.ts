@@ -86,6 +86,33 @@ export interface Docente {
   };
 }
 
+/** Módulo experimental de distribuição prévia do serviço docente. */
+export interface CargaDocenteProvisoria {
+  id: string;
+  docenteId: string;
+  ucId: string;
+  anoSemestreId: string;
+  tipologia: "T" | "TP" | "PL" | "S";
+  numeroTurmas: number;
+  horasPorTurma: number;
+  modoTurmas: "automatico" | "manual" | "misto";
+  turmasSelecionadas: string[];
+  provisoria: true;
+}
+
+export interface AtribuicaoAulaDocenteProvisoria {
+  id: string;
+  cargaId: string;
+  docenteId: string;
+  ucId: string;
+  anoSemestreId: string;
+  tipologia: "T" | "TP" | "PL" | "S";
+  turma: string;
+  numeroAula: number;
+  origem: "automatica" | "manual";
+  bloqueada: boolean;
+}
+
 export interface Sala {
   id: string;
   nome: string;
@@ -143,6 +170,8 @@ export interface SessaoHorario {
   horaFim: string; // "10:00"
   bloqueado: boolean; // manual pin/lock
   semana?: number; // academic week number within the semester (1-based)
+  numeroAula?: number; // posição pedagógica estável dentro de UC + tipologia + turma
+  atribuicaoDocenteId?: string; // referência experimental à atribuição que definiu o professor
 }
 
 export interface VersaoHorario {
@@ -178,4 +207,3 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
-
