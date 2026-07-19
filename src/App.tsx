@@ -101,6 +101,7 @@ import { gerarSessoesConjunto, calcularSemanas, calcularEndWeek, mapearSemanasPe
 import { parseHorarioCSV, gerarTemplateCSV, type ErroLinha } from "./utils/importacao";
 import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
 import { completarCargaParaBlocos100, organizarBlocos100, validarBlocos100, CONFIGURACAO_BLOCOS_100_DEFAULT, DESCRICAO_PADROES_BLOCOS_100 } from "./utils/blocos100";
+import { calcularCoberturaDocente, distribuirTurmasDocentes } from "./utils/atribuicaoDocentes";
 import { repo } from "./data/supabaseRepo";
 
 export default function App() {
@@ -961,76 +962,25 @@ export default function App() {
     }
   }[vibe];
 
-  // Helper template exporter using sheetjs (xlsx)
+  // Templates oficiais versionados: o ficheiro descarregado é exatamente o mesmo que
+  // o importador valida, evitando divergências entre um modelo gerado e o código publicado.
   const downloadTemplate = (tipo: 'instalacoes' | 'corpo_docente' | 'ucs' | 'turmas') => {
-    let headers: string[] = [];
-    let sampleData: any[] = [];
-    let filename = "";
-
-    if (tipo === 'instalacoes') {
-      headers = [
-        "Nome da Instalação", 
-        "Tipo (Teórica / Teórico-prática / Laboratório / Sala de Computadores)", 
-        "Capacidade Máxima", 
-        "Equipamentos Obrigatórios (Separados por vírgula)"
-      ];
-      sampleData = [
-        ["Auditório Professor Armando Cardoso", "Teórica", 160, "Projetor 4K, Sistema de Som Integrado, Cabine Tradicional"],
-        ["Laboratório de Saúde Materno-Infantil e Obstetrícia", "Laboratório", 30, "Manequins de Parto Avançados, Incubadora, Berços de Recém-nascido"],
-        ["Sala de Práticas Clínicas Simuladas 3", "Laboratório", 25, "Camas Clínicas de Enfermagem, Postos de Oxigenoterapia, Suportes de Soro"],
-        ["Sala de Aula Regular 108", "Teórico-prática", 45, "Quadro Interativo, Ar Condicionado"]
-      ];
-      filename = "modelo_instalacoes_eseuc.xlsx";
-    } else if (tipo === 'corpo_docente') {
-      headers = [
-        "Nome Completo do Professor", 
-        "Email Institucional @eseuc", 
-        "Departamento Científico", 
-        "Limite de Horas Semanais", 
-        "Siglas das Disciplinas que Ministra (Separadas por vírgula)"
-      ];
-      sampleData = [
-        ["Prof. Dra. Maria do Céu Rebelo", "mariaceu@eseuc.pt", "UCP Enfermagem de Saúde da Mulher", 12, "BDP, PCS1"],
-        ["Prof. Dr. António Jesus Coimbra", "antoniojesus@eseuc.pt", "UCP Enfermagem Fundamental", 16, "FE, ECCP"],
-        ["Dra. Ana Rita Mendonça", "anarita@eseuc.pt", "UCP Enfermagem Fundamental", 8, "AFH, PCS1"]
-      ];
-      filename = "modelo_corpo_docente_eseuc.xlsx";
-    } else if (tipo === 'ucs') {
-      headers = [
-        "Designação da UC",
-        "Sigla",
-        "Ano Curricular (1, 2, 3 ou 4)",
-        "Semestre (1 ou 2)",
-        "Semana de Início (1 a 15)",
-        "Total de Semanas",
-        "Créditos ECTS",
-        "Horas Teóricas T por semana",
-        "Horas Teórico-Práticas TP por semana",
-        "Horas Práticas Laboratoriais PL por semana",
-        "Horas Seminário S por semana",
-        "Ensino Clínico E total (h)",
-        "Estrutura de estudantes",
-        "Tipologia de sala preferencial",
-        "Observações para docentes/salas"
-      ];
-      sampleData = [
-        ["Fundamentos de Enfermagem", "FE", 1, 1, 1, 15, 6, 4, 2, 2, 0, 0, "Oficial ESEUC: A/B; A=TP1-TP4; B=TP5-TP8; cada TP=3 PL", "T: Anfiteatro; TP: Sala TP; PL: Laboratório", "Docentes por tipo/turno podem ser ajustados depois na ficha da UC"],
-        ["Anatomia e Fisiologia Humanas", "AFH", 1, 1, 1, 15, 6, 4, 0, 2, 0, 0, "Oficial ESEUC", "T: Anfiteatro; PL: Laboratório", ""],
-        ["Bioética e Deontologia Profissional", "BDP", 2, 1, 1, 15, 4, 2, 0, 0, 0, 0, "Oficial ESEUC", "Sala teórica", ""],
-        ["Práticas Clínicas Simuladas I", "PCS1", 2, 2, 1, 15, 6, 0, 0, 4, 0, 0, "Oficial ESEUC", "Laboratório de práticas simuladas", ""],
-        ["Enfermagem de Comunidade e Cuidados Primários", "ECCP", 3, 1, 1, 6, 6, 0, 0, 0, 0, 490, "Ensino Clínico", "Campo clínico", "Sem grelha semanal fixa quando for EC"]
-      ];
-      filename = "modelo_disciplinas_eseuc.xlsx";
-    }
-
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
-    XLSX.utils.book_append_sheet(wb, ws, "Modelo_ESEUC");
-    XLSX.writeFile(wb, filename);
-    showToast(`Œ¿ O ficheiro modelo ${filename} foi transferido para a sua máquina.`);
+    const ficheiros: Record<string, string> = {
+      instalacoes: "modelo_salas_eseuc.xlsx",
+      corpo_docente: "modelo_docentes_eseuc.xlsx",
+      ucs: "modelo_ucs_eseuc.xlsx",
+    };
+    const filename = ficheiros[tipo];
+    if (!filename) return;
+    const a = document.createElement("a");
+    a.href = `/templates/${filename}`;
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast(`O novo template ${filename} foi transferido.`);
   };
 
-  // Parser of uploaded xlsx sheets 
+  // Parser dos três templates oficiais. Também aceita os cabeçalhos antigos por
+  // aproximação, para não bloquear ficheiros que já estavam preenchidos.
   const handleLoadXlsxFile = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'instalacoes' | 'corpo_docente' | 'ucs' | 'turmas') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1040,7 +990,8 @@ export default function App() {
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
+        const nomeFolhaPrincipal = tipo === "instalacoes" ? "Salas" : tipo === "corpo_docente" ? "Docentes" : "UCs";
+        const wsname = wb.SheetNames.find(n => n.toLowerCase() === nomeFolhaPrincipal.toLowerCase()) || wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
@@ -1049,83 +1000,130 @@ export default function App() {
           return;
         }
 
-        const dataRows = rawRows.slice(1);
+        const dataRows = rawRows.slice(1).filter(r => r.some(v => v != null && String(v).trim() !== ""));
+        const normalizar = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+        const headers = (rawRows[0] || []).map(normalizar);
+        const coluna = (...nomes: string[]) => headers.findIndex(h => nomes.some(n => h === normalizar(n) || h.includes(normalizar(n))));
+        const valor = (r: any[], ...nomes: string[]) => { const i = coluna(...nomes); return i >= 0 ? r[i] : undefined; };
+        const lista = (v: unknown) => String(v ?? "").split(/[;,]/).map(s => s.trim()).filter(Boolean);
+        const disponibilidadePadrao = {
+          Segunda: ["08:00-12:00", "14:00-18:00"], Terça: ["08:00-12:00", "14:00-18:00"],
+          Quarta: ["08:00-12:00", "14:00-18:00"], Quinta: ["08:00-12:00", "14:00-18:00"], Sexta: ["08:00-13:00"],
+        };
 
         if (tipo === 'instalacoes') {
           const imported: Sala[] = dataRows
-            .filter(r => r[0] && r[0].toString().trim() !== "")
+            .filter(r => valor(r, "Nome da sala", "Nome da Instalação") || r[0])
             .map((r, idx) => {
-              const nome = r[0]?.toString() || "";
-              const tipoInst = r[1]?.toString() || "Teórica";
-              const cap = parseInt(r[2]?.toString()) || 40;
-              const equip = r[3] ? r[3].toString().split(",").map((s: string) => s.trim()) : [];
+              const nome = String(valor(r, "Nome da sala", "Nome da Instalação") ?? r[0] ?? "").trim();
+              const tipoInst = String(valor(r, "Tipo principal", "Tipo (") ?? r[1] ?? "Teórica").trim();
+              const cap = Number(valor(r, "Capacidade", "Capacidade Máxima") ?? r[2]) || 40;
+              const equip = lista(valor(r, "Equipamentos") ?? r[4] ?? r[3]);
+              const tipologias = lista(valor(r, "Tipologias compatíveis", "Tipologias compativeis"));
               return {
-                id: "imp_sala_" + Date.now() + "_" + idx,
+                id: salas.find(s => normalizar(s.nome) === normalizar(nome))?.id || "imp_sala_" + Date.now() + "_" + idx,
                 nome,
                 tipo: ["Teórica", "Teórico-prática", "Laboratório", "Sala de Computadores"].includes(tipoInst) ? tipoInst as any : "Teórica",
                 capacidade: cap,
                 equipamento: equip,
                 tipologia: tipoInst,
-                tipologias: [tipoInst]
+                tipologias: [...new Set([tipoInst, ...tipologias])]
               };
             });
-
-          setSalas(prev => [...prev, ...imported]);
-          showToast(` ${imported.length} instalações clínicas integradas com sucesso!`);
+          setSalas(prev => [...prev.filter(s => !imported.some(i => i.id === s.id)), ...imported]);
+          showToast(`${imported.length} salas importadas ou atualizadas com sucesso.`);
         }
 
         else if (tipo === 'corpo_docente') {
           const imported: Docente[] = dataRows
-            .filter(r => r[0] && r[0].toString().trim() !== "")
+            .filter(r => valor(r, "Nome completo", "Nome Completo do Professor") || r[0])
             .map((r, idx) => {
-              const nome = r[0]?.toString() || "";
-              const email = r[1]?.toString() || "docente@eseuc.pt";
-              const dept = r[2]?.toString() || "Enfermagem Fundamental";
-              const hrs = parseInt(r[3]?.toString()) || 12;
-              const ucsList = r[4] ? r[4].toString().split(",").map((s: string) => s.trim().toUpperCase()) : [];
+              const nome = String(valor(r, "Nome completo", "Nome Completo do Professor") ?? r[0] ?? "").trim();
+              const email = String(valor(r, "Email institucional", "Email") ?? r[1] ?? "").trim().toLowerCase();
+              const dept = String(valor(r, "Departamento") ?? r[2] ?? "").trim();
+              const hrs = Number(valor(r, "Limite de horas semanais") ?? r[3]) || 12;
+              const atual = docentes.find(d => normalizar(d.email) === normalizar(email));
+              const ucsAntigas = lista(valor(r, "Siglas das Disciplinas", "Siglas das UCs")).map(s => s.toUpperCase());
+              const lerDia = (dia: string) => lista(valor(r, dia)).length ? lista(valor(r, dia)) : disponibilidadePadrao[dia as keyof typeof disponibilidadePadrao];
               return {
-                id: "imp_doc_" + Date.now() + "_" + idx,
-                nome,
-                email,
-                departamento: dept,
-                maxHorasSemanais: hrs,
-                unidadesCurriculares: ucsList,
+                id: atual?.id || "imp_doc_" + Date.now() + "_" + idx, nome, email, departamento: dept, maxHorasSemanais: hrs,
+                unidadesCurriculares: ucsAntigas.length ? ucsAntigas : (atual?.unidadesCurriculares || []),
                 disponibilidade: {
-                  "Segunda": ["08:00-12:00", "14:00-18:00"],
-                  "Terça": ["08:00-12:00", "14:00-18:00"],
-                  "Quarta": ["08:00-12:00", "14:00-18:00"],
-                  "Quinta": ["08:00-12:00", "14:00-18:00"],
-                  "Sexta": ["08:00-13:00"]
-                }
+                  Segunda: lerDia("Segunda"), Terça: lerDia("Terça"), Quarta: lerDia("Quarta"), Quinta: lerDia("Quinta"), Sexta: lerDia("Sexta"),
+                },
+                isPosGraduacao: ["sim", "s", "yes", "1", "true"].includes(normalizar(valor(r, "Pós-graduação", "Pos-graduacao"))),
               };
             });
+          const docentesFinais = [...docentes.filter(d => !imported.some(i => i.id === d.id)), ...imported];
+          setDocentes(docentesFinais);
 
-          setDocentes(prev => [...prev, ...imported]);
-          showToast(` ${imported.length} novos docentes clínicos adicionados ao mapa científico!`);
+          const folhaCargas = wb.SheetNames.find(n => normalizar(n).includes("cargas"));
+          let numeroCargas = 0;
+          if (folhaCargas) {
+            const linhasCargas = XLSX.utils.sheet_to_json(wb.Sheets[folhaCargas], { header: 1 }) as any[][];
+            const cabCargas = (linhasCargas[0] || []).map(normalizar);
+            const colCarga = (...nomes: string[]) => cabCargas.findIndex(h => nomes.some(n => h === normalizar(n) || h.includes(normalizar(n))));
+            const valCarga = (r: any[], ...nomes: string[]) => { const i = colCarga(...nomes); return i >= 0 ? r[i] : undefined; };
+            const novasCargas: CargaDocenteProvisoria[] = [];
+            for (const [idx, r] of linhasCargas.slice(1).entries()) {
+              const email = normalizar(valCarga(r, "Email docente"));
+              const sigla = normalizar(valCarga(r, "Sigla UC"));
+              if (!email && !sigla) continue;
+              const docente = docentesFinais.find(d => normalizar(d.email) === email);
+              const uc = ucs.find(u => normalizar(u.sigla) === sigla);
+              const tipologia = String(valCarga(r, "Tipologia") || "TP").toUpperCase() as "T" | "TP" | "PL" | "S";
+              const anoSemestre = uc && anosSemestres.find(a => a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === Number(uc.semestre));
+              if (!docente || !uc || !anoSemestre || !["T", "TP", "PL", "S"].includes(tipologia)) continue;
+              const numeroTurmas = Number(valCarga(r, "Número de turmas", "Numero de turmas")) || 1;
+              const horasPorTurma = Number(valCarga(r, "Horas por turma")) || 2;
+              const modoRaw = normalizar(valCarga(r, "Modo de atribuição", "Modo turmas"));
+              const modoTurmas = modoRaw.startsWith("man") ? "manual" : modoRaw.startsWith("mis") ? "misto" : "automatico";
+              novasCargas.push({
+                id: idSeguro("carga-import", docente.id, uc.id, tipologia, Date.now(), idx), docenteId: docente.id, ucId: uc.id,
+                anoSemestreId: anoSemestre.id, tipologia, numeroTurmas, horasPorTurma, modoTurmas,
+                turmasSelecionadas: lista(valCarga(r, "Turmas preferidas")).slice(0, numeroTurmas), provisoria: true,
+              });
+            }
+            if (novasCargas.length) {
+              const chaves = new Set(novasCargas.map(c => `${c.docenteId}|${c.ucId}|${c.tipologia}|${c.anoSemestreId}`));
+              setCargasDocentesProvisorias(prev => [...prev.filter(c => !chaves.has(`${c.docenteId}|${c.ucId}|${c.tipologia}|${c.anoSemestreId}`)), ...novasCargas]);
+              setAtribuicoesAulasDocenteProvisorias(prev => prev.filter(a => !novasCargas.some(c => c.anoSemestreId === a.anoSemestreId)));
+              numeroCargas = novasCargas.length;
+            }
+          }
+          showToast(`${imported.length} docentes importados ou atualizados; ${numeroCargas} cargas provisórias lidas.`);
         }
 
         else if (tipo === 'ucs') {
-          const headers = (rawRows[0] || []).map(h => h?.toString().trim().toLowerCase() || "");
           const findCol = (fallback: number, ...needles: string[]) => {
-            const idx = headers.findIndex(h => needles.some(n => h.includes(n)));
+            const idx = headers.findIndex(h => needles.some(n => h.includes(normalizar(n))));
             return idx >= 0 ? idx : fallback;
           };
           const colNome = findCol(0, "designação", "disciplina", "uc");
           const colSigla = findCol(1, "sigla");
           const colAno = findCol(2, "ano curricular");
-          const colSemestre = findCol(headers.includes("semestre (1 ou 2)") ? headers.indexOf("semestre (1 ou 2)") : 7, "semestre");
+          const colSemestre = findCol(3, "semestre");
           const colSemanaInicio = findCol(4, "semana de início", "semana inicio");
-          const colSemanas = findCol(8, "total de semanas", "total semanas");
+          const colSemanas = findCol(5, "total de semanas", "total semanas");
           const colEcts = findCol(6, "ects", "créditos", "creditos");
-          const colT = findCol(3, "teóricas", "teoricas", " t ");
-          const colTP = findCol(5, "teórico-práticas", "teorico-praticas", "tp por semana");
-          const colPL = findCol(4, "laboratoriais", "pl por semana");
-          const colS = findCol(10, "seminário", "seminario");
-          const colE = findCol(9, "ensino clínico", "ensino clinico");
-          const colTipologia = findCol(13, "tipologia de sala", "sala preferencial");
+          const colT = findCol(7, "horas t por turma", "teóricas t", "teoricas t");
+          const colTP = findCol(10, "horas tp por turma", "teórico-práticas tp", "teorico-praticas tp", "tp por semana");
+          const colPL = findCol(13, "horas pl por turma", "laboratoriais pl", "pl por semana");
+          const colS = findCol(16, "horas s por turma", "seminário s", "seminario s");
+          const colE = findCol(19, "ensino clínico", "ensino clinico");
+          const colTipologia = findCol(20, "tipologia sala t", "tipologia de sala", "sala preferencial");
+          const colObs = coluna("Observações", "Observacoes");
+
+          const criarTurmas = (sigla: string, r: any[], tipoAula: "T" | "TP" | "PL" | "S", tipo: "Teórica" | "TeoricoPratica" | "Prática" | "Seminário", horas: number) => {
+            if (!horas) return [];
+            const nomes = lista(valor(r, `Nomes turmas ${tipoAula}`));
+            const quantidade = Number(valor(r, `N.º turmas ${tipoAula}`, `Numero turmas ${tipoAula}`)) || nomes.length;
+            const padrao = tipoAula === "T" ? ["Turma A", "Turma B", ...Array.from({ length: 20 }, (_, i) => `T${i + 3}`)] : Array.from({ length: Math.max(24, quantidade) }, (_, i) => `${tipoAula}${i + 1}`);
+            return (nomes.length ? nomes : padrao.slice(0, quantidade)).map((nome, i) => ({ id: idSeguro("tc-import", sigla, tipoAula, nome, i), nome, tipo }));
+          };
 
           const imported: UC[] = dataRows
-            .filter(r => r[0] && r[0].toString().trim() !== "")
+            .filter(r => r[colNome] && r[colNome].toString().trim() !== "")
             .map((r, idx) => {
               const nome = r[colNome]?.toString() || "";
               const sigla = r[colSigla]?.toString()?.toUpperCase() || "UC";
@@ -1140,8 +1138,19 @@ export default function App() {
               const semanas = parseInt(r[colSemanas]?.toString()) || 15;
               const eHrs = parseInt(r[colE]?.toString()) || 0;
               const tipologiaSalaDesejada = r[colTipologia]?.toString()?.trim() || "";
+              const salaPorTipo: Record<string, string> = {
+                "Teórica": String(valor(r, "Tipologia sala T") || tipologiaSalaDesejada),
+                TeoricoPratica: String(valor(r, "Tipologia sala TP") || tipologiaSalaDesejada),
+                "Prática": String(valor(r, "Tipologia sala PL") || tipologiaSalaDesejada),
+                "Seminário": String(valor(r, "Tipologia sala S") || tipologiaSalaDesejada),
+              };
+              const turmasConfig = [
+                ...criarTurmas(sigla, r, "T", "Teórica", t), ...criarTurmas(sigla, r, "TP", "TeoricoPratica", tp),
+                ...criarTurmas(sigla, r, "PL", "Prática", pl), ...criarTurmas(sigla, r, "S", "Seminário", s),
+              ];
+              const anterior = ucs.find(u => normalizar(u.sigla) === normalizar(sigla));
               return {
-                id: "imp_uc_" + Date.now() + "_" + idx,
+                id: anterior?.id || "imp_uc_" + Date.now() + "_" + idx,
                 nome,
                 sigla,
                 cursoId: "c1",
@@ -1155,15 +1164,15 @@ export default function App() {
                 semestre: sem,
                 semanaInicio,
                 numSemanas: semanas,
-                turmasConfig: generateEseucTurmas(sigla, t, tp, pl, s).map(turno => ({
+                observacoes: colObs >= 0 ? String(r[colObs] || "") : anterior?.observacoes,
+                turmasConfig: (turmasConfig.length ? turmasConfig : generateEseucTurmas(sigla, t, tp, pl, s)).map(turno => ({
                   ...turno,
-                  tipologiaSalaDesejada
+                  tipologiaSalaDesejada: salaPorTipo[turno.tipo] || tipologiaSalaDesejada
                 }))
               };
             });
-
-          setUcs(prev => [...prev, ...imported]);
-          showToast(` ${imported.length} novas Unidades Curriculares integradas ao rascunho de Coimbra!`);
+          setUcs(prev => [...prev.filter(u => !imported.some(i => i.id === u.id)), ...imported]);
+          showToast(`${imported.length} UCs importadas ou atualizadas, incluindo as turmas disponíveis.`);
         }
 
       } catch (err) {
@@ -2175,41 +2184,47 @@ export default function App() {
     if (draft.numeroTurmas < 1 || draft.numeroTurmas > turmasPossiveis.length) { showToast(`Existem ${turmasPossiveis.length} turmas desta tipologia.`); return; }
     const anoSemestre = anosSemestres.find(a => a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === Number(uc.semestre));
     if (!anoSemestre) { showToast("Não existe semestre configurado para esta UC e ano letivo."); return; }
-    const ocupacaoTurma = (turma: string) => atribuicoesAulasDocenteProvisorias.filter(a =>
-      a.anoSemestreId === anoSemestre.id && a.ucId === uc.id && a.tipologia === draft.tipologia && a.turma === turma).length;
     const manuaisValidas = draft.turmasManuais.filter(t => turmasPossiveis.includes(t));
-    let escolhidas = draft.modoTurmas === "automatico" ? [] : manuaisValidas.slice(0, draft.numeroTurmas);
-    const restantes = turmasPossiveis.filter(t => !escolhidas.includes(t)).sort((a, b) => ocupacaoTurma(a) - ocupacaoTurma(b) || a.localeCompare(b, "pt"));
-    escolhidas = [...escolhidas, ...restantes.slice(0, draft.numeroTurmas - escolhidas.length)];
-    if (escolhidas.length !== draft.numeroTurmas) { showToast("Não foi possível propor o número de turmas pedido."); return; }
+    if (draft.modoTurmas === "manual" && manuaisValidas.length !== draft.numeroTurmas) {
+      showToast(`Selecione exatamente ${draft.numeroTurmas} turma(s) para a carga manual.`); return;
+    }
 
     const cargaId = idSeguro("carga-teste", docente.id, uc.id, draft.tipologia, Date.now());
-    const novasAtribuicoes: AtribuicaoAulaDocenteProvisoria[] = [];
-    for (const [indiceTurma, turma] of escolhidas.entries()) {
-      const ocupadas = new Set(atribuicoesAulasDocenteProvisorias.filter(a =>
-        a.anoSemestreId === anoSemestre.id && a.ucId === uc.id && a.tipologia === draft.tipologia && a.turma === turma
-      ).map(a => a.numeroAula));
-      const inicioRotacao = (indiceTurma * aulasNecessarias) % totalAulas;
-      const livres = Array.from({ length: totalAulas }, (_, i) => ((inicioRotacao + i) % totalAulas) + 1).filter(n => !ocupadas.has(n));
-      if (livres.length < aulasNecessarias) { showToast(`${turma} não tem ${aulasNecessarias} aulas livres.`); return; }
-      for (const numeroAula of livres.slice(0, aulasNecessarias)) novasAtribuicoes.push({
-        id: idSeguro("aula-teste", anoSemestre.id, uc.id, draft.tipologia, turma, numeroAula),
-        cargaId, docenteId: docente.id, ucId: uc.id, anoSemestreId: anoSemestre.id,
-        tipologia: draft.tipologia, turma, numeroAula,
-        origem: draft.modoTurmas === "automatico" ? "automatica" : "manual", bloqueada: draft.modoTurmas !== "automatico",
-      });
-    }
     const carga: CargaDocenteProvisoria = {
       id: cargaId, docenteId: docente.id, ucId: uc.id, anoSemestreId: anoSemestre.id,
       tipologia: draft.tipologia, numeroTurmas: draft.numeroTurmas, horasPorTurma: draft.horasPorTurma,
-      modoTurmas: draft.modoTurmas, turmasSelecionadas: escolhidas, provisoria: true,
+      // Antes da simulação final guarda preferências; depois, as turmas calculadas.
+      modoTurmas: draft.modoTurmas, turmasSelecionadas: draft.modoTurmas === "automatico" ? [] : manuaisValidas.slice(0, draft.numeroTurmas), provisoria: true,
     };
     setCargasDocentesProvisorias(prev => [...prev, carga]);
-    setAtribuicoesAulasDocenteProvisorias(prev => [...prev, ...novasAtribuicoes]);
+    // Uma nova entrada torna qualquer simulação anterior deste período obsoleta.
+    setAtribuicoesAulasDocenteProvisorias(prev => prev.filter(a => a.anoSemestreId !== anoSemestre.id));
     if (!docente.unidadesCurriculares.includes(uc.sigla)) setDocentes(prev => prev.map(d => d.id === docente.id
       ? { ...d, unidadesCurriculares: [...d.unidadesCurriculares, uc.sigla] } : d));
     setNovaCargaDocenteTeste({ ucId: "", tipologia: "TP", numeroTurmas: 1, horasPorTurma: 2, modoTurmas: "automatico", turmasManuais: [] });
-    showToast(`Proposta provisória criada: ${escolhidas.join(", ")} · ${draft.horasPorTurma}h por turma.`);
+    showToast(`Carga provisória declarada: ${draft.numeroTurmas} turma(s) × ${draft.horasPorTurma}h. A turma será calculada no final.`);
+  };
+
+  const simularDistribuicaoDocenteSegundoAno = (anoSemestreId: string) => {
+    const anoSemestre = anosSemestres.find(a => a.id === anoSemestreId);
+    const ucsPeriodo = anoSemestre ? ucs.filter(u => Number(u.semestre) === Number(anoSemestre.semestre)) : ucs;
+    const cobertura = calcularCoberturaDocente(ucsPeriodo, cargasDocentesProvisorias, anoSemestreId, 2);
+    if (!cobertura.length || cobertura.some(l => l.numeroTurmas === 0 || l.diferenca !== 0)) {
+      showToast("Complete primeiro todas as horas do 2.º ano, sem faltas nem excessos, em cada UC e tipologia."); return;
+    }
+    try {
+      const resultado = distribuirTurmasDocentes(ucsPeriodo, cargasDocentesProvisorias, anoSemestreId, 2, activeVersao?.sessoes || []);
+      const idsCargaAno = new Set(cargasDocentesProvisorias.filter(c => c.anoSemestreId === anoSemestreId && ucs.some(u => u.id === c.ucId && Number(u.anoCurricular) === 2)).map(c => c.id));
+      const novasAtribuicoes: AtribuicaoAulaDocenteProvisoria[] = resultado.atribuicoes.map(a => ({
+        ...a, id: idSeguro("aula-teste", a.anoSemestreId, a.ucId, a.tipologia, a.turma, a.numeroAula),
+      }));
+      setCargasDocentesProvisorias(prev => prev.map(c => idsCargaAno.has(c.id)
+        ? { ...c, turmasSelecionadas: resultado.turmasPorCarga.get(c.id) || [] } : c));
+      setAtribuicoesAulasDocenteProvisorias(prev => [...prev.filter(a => !idsCargaAno.has(a.cargaId)), ...novasAtribuicoes]);
+      showToast(`Simulação concluída: ${novasAtribuicoes.length} aulas atribuídas; ${resultado.incompatibilidadesEstimadas} incompatibilidade(s) estimada(s).`);
+    } catch (erro: any) {
+      showToast(`Não foi possível distribuir: ${erro?.message || "combinação inválida"}`);
+    }
   };
 
   const removerCargaDocenteProvisoria = (id: string) => {
@@ -3182,6 +3197,17 @@ export default function App() {
       {editingUcId && (() => {
         const activeEditingUc = ucs.find(u => u.id === editingUcId);
         if (!activeEditingUc) return null;
+        const anoSemestreUc = anosSemestres.find(a => a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === Number(activeEditingUc.semestre));
+        const ucsSemestreAtivo = anoSemestreUc ? ucs.filter(u => Number(u.semestre) === Number(anoSemestreUc.semestre)) : [];
+        const coberturaAnoAtivo = anoSemestreUc ? calcularCoberturaDocente(ucsSemestreAtivo, cargasDocentesProvisorias, anoSemestreUc.id, Number(activeEditingUc.anoCurricular)) : [];
+        const coberturaAno2 = anoSemestreUc ? calcularCoberturaDocente(ucsSemestreAtivo, cargasDocentesProvisorias, anoSemestreUc.id, 2) : [];
+        const coberturaUc = coberturaAnoAtivo.filter(l => l.ucId === activeEditingUc.id);
+        const horasDisponiveisUc = coberturaUc.reduce((t, l) => t + l.horasDisponiveis, 0);
+        const horasDeclaradasUc = coberturaUc.reduce((t, l) => t + l.horasDeclaradas, 0);
+        const segundoAnoCompleto = coberturaAno2.length > 0 && coberturaAno2.every(l => l.numeroTurmas > 0 && l.diferenca === 0);
+        const cargasUc = cargasDocentesProvisorias.filter(c => c.ucId === activeEditingUc.id && (!anoSemestreUc || c.anoSemestreId === anoSemestreUc.id));
+        const distribuicaoUcConcluida = cargasUc.length > 0 && cargasUc.every(c =>
+          atribuicoesAulasDocenteProvisorias.filter(a => a.cargaId === c.id).length === (c.numeroTurmas * c.horasPorTurma / 2));
         return (
           <div className="fixed inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in text-xs">
             <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-stone-200 flex flex-col max-h-[85vh] text-xs">
@@ -3205,6 +3231,30 @@ export default function App() {
 
               {/* Scrollable Form Content */}
               <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <span className="text-[9px] uppercase font-black tracking-wide text-amber-800 font-mono">Serviço docente · provisório / teste</span>
+                      <p className="text-xs font-bold text-stone-800 mt-0.5">Horas distribuídas na UC: {horasDeclaradasUc}h / {horasDisponiveisUc}h disponíveis</p>
+                      <p className="text-[9px] text-stone-500">{distribuicaoUcConcluida ? "Turmas e números de aula já simulados." : "As entradas ainda são cargas declaradas; a turma só é calculada no final."}</p>
+                    </div>
+                    {Number(activeEditingUc.anoCurricular) === 2 && anoSemestreUc && (
+                      <button type="button" disabled={!segundoAnoCompleto} onClick={() => simularDistribuicaoDocenteSegundoAno(anoSemestreUc.id)}
+                        title={segundoAnoCompleto ? "Distribuir todas as turmas do 2.º ano minimizando incompatibilidades" : "Só fica disponível quando todas as UCs/tipologias do 2.º ano tiverem exatamente 100% das horas declaradas"}
+                        className="px-3 py-2 rounded-lg bg-amber-700 text-white text-[9px] font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-800 shrink-0">
+                        Simular distribuição do 2.º ano
+                      </button>
+                    )}
+                  </div>
+                  {coberturaUc.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {coberturaUc.map(l => <span key={l.tipologia} className={`px-2 py-1 rounded border text-[9px] font-mono font-bold ${l.numeroTurmas > 0 && l.diferenca === 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : l.numeroTurmas === 0 || l.diferenca < 0 ? "bg-white border-amber-200 text-amber-700" : "bg-rose-50 border-rose-200 text-rose-700"}`}>
+                        {l.tipologia}: {l.horasDeclaradas}/{l.horasDisponiveis}h {l.numeroTurmas === 0 ? "(sem turmas configuradas)" : l.diferenca < 0 ? `(faltam ${-l.diferenca}h)` : l.diferenca > 0 ? `(+${l.diferenca}h)` : "✓"}
+                      </span>)}
+                    </div>
+                  )}
+                  {Number(activeEditingUc.anoCurricular) === 2 && <p className="text-[9px] text-stone-500">Estado global do 2.º ano: <strong>{segundoAnoCompleto ? "100% completo — simulação desbloqueada" : "incompleto — complete todas as entradas docentes"}</strong>.</p>}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="col-span-2">
                     <label className="block text-[10px] font-bold text-stone-500 mb-1">Nome Curricular</label>
@@ -3818,7 +3868,7 @@ export default function App() {
                             <label className="block text-[10px] font-bold text-amber-900 uppercase tracking-wider">Distribuição por número de aula</label>
                             <span className="text-[8px] font-bold uppercase bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded">Provisório · apenas para testes</span>
                           </div>
-                          <p className="text-[10px] text-stone-600 mt-1">Indique número de turmas e horas por turma. A proposta automática pode depois ser personalizada aula a aula.</p>
+                          <p className="text-[10px] text-stone-600 mt-1">Declare primeiro todas as cargas. A atribuição automática de turmas só é executada quando o 2.º ano atingir exatamente 100% das horas.</p>
                         </div>
                       </div>
 
@@ -3827,16 +3877,20 @@ export default function App() {
                         if (!uc) return null;
                         const totalAulas = Math.floor(horasDaTipologia(uc, carga.tipologia) / 2);
                         const alvoPorTurma = carga.horasPorTurma / 2;
+                        const atribuicoesCarga = atribuicoesAulasDocenteProvisorias.filter(a => a.cargaId === carga.id);
+                        const simulada = atribuicoesCarga.length === carga.numeroTurmas * alvoPorTurma;
                         return (
                           <div key={carga.id} className="bg-white border border-amber-200 rounded-xl p-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
                               <div>
                                 <span className="font-bold text-stone-800">{uc.sigla} · {carga.tipologia}</span>
                                 <span className="ml-2 text-[9px] text-stone-500">{carga.numeroTurmas} turma(s) × {carga.horasPorTurma}h · {carga.modoTurmas}</span>
+                                <span className={`ml-2 text-[8px] font-bold uppercase ${simulada ? "text-emerald-700" : "text-amber-700"}`}>{simulada ? "distribuída" : "aguarda simulação final"}</span>
                               </div>
                               <button onClick={() => removerCargaDocenteProvisoria(carga.id)} className="text-rose-500 hover:bg-rose-50 p-1 rounded" title="Eliminar proposta de teste"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
-                            {carga.turmasSelecionadas.map(turma => {
+                            {!simulada && carga.turmasSelecionadas.length > 0 && <p className="text-[9px] text-stone-500 border-t border-stone-100 pt-2">Preferências registadas: <strong>{carga.turmasSelecionadas.join(", ")}</strong>.</p>}
+                            {simulada && carga.turmasSelecionadas.map(turma => {
                               const selecionadas = atribuicoesAulasDocenteProvisorias.filter(a => a.cargaId === carga.id && a.turma === turma);
                               return (
                                 <div key={turma} className="border-t border-stone-100 pt-2">
@@ -3895,14 +3949,14 @@ export default function App() {
                             <div className="flex flex-wrap gap-1 mt-1">
                               {turmasDraft.map(t => {
                                 const ativa = novaCargaDocenteTeste.turmasManuais.includes(t);
-                                return <button key={t} onClick={() => setNovaCargaDocenteTeste(p => ({ ...p, turmasManuais: ativa ? p.turmasManuais.filter(x => x !== t) : [...p.turmasManuais, t] }))}
+                                return <button key={t} onClick={() => setNovaCargaDocenteTeste(p => ({ ...p, turmasManuais: ativa ? p.turmasManuais.filter(x => x !== t) : p.turmasManuais.length >= p.numeroTurmas ? p.turmasManuais : [...p.turmasManuais, t] }))}
                                   className={`px-2 py-1 rounded border text-[9px] font-bold ${ativa ? "bg-amber-600 text-white border-amber-600" : "bg-white border-stone-200 text-stone-600"}`}>{t}</button>;
                               })}
                             </div>
                           </div>
                         )}
                         <button onClick={() => criarCargaDocenteProvisoria(activeEditingDocente)} className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px]">
-                          Criar proposta provisória e abrir números de aula
+                          Declarar carga provisória (turmas calculadas no final)
                         </button>
                       </div>
                     </div>

@@ -2,6 +2,7 @@ node_modules/
 build/
 dist/
 coverage/
+outputs/
 .DS_Store
 *.log
 .env*
@@ -10,6 +11,7 @@ coverage/
 # Tooling / agentes
 .claude/
 .codex-tools/
+tools/template_builder/node_modules/
 
 # Restos do Firebase (já removido)
 firebase-applet-config.json
