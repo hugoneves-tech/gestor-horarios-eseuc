@@ -112,7 +112,9 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
       const k = `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
       if (!porMomento.has(k)) porMomento.set(k, []);
       porMomento.get(k)!.push(s);
-      if (!["Segunda", "Quarta"].includes(s.diaSemana) || !permitidos.has(s.horaInicio)) {
+      const diaHoraPermitidos = ["Segunda", "Quarta"].includes(s.diaSemana)
+        || (s.diaSemana === "Sexta" && s.horaInicio === "10:00");
+      if (!diaHoraPermitidos || !permitidos.has(s.horaInicio)) {
         violacoesTSimultaneas.push(`${uc.sigla}: ${k} fora dos blocos permitidos`);
       }
     }

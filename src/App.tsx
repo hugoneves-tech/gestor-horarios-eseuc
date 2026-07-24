@@ -1878,6 +1878,7 @@ export default function App() {
       const sessoesS1 = gerarSessoesConjunto(entradasS1, 1, 0, ocupacaoGlobal, plCount, opcoes);
       const sessoesS2 = gerarSessoesConjunto(entradasS2, 2, sessoesS1.length, ocupacaoGlobal, plCount, opcoes);
       let allSessoes: SessaoHorario[] = [...sessoesS1, ...sessoesS2];
+      const avisosBlocos: string[] = [];
       const regraBlocos100 = regras.find(r => r.id === "h_blocos_ocupacao_100" && r.ativa && regraNoAmbito(r));
       if (!semRegras && regraBlocos100) {
         const configBlocos = {
@@ -1890,7 +1891,7 @@ export default function App() {
         const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos, [...entradasS1, ...entradasS2], sessoesFixas);
         if (resultadoBlocos.naoAlocadas.length > 0) {
           const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
-          throw new Error(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). Reveja as regras de blocos no Supabase.`);
+          avisosBlocos.push(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). O melhor horário possível foi criado; reveja as regras de blocos no Supabase.`);
         }
         allSessoes = resultadoBlocos.sessoes;
       }
@@ -1926,7 +1927,7 @@ export default function App() {
         const errosBlocos = validarBlocos100(merged.filter(mesmoAnoGen), ucs);
         if (errosBlocos.length) {
           const e0 = errosBlocos[0];
-          throw new Error(`A proposta final contém ${errosBlocos.length} bloco(s) fora das combinações de 100%. Primeiro caso: ${e0.chave}, cobertura ${e0.cobertura}%. Reveja também as sessões importadas ou fixadas.`);
+          avisosBlocos.push(`A proposta final contém ${errosBlocos.length} bloco(s) fora das combinações de 100%. Primeiro caso: ${e0.chave}, cobertura ${e0.cobertura}%. Reveja também as sessões importadas ou fixadas.`);
         }
       }
       if (!semRegras) {
@@ -1948,17 +1949,22 @@ export default function App() {
         duracaoMs: durationMs,
         tentativas: 1,
         score,
-        conflitosContidos: 0,
+        conflitosContidos: avisosBlocos.length,
         detalhes: {
           iteracoes: allSessoes.length,
-          log: `Distribuição completa: ${allSessoes.length} sessões geradas em ${durationMs}ms para 30 semanas letivas.`
+          log: `Distribuição concluída: ${allSessoes.length} sessões geradas em ${durationMs}ms para 30 semanas letivas.${avisosBlocos.length ? ` Avisos: ${avisosBlocos.join(" ")}` : ""}`
         }
       };
 
       setSolverRuns([newRun, ...solverRuns]);
       setLastSolverVerdict({ score, conflicts: [], runDetails: { solveTimeMs: durationMs, iterations: allSessoes.length } });
       setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, score, sessoes: merged } : v));
-      showToast(` ${allSessoes.length} sessões distribuídas pelas 30 semanas letivas!`);
+      if (avisosBlocos.length) {
+        showToast(`Horário criado com ${avisosBlocos.length} aviso(s) de blocos a 100%.`);
+        window.setTimeout(() => alert(`Horário criado com aviso:\n\n${avisosBlocos.join("\n\n")}`), 0);
+      } else {
+        showToast(` ${allSessoes.length} sessões distribuídas pelas 30 semanas letivas!`);
+      }
     } catch (e) {
       console.error(e);
       alert(e instanceof Error ? e.message : "Erro no motor de distribuição. Verifique as configurações das UCs.");
@@ -3489,7 +3495,7 @@ export default function App() {
                       <span>
                         <strong className="block text-[11px] text-teal-900">Turmas T em simultâneo</strong>
                         <span className="block text-[9.5px] text-stone-600 mt-0.5">
-                          Todas as turmas teóricas desta UC ficam no mesmo bloco, à segunda ou quarta-feira. A opção é guardada no Supabase e pode ser reutilizada em qualquer ano letivo.
+                          Todas as turmas teóricas desta UC ficam no mesmo bloco, à segunda ou quarta-feira; à sexta-feira podem decorrer de manhã, das 10h às 12h. A opção é guardada no Supabase e pode ser reutilizada em qualquer ano letivo.
                         </span>
                       </span>
                     </label>
@@ -7099,7 +7105,7 @@ export default function App() {
                         <span>
                           <strong className="block text-[10px] text-teal-900">Turmas T em simultâneo</strong>
                           <span className="block text-[9px] text-stone-600 mt-0.5">
-                            Todas as turmas teóricas desta UC ficam juntas, à segunda ou quarta-feira, num dos blocos selecionados.
+                            Todas as turmas teóricas desta UC ficam juntas, à segunda ou quarta-feira; à sexta-feira podem decorrer de manhã, das 10h às 12h.
                           </span>
                         </span>
                       </label>

@@ -23,7 +23,10 @@ const entrada: EntradaUC = { uc, semanas, semanaGlobalOffset: 0 };
 const sessoes = gerarSessoesConjunto([entrada], 1);
 
 assert.equal(sessoes.length, 4, "2 blocos × 2 turmas T");
-assert.ok(sessoes.every(s => ["Segunda", "Quarta"].includes(s.diaSemana)));
+assert.ok(sessoes.every(s =>
+  ["Segunda", "Quarta"].includes(s.diaSemana)
+  || (s.diaSemana === "Sexta" && s.horaInicio === "10:00")
+));
 assert.ok(sessoes.every(s => ["10:00", "16:00"].includes(s.horaInicio)));
 
 const porMomento = new Map<string, Set<string>>();
@@ -34,6 +37,15 @@ for (const s of sessoes) {
 }
 assert.ok([...porMomento.values()].every(turmas => turmas.has("Turma A") && turmas.has("Turma B") && turmas.size === 2));
 assert.deepEqual(validarHorario(sessoes, [uc]).violacoesTSimultaneas, []);
+const primeiraSemana = sessoes[0].semana;
+const primeiroDia = sessoes[0].diaSemana;
+const primeiraOcorrencia = sessoes.filter(s =>
+  s.semana === primeiraSemana && s.diaSemana === primeiroDia && s.horaInicio === sessoes[0].horaInicio
+);
+const sextaManha = primeiraOcorrencia.map(s => ({ ...s, diaSemana: "Sexta", horaInicio: "10:00", horaFim: "12:00" }));
+assert.deepEqual(validarHorario(sextaManha, [uc]).violacoesTSimultaneas, []);
+const sextaTarde = primeiraOcorrencia.map(s => ({ ...s, diaSemana: "Sexta", horaInicio: "16:00", horaFim: "18:00" }));
+assert.ok(validarHorario(sextaTarde, [uc]).violacoesTSimultaneas.length > 0);
 
 const incompleto = sessoes.filter(s => s.turma !== "Turma B");
 assert.ok(validarHorario(incompleto, [uc]).violacoesTSimultaneas.length > 0);

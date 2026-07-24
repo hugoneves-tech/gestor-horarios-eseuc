@@ -1218,7 +1218,10 @@ export function gerarSessoesConjunto(
     const grupoTConjunto = grupoTeoricoConjunto(t);
     if (!opts.semRegras && t.tipo === "T" && t.turmasTSimultaneas) {
       const permitidos = new Set(t.horariosTSimultaneas);
-      pool = pool.filter(s => ["Segunda", "Quarta"].includes(s.dia) && permitidos.has(s.hora));
+      pool = pool.filter(s =>
+        permitidos.has(s.hora) &&
+        (["Segunda", "Quarta"].includes(s.dia) || (s.dia === "Sexta" && s.hora === "10:00"))
+      );
       pool = pool.filter(s => grupoTConjunto.every(g =>
         g.placed < g.total &&
         !ocupacao.has(slotKey(g.ano, wk.semanaGlobal, g.turmaNome, s.dia, s.hora)) &&
