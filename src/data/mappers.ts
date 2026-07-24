@@ -147,12 +147,31 @@ export const regraToRow = (r: RegraHorario) => ({
   escopo: r.escopo ?? null, ano_curricular: r.anoCurricular != null ? String(r.anoCurricular) : null,
   config: r.config ?? {}, peso: r.peso, ativa: r.ativa,
 });
-export const rowToRegra = (r: any): RegraHorario => ({
-  id: r.id, nome: r.nome, tipo: r.tipo, categoria: r.categoria ?? "", descricao: r.descricao ?? "",
-  escopo: r.escopo ?? undefined,
-  anoCurricular: r.ano_curricular == null ? undefined : (r.ano_curricular === "todos" ? "todos" : Number(r.ano_curricular)),
-  config: r.config ?? {}, peso: r.peso ?? 5, ativa: !!r.ativa,
-});
+export const rowToRegra = (r: any): RegraHorario => {
+  let config = r.config ?? {};
+  // Migração de compatibilidade: versões anteriores gravavam esta preferência
+  // como true. A regra atual utiliza a sexta-feira como dia letivo normal e o
+  // autosave volta a persistir o valor corrigido no Supabase.
+  if (r.id === "h_blocos_ocupacao_100") {
+    config = {
+      ...config,
+      traducaoSimples: "Todos os blocos têm sempre 100% dos estudantes e a sexta-feira utiliza toda a capacidade disponível, incluindo 18h-20h.",
+      motor: {
+        ...(config.motor || {}),
+        blocos100: {
+          ...(config.motor?.blocos100 || {}),
+          preferirSextaLivre: false,
+        },
+      },
+    };
+  }
+  return {
+    id: r.id, nome: r.nome, tipo: r.tipo, categoria: r.categoria ?? "", descricao: r.descricao ?? "",
+    escopo: r.escopo ?? undefined,
+    anoCurricular: r.ano_curricular == null ? undefined : (r.ano_curricular === "todos" ? "todos" : Number(r.ano_curricular)),
+    config, peso: r.peso ?? 5, ativa: !!r.ativa,
+  };
+};
 
 // --- Versão (sessões em JSONB) -------------------------------------------
 export const versaoToRow = (v: VersaoHorario) => ({

@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { organizarBlocos100, validarBlocos100, type PadraoBloco100Id } from "./src/utils/blocos100";
 import type { SessaoHorario, UC } from "./src/types";
+import { rowToRegra } from "./src/data/mappers";
 
 const uc = (id: string): UC => ({
   id, nome: id, sigla: id, cursoId: "CLE", anoCurricular: 1,
@@ -8,6 +9,11 @@ const uc = (id: string): UC => ({
   cargaHorariaE: 0, ects: 1, semestre: 1, numSemanas: 15,
 });
 const catalogo = ["U1", "U2", "U3"].map(uc);
+const regraLegada = rowToRegra({
+  id: "h_blocos_ocupacao_100", nome: "Blocos", tipo: "hard", ativa: true,
+  config: { motor: { blocos100: { preferirSextaLivre: true } } },
+});
+assert.equal((regraLegada.config as any).motor.blocos100.preferirSextaLivre, false);
 let id = 0;
 const s = (ucSigla: string, tipoAula: "TP" | "PL", turma: string): SessaoHorario => ({
   id: ++id, ucNome: ucSigla, ucSigla, tipoAula, turma, docente: "", sala: "", salaTipo: "",
