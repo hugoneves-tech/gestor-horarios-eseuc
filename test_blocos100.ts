@@ -59,6 +59,17 @@ const sexta18 = organizarBlocos100(
 assert.equal(sexta18.naoAlocadas.length, 0);
 assert.ok(sexta18.sessoes.every(x => x.diaSemana === "Sexta" && x.horaInicio === "18:00"));
 
+const sextaComoDiaNormal = organizarBlocos100(
+  Array.from({ length: 3 }, () => [5, 6, 7, 8].map(n => ({ ...s("U1", "TP", `TP${n}`), semana: 5 }))).flat(),
+  catalogo,
+  { prefTurmaAManha: { "1|1": true }, preferirSextaLivre: false },
+);
+assert.equal(sextaComoDiaNormal.naoAlocadas.length, 0);
+assert.ok(
+  sextaComoDiaNormal.sessoes.some(x => x.diaSemana === "Sexta" && x.horaInicio === "18:00"),
+  "sem a preferência de sexta livre, o bloco 18h–20h deve entrar na rotação normal",
+);
+
 const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
 assert.equal(incompleto.sessoes.length, 0);
 assert.equal(incompleto.naoAlocadas.length, 1);

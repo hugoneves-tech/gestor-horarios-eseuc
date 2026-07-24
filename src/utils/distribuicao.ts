@@ -275,7 +275,8 @@ function poolDoTipo(
   manha: boolean,
   rotacao: number = 0,   // roda a ordem dos períodos por semana (Regra B: não estar sempre cedo/tarde)
   flexivel: boolean = false, // PL de MI: qualquer dia, no período da família (tapa-buracos)
-  isFirstWeekS1: boolean = false // Só se aplica à semana 1 do 1º semestre
+  isFirstWeekS1: boolean = false, // Só se aplica à semana 1 do 1º semestre
+  preferirSextaLivre: boolean = false
 ): Slot[] {
   const rotN = (a: string[], off: number) => { const n = ((off % a.length) + a.length) % a.length; return a.slice(n).concat(a.slice(0, n)); };
   const baseMetade = manha ? PERIODOS_MANHA : PERIODOS_TARDE;
@@ -319,6 +320,7 @@ function poolDoTipo(
   } else {
     ordemDias = ["Quinta", "Terça", "Segunda", "Quarta", "Sexta"].filter(d => avail.includes(d));
   }
+  if (!preferirSextaLivre && tipo !== "T" && ordemDias.length > 1) ordemDias = rotN(ordemDias, rotacao);
     // SEMANA PARCIAL S1 (ex.: arranque à 4ª ou 5ª) → 6ª de manhã T (ambas as turmas) e TODAS
   // as TP no bloco 16-18 (admitindo 2 UCs diferentes nesse bloco). Sem quinta, sem PL.
   if (isFirstWeekS1 && !avail.includes("Segunda") && !avail.includes("Terça")) {
@@ -784,6 +786,7 @@ export interface OpcoesDistribuicao {
   // Preferência manhã/tarde da turma teórica (Turma A) por ano+semestre.
   // Chave `${ano}|${semestre}` → true = manhã, false = tarde. Sem entrada = manhã no S1.
   prefTurmaAManha?: Record<string, boolean>;
+  preferirSextaLivre?: boolean;
   // Pares de SIGLAS de UC que NÃO podem estar na mesma mancha (ex.: docentes partilhados):
   // [["ESDAC","EIG"]]. Bidirecional.
   ucConflitos?: string[][];
@@ -1198,7 +1201,11 @@ export function gerarSessoesConjunto(
     // abaixo, sem transformar genericamente a Turma B numa turma da manhã.
     // Semana PARCIAL (1.ª semana do 2.º ano): permite 2 UCs no bloco de TP (16-18 da 6ª).
     const manhaEf = t.manha;
-    let pool = poolDoTipo(t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel, semestre === 1 && wk.semanaGlobal === 1);
+    let pool = poolDoTipo(
+      t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel,
+      semestre === 1 && wk.semanaGlobal === 1,
+      opts.preferirSextaLivre ?? false,
+    );
     // MODO SEM REGRAS: SEM nenhuma regra — todos os dias úteis e TODOS os períodos (08-18),
     // sem turnos, sem almoço, sem teto de 8h. Só não duplica a mesma turma. Para comparar.
     if (opts.semRegras) {
@@ -1353,7 +1360,9 @@ export function gerarSessoesConjunto(
       // ÚLTIMA semana da UC: 6ª em último recurso (antecipa para 2ª-5ª; se possível a
       // 6ª fica livre e os estudantes vão mais cedo para casa). Partição estável.
       const ultima = t.weeks.length > 0 && wk.semanaGlobal === t.weeks[t.weeks.length - 1].semanaGlobal;
-      if (ultima) pool = [...pool.filter(s => s.dia !== "Sexta"), ...pool.filter(s => s.dia === "Sexta")];
+      if (ultima && opts.preferirSextaLivre) {
+        pool = [...pool.filter(s => s.dia !== "Sexta"), ...pool.filter(s => s.dia === "Sexta")];
+      }
       // ESPELHO A↔B (preferência principal): se a OUTRA família já tem esta (UC, tipo)
       // nesta semana, preferir o slot espelhado (mesmo dia, manhã↔tarde). Nas Teóricas
       // o MESMO slot também conta (momento em comum: ambas as turmas no anfiteatro).

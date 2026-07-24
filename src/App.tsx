@@ -1825,6 +1825,10 @@ export default function App() {
 
       // Regra opcional (ligável/desligável): PL só de 4.ª a 6.ª feira.
       const regraPLDias = regras.find(r => r.id === "h_pl_dias_4a_6a" && r.ativa);
+      const regraBlocos100 = regras.find(r => r.id === "h_blocos_ocupacao_100" && r.ativa && regraNoAmbito(r));
+      const preferirSextaLivre = (motorAI.blocos100?.preferirSextaLivre
+        ?? (regraBlocos100?.config as any)?.motor?.blocos100?.preferirSextaLivre
+        ?? CONFIGURACAO_BLOCOS_100_DEFAULT.preferirSextaLivre) === true;
       // Preferência manhã/tarde da Turma A por ano+semestre (do painel de configuração).
       const prefTurmaAManha: Record<string, boolean> = {};
       for (let ano = 1; ano <= 4; ano++) for (const sem of [1, 2]) prefTurmaAManha[`${ano}|${sem}`] = prefManhaDe(ano, sem);
@@ -1860,6 +1864,7 @@ export default function App() {
         // Sem limite de TP por mancha nesta fase: 4 TP podem coexistir.
         maxTPporMancha: motorAI.maxTPporMancha ?? null,
         prefTurmaAManha,
+        preferirSextaLivre,
         ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
         // Estrutura ESEUC: 8-15 só T1 (Turma A) presente, UCs "-I"; 16-23 só T2 (Turma B), UCs
         // "-II". Tudo de manhã. Assim T1 está de manhã nas semanas 1-15 e T2 nas 16-29.
@@ -1879,7 +1884,6 @@ export default function App() {
       const sessoesS2 = gerarSessoesConjunto(entradasS2, 2, sessoesS1.length, ocupacaoGlobal, plCount, opcoes);
       let allSessoes: SessaoHorario[] = [...sessoesS1, ...sessoesS2];
       const avisosBlocos: string[] = [];
-      const regraBlocos100 = regras.find(r => r.id === "h_blocos_ocupacao_100" && r.ativa && regraNoAmbito(r));
       if (!semRegras && regraBlocos100) {
         const configBlocos = {
           ...CONFIGURACAO_BLOCOS_100_DEFAULT,

@@ -25,7 +25,7 @@ export interface ConfiguracaoBlocos100 {
 
 export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   exigirCoberturaTotal: true,
-  preferirSextaLivre: true,
+  preferirSextaLivre: false,
   padroesAtivos: ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
   padraoAEvitar: "TP3_PL3",
   cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 },
@@ -371,7 +371,7 @@ export function organizarBlocos100(
   }
   const blocosPorPadrao: Partial<Record<PadraoBloco100Id, number>> = {};
   const alocadas: SessaoHorario[] = [];
-  const ordemDias = cfg.preferirSextaLivre ? DIAS : [...DIAS.slice(0, 4), "Sexta"];
+  const ordemDias = DIAS;
 
   for (const bloco of blocos.sort((a, b) => a.semanaPreferida - b.semanaPreferida
     || Number(a.padrao === cfg.padraoAEvitar) - Number(b.padrao === cfg.padraoAEvitar))) {
@@ -406,8 +406,13 @@ export function organizarBlocos100(
       }
       const folhasAcimaAlvo = folhasBloco.filter(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= alvoBlocos).length;
       const distanciaSemana = Math.abs(semana - bloco.semanaPreferida);
-      const custo = folhasAcimaAlvo * 1_000_000 + Number(dia === "Sexta") * 10_000 + distanciaSemana * 100
-        + DIAS.indexOf(dia) * 10 + HORAS.indexOf(hora);
+      const rotacaoDia = (semana - 1) % DIAS.length;
+      const indiceDia = cfg.preferirSextaLivre
+        ? DIAS.indexOf(dia)
+        : (DIAS.indexOf(dia) - rotacaoDia + DIAS.length) % DIAS.length;
+      const custo = folhasAcimaAlvo * 1_000_000
+        + Number(cfg.preferirSextaLivre && dia === "Sexta") * 10_000
+        + distanciaSemana * 100 + indiceDia * 10 + HORAS.indexOf(hora);
       candidatosSlot.push({ semana, dia, hora, custo });
     }
     const escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;
