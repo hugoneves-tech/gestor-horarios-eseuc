@@ -12,6 +12,8 @@ export type PadraoBloco100Id =
 export interface ConfiguracaoBlocos100 {
   exigirCoberturaTotal: boolean;
   preferirSextaLivre: boolean;
+  /** Capacidade física global de PL por semana+dia+hora, somando todas as turmas e anos. */
+  maxPLporMancha: number;
   /** Turma A: true = manhã, false = tarde, por `${ano}|${semestre}`. A B usa o turno oposto. */
   prefTurmaAManha?: Record<string, boolean>;
   padroesAtivos: PadraoBloco100Id[];
@@ -26,6 +28,7 @@ export interface ConfiguracaoBlocos100 {
 export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   exigirCoberturaTotal: true,
   preferirSextaLivre: false,
+  maxPLporMancha: 6,
   padroesAtivos: ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
   padraoAEvitar: "TP3_PL3",
   cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 3 },
@@ -354,6 +357,8 @@ export function organizarBlocos100(
   // Cada bloco usa a turma teórica completa; por isso recebe um slot exclusivo por
   // (ano, semestre, família). Segunda a quinta são sempre tentadas antes de sexta.
   const ocupados = new Set<string>();
+  const plPorMancha = new Map<string, number>();
+  const chavePL = (semana: number, dia: string, hora: string) => `${semana}|${dia}|${hora}`;
   const cargaDia = new Map<string, number>();
   const chaveCarga = (ano: number, semana: number, dia: string, folha: string) => `${ano}|${semana}|${dia}|${folha}`;
   const registarCarga = (s: SessaoHorario) => {
@@ -367,6 +372,10 @@ export function organizarBlocos100(
   for (const s of [...preservadas, ...sessoesExternas]) {
     const uc = ucPorSigla.get(s.ucSigla); const fam = familiaTeorica(s.turma);
     if (uc && fam && s.semana != null) ocupados.add(`${uc.anoCurricular}|${fam}|${s.semana}|${s.diaSemana}|${s.horaInicio}`);
+    if (s.tipoAula === "PL" && s.semana != null) {
+      const chave = chavePL(s.semana, s.diaSemana, s.horaInicio);
+      plPorMancha.set(chave, (plPorMancha.get(chave) || 0) + 1);
+    }
     registarCarga(s);
   }
   const blocosPorPadrao: Partial<Record<PadraoBloco100Id, number>> = {};
@@ -390,6 +399,7 @@ export function organizarBlocos100(
     const semanas = Array.from({ length: semFim - semInicio + 1 }, (_, i) => semInicio + i)
       .sort((a, b) => Math.abs(a - bloco.semanaPreferida) - Math.abs(b - bloco.semanaPreferida));
     const folhasBloco = [...new Set(bloco.sessoes.flatMap(s => gruposFolha(s.turma)))];
+    const plNesteBloco = bloco.sessoes.filter(s => s.tipoAula === "PL").length;
     const alvoBlocos = Math.max(1, Math.floor(cfg.cargaDiariaEstudante.alvoHoras / 2));
     const maxBlocos = Math.max(alvoBlocos, Math.floor(cfg.cargaDiariaEstudante.maxHoras / 2));
     const candidatosSlot: { semana: number; dia: string; hora: string; custo: number }[] = [];
@@ -398,6 +408,7 @@ export function organizarBlocos100(
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (ocupados.has(k)) continue;
+      if ((plPorMancha.get(chavePL(semana, dia, hora)) || 0) + plNesteBloco > cfg.maxPLporMancha) continue;
       const cargasAtuais = folhasBloco.map(folha => cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0);
       // O bloco fora do turno só pode ser o quarto bloco do dia, nunca um atalho
       // para colocar a Turma B de manhã ou a Turma A à tarde.
@@ -425,6 +436,10 @@ export function organizarBlocos100(
     const escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;
     if (!escolhido) { sobras.push(...bloco.sessoes); continue; }
     ocupados.add(`${uc.anoCurricular}|${fam}|${escolhido.semana}|${escolhido.dia}|${escolhido.hora}`);
+    if (plNesteBloco) {
+      const chave = chavePL(escolhido.semana, escolhido.dia, escolhido.hora);
+      plPorMancha.set(chave, (plPorMancha.get(chave) || 0) + plNesteBloco);
+    }
     for (const s of bloco.sessoes) alocadas.push({
       ...s, semana: escolhido.semana, diaSemana: escolhido.dia, horaInicio: escolhido.hora,
       horaFim: `${String(Number(escolhido.hora.slice(0, 2)) + 2).padStart(2, "0")}:00`,

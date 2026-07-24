@@ -42,6 +42,7 @@ export interface RelatorioValidacao {
   violacoesAlmoco: number;           // aluno com 12:00 e 14:00 no mesmo dia
   violacoesCronologia: { sigla: string; familia: string; problema: string }[];
   tpPlMesmaUC: string[];             // chaves ano|semana|dia|hora|UC com TP e PL juntas
+  excessosPLPorBloco: { chave: string; total: number }[]; // capacidade física global de laboratórios
   violacoesTSimultaneas: string[];    // UCs configuradas cujas turmas T não estão juntas/no bloco permitido
 }
 
@@ -66,7 +67,7 @@ function alvoUC(uc: UC) {
   };
 }
 
-export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioValidacao {
+export function validarHorario(sessoes: SessaoHorario[], ucs: UC[], maxPLporMancha = 6): RelatorioValidacao {
   const ucPorSigla = new Map(ucs.map(u => [u.sigla, u]));
   const anoDe = (sigla: string) => Number(ucPorSigla.get(sigla)?.anoCurricular) || 0;
 
@@ -100,6 +101,18 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
   }
   const tpPlMesmaUC: string[] = [];
   for (const [k, set] of tipoNaMancha) if (set.has("TP") && set.has("PL")) tpPlMesmaUC.push(k);
+
+  // --- Capacidade física GLOBAL: no máximo 6 PL em semana+dia+hora ---
+  // A chave não inclui ano, turma, UC ou tipologia de sala.
+  const plPorBloco = new Map<string, number>();
+  for (const s of sessoes) {
+    if (s.tipoAula !== "PL" || s.semana == null) continue;
+    const k = `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+    plPorBloco.set(k, (plPorBloco.get(k) || 0) + 1);
+  }
+  const excessosPLPorBloco = [...plPorBloco]
+    .filter(([, total]) => total > maxPLporMancha)
+    .map(([chave, total]) => ({ chave, total }));
 
   // --- Turmas T simultâneas e horários permitidos (configuração por UC) ---
   const violacoesTSimultaneas: string[] = [];
@@ -176,7 +189,7 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
 
   const ok = sobreposicoes === 0 && maxBlocosDia <= 4 && violacoesAlmoco === 0
     && violacoesCronologia.length === 0 && tpPlMesmaUC.length === 0
-    && violacoesTSimultaneas.length === 0;
+    && excessosPLPorBloco.length === 0 && violacoesTSimultaneas.length === 0;
 
   return {
     ok,
@@ -188,6 +201,7 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
     violacoesAlmoco,
     violacoesCronologia,
     tpPlMesmaUC,
+    excessosPLPorBloco,
     violacoesTSimultaneas,
   };
 }

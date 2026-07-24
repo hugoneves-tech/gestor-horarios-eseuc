@@ -220,12 +220,27 @@ export const regrasIniciais: RegraHorario[] = [
   },
   {
     id: "h_mi_pl_computador",
-    nome: "PL de MI em salas de computadores (paralelas às de laboratório)",
+    nome: "PL de MI em salas de computadores",
     tipo: "hard",
     categoria: "Sala",
-    descricao: "As PL de Metodologia de Investigação (MI) decorrem em salas de computadores, não nos laboratórios de simulação. Por isso podem ocorrer em simultâneo com outras PL, contando num conjunto de salas próprio (4 a 6 PL de MI em simultâneo).",
-    config: { traducaoSimples: "As PL de MI usam salas de computadores: têm o seu próprio limite (até 6 em simultâneo) e não competem pelas manchas dos laboratórios de simulação." },
+    descricao: "As PL de Metodologia de Investigação (MI) decorrem em salas de computadores, mas contam para o limite operacional global de seis PL em simultâneo.",
+    config: { traducaoSimples: "As PL de MI usam salas de computadores, mantendo-se dentro do máximo global de 6 PL por bloco." },
     peso: 9,
+    ativa: true
+  },
+  {
+    id: "h_limite_global_6_pl",
+    nome: "Máximo global de 6 PL por bloco",
+    tipo: "hard",
+    categoria: "Sala",
+    descricao: "Em cada semana, dia e hora podem decorrer no máximo seis sessões PL em toda a escola, somando todas as turmas, UCs e anos curriculares.",
+    escopo: "transversal",
+    anoCurricular: "todos",
+    config: {
+      traducaoSimples: "Os seis laboratórios são partilhados por toda a escola: nunca existem mais de 6 PL no mesmo bloco.",
+      motor: { maxPLporMancha: 6 },
+    },
+    peso: 10,
     ativa: true
   },
   {
@@ -452,5 +467,3 @@ export const versoesIniciais: VersaoHorario[] = [
   }
 ];
 export const solverRunsIniciais: SolverRun[] = [];
-
-

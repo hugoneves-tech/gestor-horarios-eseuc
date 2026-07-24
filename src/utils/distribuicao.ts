@@ -360,21 +360,21 @@ function poolDoTipo(
 // ---------------------------------------------------------------------------
 
 export type OcupacaoGlobal = Set<string>;
-export type ContagemPL = Map<string, number>; // `${ano}|${semana}|${dia}|${hora}` → nº de PL nessa mancha
+export type ContagemPL = Map<string, number>; // `${semana}|${dia}|${hora}` → nº GLOBAL de PL nessa mancha
 
 function slotKey(ano: number, semanaGlobal: number, turma: string, dia: string, hora: string): string {
   return `${ano}|${semanaGlobal}|${turma}|${dia}|${hora}`;
 }
 
-// Conjuntos de salas práticas independentes. As PL de laboratório de simulação
-// e as PL de sala de computadores ocupam espaços diferentes → contadores separados,
-// podendo decorrer em simultâneo. (ex.: MI usa salas de computadores.)
+// A tipologia continua a orientar a atribuição da sala, mas a capacidade física
+// das PL é global: em cada mancha só podem decorrer seis PL no total, somando
+// todas as UCs, turmas, famílias, anos e tipologias de sala.
 export type SalaPool = "lab" | "comp";
 const UCS_PL_COMPUTADOR = new Set(["MI"]); // UCs cujas PL decorrem em salas de computadores
-const MAX_PL_POR_POOL: Record<SalaPool, number> = { lab: 6, comp: 6 };
+export const MAX_PL_POR_MANCHA_DEFAULT = 6;
 
-function manchaKey(ano: number, semanaGlobal: number, dia: string, hora: string, pool: SalaPool = "lab"): string {
-  return `${ano}|${semanaGlobal}|${dia}|${hora}|${pool}`;
+function manchaKey(_ano: number, semanaGlobal: number, dia: string, hora: string, _pool: SalaPool = "lab"): string {
+  return `${semanaGlobal}|${dia}|${hora}`;
 }
 
 /**
@@ -469,8 +469,8 @@ function registarSlot(
 
 /**
  * Finds the first available slot in the pool for this turma+week, skipping
- * already-occupied slots and (for PL) slots that already hold the max of 6
- * simultaneous PL of that year.
+ * already-occupied slots and (for PL) slots that already hold the global
+ * maximum of simultaneous PL.
  */
 function encontrarSlotLivre(
   pool: Slot[],
@@ -481,16 +481,17 @@ function encontrarSlotLivre(
   ocupacao: OcupacaoGlobal,
   plCount: ContagemPL,
   startIdx: number,
-  salaPool: SalaPool = "lab"
+  salaPool: SalaPool = "lab",
+  maxPLporMancha: number = MAX_PL_POR_MANCHA_DEFAULT,
 ): Slot | null {
   if (!pool.length) return null;
   for (let i = 0; i < pool.length; i++) {
     const slot = pool[(startIdx + i) % pool.length];
     if (ocupacao.has(slotKey(ano, semanaGlobal, turma, slot.dia, slot.hora))) continue;
     if (tipo === "PL") {
-      // Cap por conjunto de salas: lab e comp são contados em separado.
+      // Cap físico global: não reinicia por turma, família, UC, ano ou sala.
       const c = plCount.get(manchaKey(ano, semanaGlobal, slot.dia, slot.hora, salaPool)) || 0;
-      if (c >= MAX_PL_POR_POOL[salaPool]) continue;
+      if (c >= maxPLporMancha) continue;
     }
     return slot;
   }
@@ -784,6 +785,8 @@ export interface OpcoesDistribuicao {
   // Nº de salas de TP disponíveis = máximo de TP em simultâneo por mancha.
   // Não definido = sem limite (4 TP podem coexistir). Com 2 salas → emerge o padrão 2 TP + 6 PL.
   maxTPporMancha?: number | null;
+  // Capacidade física GLOBAL de PL por semana+dia+hora. Não é por turma/ano.
+  maxPLporMancha?: number | null;
   // Preferência manhã/tarde da turma teórica (Turma A) por ano+semestre.
   // Chave `${ano}|${semestre}` → true = manhã, false = tarde. Sem entrada = manhã no S1.
   prefTurmaAManha?: Record<string, boolean>;
@@ -1026,6 +1029,9 @@ export function gerarSessoesConjunto(
   // UC nunca tem 8 TPs no mesmo bloco (docentes a mais). Mas DUAS UCs diferentes podem
   // partilhar o bloco (ex.: Turma B de uma UC + Turma A em overflow de OUTRA UC = 4+4).
   const MAX_TP_POR_UC_MANCHA = (opts.maxTPporMancha && opts.maxTPporMancha > 0) ? opts.maxTPporMancha : 4;
+  const MAX_PL_POR_MANCHA = (opts.maxPLporMancha && opts.maxPLporMancha > 0)
+    ? Math.floor(opts.maxPLporMancha)
+    : MAX_PL_POR_MANCHA_DEFAULT;
   const tpCount = new Map<string, number>(); // `${ano}|${week}|${dia}|${hora}` → nº de TP
   const tpManchaKey = (ano: number, week: number, dia: string, hora: string) => `${ano}|${week}|${dia}|${hora}`;
   const ucSimultaneoCount = new Map<string, number>(); // `${ucKey}|${week}|${dia}|${hora}|${tipo}` → count
@@ -1175,7 +1181,7 @@ export function gerarSessoesConjunto(
       if (plUCsAll.get(smk)?.has(t.ucKey)) return false; // docente partilhado: não com PL da mesma UC (inclui MI)
     }
     if (t.tipo === "PL") {
-      if ((plCount.get(manchaKey(t.ano, wk.semanaGlobal, dia, hora, t.salaPool)) || 0) >= MAX_PL_POR_POOL[t.salaPool]) return false;
+      if ((plCount.get(manchaKey(t.ano, wk.semanaGlobal, dia, hora, t.salaPool)) || 0) >= MAX_PL_POR_MANCHA) return false;
       // relaxPLuc: bloco de recuperação da 6ª admite PL de UCs diferentes (3 ESDAC + 3 FT).
       if (!relaxPLuc && t.salaPool !== "comp") {
         const set = plUCs.get(smk);
@@ -1443,7 +1449,7 @@ export function gerarSessoesConjunto(
       });
     }
 
-    const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
+    const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool, MAX_PL_POR_MANCHA);
     if (!slot) return false;
     if (!opts.semRegras && t.tipo === "T" && t.turmasTSimultaneas) {
       for (const g of grupoTConjunto) commit(g, wk, slot);
@@ -1642,7 +1648,7 @@ export function gerarSessoesConjunto(
       }
     }
   }
-  // recuperar a carga de PL atrasada (FT/ESDAC). O cap do pool (6) limita cada bloco.
+  // recuperar a carga de PL atrasada (FT/ESDAC). O cap global (6) limita cada bloco.
   const plTasksRec = tasks.filter(t => (t.tipo === "PL" || t.tipo === "TP") && t.salaPool !== "comp");
   for (const [wg, wk] of wkByGlobal) {
     if (soUmaTurma(2, wg)) continue; // TODO: Pl recovery might need ano check. Assuming ano 2 for legacy behaviour for now

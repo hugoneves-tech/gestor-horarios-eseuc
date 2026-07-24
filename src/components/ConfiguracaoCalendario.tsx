@@ -63,7 +63,7 @@ export function ConfiguracaoCalendario({
     try {
       const ucsDeste = ucsPorSemestre(anoSemestre);
       // Shared occupancy + PL-count across all UCs of this semester so turmas are
-      // never double-booked and at most 6 PL run simultaneously per year per mancha.
+      // never double-booked and at most 6 PL run simultaneously in the whole block.
       const ocupacao = new Set<string>();
       const plCount = new Map<string, number>();
       const semanaGlobalOffset = anoSemestre.semestre === 2 ? 15 : 0;
@@ -541,4 +541,3 @@ function DistribuicaoDetalhe({ anoSem, ucsDeste, ucs, setUcs, feriados, motorReg
     </div>
   );
 }
-

@@ -20,15 +20,15 @@ values (
 )
 on conflict (id) do nothing;
 
--- Regra: PL de MI em salas de computadores (paralelas às de laboratório).
+-- Regra: PL de MI em salas de computadores, incluídas no limite global de PL.
 insert into regras (id, nome, tipo, categoria, descricao, escopo, ano_curricular, config, peso, ativa)
 values (
   'h_mi_pl_computador',
-  'PL de MI em salas de computadores (paralelas às de laboratório)',
+  'PL de MI em salas de computadores',
   'hard', 'Sala',
-  'As PL de Metodologia de Investigação (MI) decorrem em salas de computadores, não nos laboratórios de simulação. Por isso podem ocorrer em simultâneo com outras PL, contando num conjunto de salas próprio (4 a 6 PL de MI em simultâneo).',
+  'As PL de Metodologia de Investigação (MI) decorrem em salas de computadores, mas contam para o limite operacional global de seis PL em simultâneo.',
   'transversal', 'todos',
-  '{"traducaoSimples":"As PL de MI usam salas de computadores: têm o seu próprio limite (até 6 em simultâneo) e não competem pelas manchas dos laboratórios de simulação."}'::jsonb,
+  '{"traducaoSimples":"As PL de MI usam salas de computadores, mantendo-se dentro do máximo global de 6 PL por bloco."}'::jsonb,
   9, true
 )
 on conflict (id) do nothing;

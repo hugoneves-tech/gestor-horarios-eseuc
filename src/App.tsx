@@ -104,6 +104,42 @@ import { completarCargaParaBlocos100, organizarBlocos100, validarBlocos100, CONF
 import { calcularCoberturaDocente, distribuirTurmasDocentes } from "./utils/atribuicaoDocentes";
 import { repo } from "./data/supabaseRepo";
 
+const REGRA_LIMITE_GLOBAL_PL: RegraHorario = {
+  id: "h_limite_global_6_pl",
+  nome: "Máximo global de 6 PL por bloco",
+  tipo: "hard",
+  categoria: "Sala",
+  descricao: "Em cada semana, dia e hora podem decorrer no máximo seis sessões PL em toda a escola, somando todas as turmas, UCs e anos curriculares.",
+  escopo: "transversal",
+  anoCurricular: "todos",
+  config: {
+    traducaoSimples: "Os seis laboratórios são partilhados por toda a escola: nunca existem mais de 6 PL no mesmo bloco.",
+    motor: { maxPLporMancha: 6 },
+  },
+  peso: 10,
+  ativa: true,
+};
+
+const garantirRegraLimiteGlobalPL = (lista: RegraHorario[]): RegraHorario[] => {
+  const existente = lista.find(r => r.id === REGRA_LIMITE_GLOBAL_PL.id);
+  if (!existente) return [REGRA_LIMITE_GLOBAL_PL, ...lista];
+  return lista.map(r => {
+    if (r.id !== REGRA_LIMITE_GLOBAL_PL.id) return r;
+    const configurado = Number((r.config as any)?.motor?.maxPLporMancha);
+    return {
+      ...r,
+      ativa: true,
+      config: {
+        ...(r.config || {}),
+        motor: {
+          ...((r.config as any)?.motor || {}),
+          maxPLporMancha: configurado > 0 ? Math.floor(configurado) : 6,
+        },
+      },
+    };
+  });
+};
+
 export default function App() {
   // Theme and Vibe State for ESEUC Coimbra
   // - "eseuc_ouro": Classic Coimbra Gold
@@ -206,7 +242,7 @@ export default function App() {
   };
   // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
   // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
-  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "blocos100", "cargaDiariaEstudante"] as const;
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "maxPLporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "blocos100", "cargaDiariaEstudante"] as const;
   const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
     const m = (r.config as any)?.motor;
     if (!m || typeof m !== "object") return false;
@@ -1259,7 +1295,9 @@ export default function App() {
         setSalas(d.salas);
         setTurmas(d.turmas);
         setFeriados(d.feriados);
-        setRegras(d.regras);
+        // Regra física obrigatória: se a migração SQL ainda não tiver sido
+        // executada, o autosave cria-a no Supabase após este carregamento.
+        setRegras(garantirRegraLimiteGlobalPL(d.regras));
         // Sanitizar propostas carregadas: remover quaisquer sessões órfãs (UCs que já não existem)
         const existingUcSiglas = new Set(d.ucs.map(u => u.sigla));
         const sanitizedVersoes = d.versoes.map(v => ({
@@ -1387,7 +1425,7 @@ export default function App() {
               }
               if (data && isSubscribed) {
                 import("./data/mappers").then(M => {
-                  const newRegras = data.map(M.rowToRegra);
+                  const newRegras = garantirRegraLimiteGlobalPL(data.map(M.rowToRegra));
                   setRegras(prev => {
                     // Evitar ciclo infinito: só atualiza se houver diferenças estruturais
                     const stringifiedPrev = JSON.stringify(prev);
@@ -1726,12 +1764,24 @@ export default function App() {
 
     try {
       const t0 = performance.now();
+      const existingUcSiglas = new Set(ucs.map(u => u.sigla));
+      const activeSessoesValidas = (activeVersao?.sessoes ?? []).filter(s => existingUcSiglas.has(s.ucSigla));
+      const mesmoAnoGen = (s: SessaoHorario) => {
+        if (selectedYearFilter === "todos") return true;
+        const uc = ucs.find(u => u.sigla === s.ucSigla);
+        return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
+      };
+      const sessoesOutrosAnosAtivas = activeSessoesValidas.filter(s => !mesmoAnoGen(s));
 
       // ONE shared occupancy set + PL-count map for the entire 30-week schedule.
-      // Keys are namespaced by ano, so turmas never collide across years, and
-      // at most 6 PL run simultaneously per year per mancha horária.
+      // A capacidade de PL é física e global: a chave não inclui ano/turma/UC.
       const ocupacaoGlobal = new Set<string>();
       const plCount = new Map<string, number>();
+      for (const s of sessoesOutrosAnosAtivas) {
+        if (s.tipoAula !== "PL" || s.semana == null) continue;
+        const chave = `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+        plCount.set(chave, (plCount.get(chave) || 0) + 1);
+      }
 
       // pela última regra ativa que os defina.
       const regraNoAmbito = (r: RegraHorario) => {
@@ -1740,7 +1790,7 @@ export default function App() {
         const anoCurricularOk = anos.length === 0 || selectedYearFilter === "todos" || anos.includes(Number(selectedYearFilter));
         return anoCurricularOk && (anosLetivos.length === 0 || anosLetivos.includes(selectedAnoLetivo));
       };
-      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; semanasSoTurmaA?: Record<number, number[]>; semanasSoTurmaB?: Record<number, number[]>; restricoesUC?: any[]; blocos100?: any; [key: string]: any } = {
+      const motorAI: { plDiasPermitidos?: string[]; ucConflitos?: string[][]; maxTPporMancha?: number; maxPLporMancha?: number; semanasSoTurmaA?: Record<number, number[]>; semanasSoTurmaB?: Record<number, number[]>; restricoesUC?: any[]; blocos100?: any; [key: string]: any } = {
         semanasSoTurmaA: {},
         semanasSoTurmaB: {}
       };
@@ -1753,6 +1803,7 @@ export default function App() {
         if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
         if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
         if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
+        if (typeof m.maxPLporMancha === "number" && m.maxPLporMancha > 0) motorAI.maxPLporMancha = Math.floor(m.maxPLporMancha);
         if (m.blocos100 && typeof m.blocos100 === "object") motorAI.blocos100 = m.blocos100;
         if (m.cargaDiariaEstudante && typeof m.cargaDiariaEstudante === "object") motorAI.cargaDiariaEstudante = m.cargaDiariaEstudante;
         
@@ -1849,12 +1900,9 @@ export default function App() {
       // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
       // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
       // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
-      // Filtrar apenas sessões que pertencem a UCs ativas/existentes
-      const existingUcSiglas = new Set(ucs.map(u => u.sigla));
-      const activeSessoesValidas = (activeVersao?.sessoes ?? []).filter(s => existingUcSiglas.has(s.ucSigla));
-
       const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
-      const fixasExistentes = activeSessoesValidas.filter(s => s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
+      const fixasExistentes = activeSessoesValidas.filter(s =>
+        mesmoAnoGen(s) && s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
       const sessoesFixas = [...sessoesFixasImport, ...fixasExistentes];
 
       const opcoes = {
@@ -1863,6 +1911,8 @@ export default function App() {
           : null),
         // Sem limite de TP por mancha nesta fase: 4 TP podem coexistir.
         maxTPporMancha: motorAI.maxTPporMancha ?? null,
+        // Seis laboratórios para TODA a escola, não seis por turma ou ano.
+        maxPLporMancha: motorAI.maxPLporMancha ?? 6,
         prefTurmaAManha,
         preferirSextaLivre,
         ucConflitos: [...ucConflitos, ...(motorAI.ucConflitos || [])],
@@ -1890,10 +1940,17 @@ export default function App() {
           ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
           ...(motorAI.blocos100 || {}),
           prefTurmaAManha,
+          maxPLporMancha: motorAI.maxPLporMancha ?? CONFIGURACAO_BLOCOS_100_DEFAULT.maxPLporMancha,
           cargaDiariaEstudante: motorAI.cargaDiariaEstudante ?? CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
         };
         allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);
-        const resultadoBlocos = organizarBlocos100(allSessoes, ucs, configBlocos, [...entradasS1, ...entradasS2], sessoesFixas);
+        const resultadoBlocos = organizarBlocos100(
+          allSessoes,
+          ucs,
+          configBlocos,
+          [...entradasS1, ...entradasS2],
+          [...sessoesFixas, ...sessoesOutrosAnosAtivas],
+        );
         if (resultadoBlocos.naoAlocadas.length > 0) {
           const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
           avisosBlocos.push(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). O melhor horário possível foi criado; reveja as regras de blocos no Supabase.`);
@@ -1906,12 +1963,7 @@ export default function App() {
       // individualmente nas restantes semanas.
       // Geração por ano: ao gerar um ano específico, as sessões dos OUTROS anos preservam-se
       // tal como estão (não são tocadas). Com "todos", não há outros anos a preservar.
-      const mesmoAnoGen = (s: SessaoHorario) => {
-        if (selectedYearFilter === "todos") return true;
-        const uc = ucs.find(u => u.sigla === s.ucSigla);
-        return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
-      };
-      const outrosAnos = activeSessoesValidas.filter(s => !mesmoAnoGen(s));
+      const outrosAnos = sessoesOutrosAnosAtivas;
 
       const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
       const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
@@ -1936,9 +1988,15 @@ export default function App() {
         }
       }
       if (!semRegras) {
-        const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs);
+        const maxPLporMancha = motorAI.maxPLporMancha ?? 6;
+        const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs, maxPLporMancha);
         if (relatorioFinal.violacoesTSimultaneas.length) {
           throw new Error(`A proposta viola a configuração de turmas T simultâneas: ${relatorioFinal.violacoesTSimultaneas[0]}. Reveja também as sessões importadas ou fixadas.`);
+        }
+        const relatorioGlobal = validarHorario(merged, ucs, maxPLporMancha);
+        if (relatorioGlobal.excessosPLPorBloco.length) {
+          const excesso = relatorioGlobal.excessosPLPorBloco[0];
+          throw new Error(`Capacidade dos laboratórios excedida em ${excesso.chave}: ${excesso.total} PL em simultâneo (máximo ${maxPLporMancha}). Reveja também as sessões importadas, fixadas ou semanas bloqueadas.`);
         }
       }
 
@@ -5412,6 +5470,7 @@ export default function App() {
                               <span className={relatorioImport.violacoesAlmoco ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesAlmoco ? "✗" : "✓"} Almoço: {relatorioImport.violacoesAlmoco}</span>
                               <span className={relatorioImport.violacoesCronologia.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesCronologia.length ? "✗" : "✓"} Cronologia: {relatorioImport.violacoesCronologia.length}</span>
                               <span className={relatorioImport.tpPlMesmaUC.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.tpPlMesmaUC.length ? "✗" : "✓"} TP+PL mesma UC: {relatorioImport.tpPlMesmaUC.length}</span>
+                              <span className={relatorioImport.excessosPLPorBloco.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excessosPLPorBloco.length ? "✗" : "✓"} Limite global de 6 PL: {relatorioImport.excessosPLPorBloco.length}</span>
                               <span className={relatorioImport.violacoesTSimultaneas.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesTSimultaneas.length ? "✗" : "✓"} T simultâneas: {relatorioImport.violacoesTSimultaneas.length}</span>
                               <span className="text-stone-600">Completude: {relatorioImport.completude.pct}%</span>
                             </div>
