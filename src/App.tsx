@@ -414,7 +414,9 @@ export default function App() {
     ects: 6,
     semanaInicio: 1,
     numSemanas: 15,
-    turmasConfig: generateEseucTurmas("UC", 2, 0, 0, 0)
+    turmasConfig: generateEseucTurmas("UC", 2, 0, 0, 0),
+    turmasTSimultaneas: false,
+    horariosTSimultaneas: ["10:00", "16:00"],
   });
   const [autoDistributeNewUc, setAutoDistributeNewUc] = useState(true);
 
@@ -1164,6 +1166,8 @@ export default function App() {
                 semestre: sem,
                 semanaInicio,
                 numSemanas: semanas,
+                turmasTSimultaneas: normalizar(sigla).replace(/[^a-z0-9]/g, "").toUpperCase() === "PSIS",
+                horariosTSimultaneas: ["10:00", "16:00"],
                 observacoes: colObs >= 0 ? String(r[colObs] || "") : anterior?.observacoes,
                 turmasConfig: (turmasConfig.length ? turmasConfig : generateEseucTurmas(sigla, t, tp, pl, s)).map(turno => ({
                   ...turno,
@@ -1325,6 +1329,7 @@ export default function App() {
         semanaInicio: u.semanaInicio, semanaFim: u.semanaFim, numSemanas: u.numSemanas,
         dataInicio: u.dataInicio, dataFim: u.dataFim, semanasPL: u.semanasPL,
         turmasConfig: u.turmasConfig, planoDistribucao: u.planoDistribucao,
+        turmasTSimultaneas: u.turmasTSimultaneas, horariosTSimultaneas: u.horariosTSimultaneas,
       });
       return [{ antiga, atual, pedagogica: camposPedagogicos(antiga) !== camposPedagogicos(atual) }];
     }).filter(x => x.pedagogica || x.antiga.sigla !== x.atual.sigla || x.antiga.nome !== x.atual.nome);
@@ -1535,11 +1540,14 @@ export default function App() {
       semestre: Number(newUc.semestre) || 1,
       semanaInicio: Number(newUc.semanaInicio) || 1,
       numSemanas: Number(newUc.numSemanas) || 15,
-      turmasConfig: newUc.turmasConfig || []
+      turmasConfig: newUc.turmasConfig || [],
+      turmasTSimultaneas: !!newUc.turmasTSimultaneas,
+      horariosTSimultaneas: newUc.horariosTSimultaneas?.length ? newUc.horariosTSimultaneas : ["10:00", "16:00"],
+      maxSimultaneoT: newUc.turmasTSimultaneas ? 2 : undefined,
     };
     setUcs([...ucs, item]);
     setIsAddingUc(false);
-    setNewUc({ nome: "", sigla: "", cursoId: "c1", anoCurricular: 1, semestre: 1, semanaInicio: 1, numSemanas: 15, cargaHorariaTeorica: 2, cargaHorariaPratica: 0, cargaHorariaTP: 0, cargaHorariaS: 0, cargaHorariaE: 0, ects: 6, turmasConfig: generateEseucTurmas("UC", 2, 0, 0, 0) });
+    setNewUc({ nome: "", sigla: "", cursoId: "c1", anoCurricular: 1, semestre: 1, semanaInicio: 1, numSemanas: 15, cargaHorariaTeorica: 2, cargaHorariaPratica: 0, cargaHorariaTP: 0, cargaHorariaS: 0, cargaHorariaE: 0, ects: 6, turmasConfig: generateEseucTurmas("UC", 2, 0, 0, 0), turmasTSimultaneas: false, horariosTSimultaneas: ["10:00", "16:00"] });
     showToast(`Materia "${item.nome}" criada com sucesso com ${item.turmasConfig.length} turmas associadas!`);
   };
 
@@ -1919,6 +1927,12 @@ export default function App() {
         if (errosBlocos.length) {
           const e0 = errosBlocos[0];
           throw new Error(`A proposta final contém ${errosBlocos.length} bloco(s) fora das combinações de 100%. Primeiro caso: ${e0.chave}, cobertura ${e0.cobertura}%. Reveja também as sessões importadas ou fixadas.`);
+        }
+      }
+      if (!semRegras) {
+        const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs);
+        if (relatorioFinal.violacoesTSimultaneas.length) {
+          throw new Error(`A proposta viola a configuração de turmas T simultâneas: ${relatorioFinal.violacoesTSimultaneas[0]}. Reveja também as sessões importadas ou fixadas.`);
         }
       }
 
@@ -3455,6 +3469,61 @@ export default function App() {
                         className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 font-mono font-medium"
                       />
                     </div>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-teal-200 bg-teal-50/70 p-3 space-y-2">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!activeEditingUc.turmasTSimultaneas}
+                        onChange={(e) => {
+                          const ativa = e.target.checked;
+                          setUcs(ucs.map(u => u.id === editingUcId ? {
+                            ...u,
+                            turmasTSimultaneas: ativa,
+                            horariosTSimultaneas: u.horariosTSimultaneas?.length ? u.horariosTSimultaneas : ["10:00", "16:00"],
+                            maxSimultaneoT: ativa ? Math.max(2, u.maxSimultaneoT || 0) : u.maxSimultaneoT,
+                          } : u));
+                        }}
+                        className="mt-0.5 rounded text-[#148A96] focus:ring-[#148A96]"
+                      />
+                      <span>
+                        <strong className="block text-[11px] text-teal-900">Turmas T em simultâneo</strong>
+                        <span className="block text-[9.5px] text-stone-600 mt-0.5">
+                          Todas as turmas teóricas desta UC ficam no mesmo bloco, à segunda ou quarta-feira. A opção é guardada no Supabase e pode ser reutilizada em qualquer ano letivo.
+                        </span>
+                      </span>
+                    </label>
+                    {activeEditingUc.turmasTSimultaneas && (
+                      <div className="border-t border-teal-200 pt-2">
+                        <span className="text-[9px] uppercase font-bold text-teal-800 font-mono">Blocos permitidos</span>
+                        <div className="flex flex-wrap gap-2 mt-1.5">
+                          {[
+                            { inicio: "10:00", fim: "12:00" },
+                            { inicio: "16:00", fim: "18:00" },
+                          ].map(bloco => {
+                            const selecionado = (activeEditingUc.horariosTSimultaneas || ["10:00", "16:00"]).includes(bloco.inicio);
+                            return (
+                              <button
+                                key={bloco.inicio}
+                                type="button"
+                                onClick={() => {
+                                  const atuais = activeEditingUc.horariosTSimultaneas || ["10:00", "16:00"];
+                                  if (selecionado && atuais.length === 1) {
+                                    showToast("Mantenha pelo menos um bloco disponível para as turmas T simultâneas.");
+                                    return;
+                                  }
+                                  const horarios = selecionado ? atuais.filter(h => h !== bloco.inicio) : [...atuais, bloco.inicio];
+                                  setUcs(ucs.map(u => u.id === editingUcId ? { ...u, horariosTSimultaneas: horarios } : u));
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-colors ${selecionado ? "bg-[#148A96] border-[#148A96] text-white" : "bg-white border-stone-200 text-stone-500"}`}
+                              >
+                                {bloco.inicio}–{bloco.fim}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -5332,6 +5401,7 @@ export default function App() {
                               <span className={relatorioImport.violacoesAlmoco ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesAlmoco ? "✗" : "✓"} Almoço: {relatorioImport.violacoesAlmoco}</span>
                               <span className={relatorioImport.violacoesCronologia.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesCronologia.length ? "✗" : "✓"} Cronologia: {relatorioImport.violacoesCronologia.length}</span>
                               <span className={relatorioImport.tpPlMesmaUC.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.tpPlMesmaUC.length ? "✗" : "✓"} TP+PL mesma UC: {relatorioImport.tpPlMesmaUC.length}</span>
+                              <span className={relatorioImport.violacoesTSimultaneas.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesTSimultaneas.length ? "✗" : "✓"} T simultâneas: {relatorioImport.violacoesTSimultaneas.length}</span>
                               <span className="text-stone-600">Completude: {relatorioImport.completude.pct}%</span>
                             </div>
                           )}
@@ -7012,6 +7082,60 @@ export default function App() {
                           )}
                         </div>
                       </div>
+                    </div>
+
+                    <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-3 space-y-2">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!newUc.turmasTSimultaneas}
+                          onChange={(e) => setNewUc({
+                            ...newUc,
+                            turmasTSimultaneas: e.target.checked,
+                            horariosTSimultaneas: newUc.horariosTSimultaneas?.length ? newUc.horariosTSimultaneas : ["10:00", "16:00"],
+                          })}
+                          className="mt-0.5 rounded text-[#148A96] focus:ring-[#148A96]"
+                        />
+                        <span>
+                          <strong className="block text-[10px] text-teal-900">Turmas T em simultâneo</strong>
+                          <span className="block text-[9px] text-stone-600 mt-0.5">
+                            Todas as turmas teóricas desta UC ficam juntas, à segunda ou quarta-feira, num dos blocos selecionados.
+                          </span>
+                        </span>
+                      </label>
+                      {newUc.turmasTSimultaneas && (
+                        <div className="border-t border-teal-200 pt-2">
+                          <span className="text-[8px] uppercase font-bold text-teal-800 font-mono">Blocos permitidos</span>
+                          <div className="flex flex-wrap gap-2 mt-1.5">
+                            {[
+                              { inicio: "10:00", fim: "12:00" },
+                              { inicio: "16:00", fim: "18:00" },
+                            ].map(bloco => {
+                              const atuais = newUc.horariosTSimultaneas || ["10:00", "16:00"];
+                              const selecionado = atuais.includes(bloco.inicio);
+                              return (
+                                <button
+                                  key={bloco.inicio}
+                                  type="button"
+                                  onClick={() => {
+                                    if (selecionado && atuais.length === 1) {
+                                      showToast("Mantenha pelo menos um bloco disponível para as turmas T simultâneas.");
+                                      return;
+                                    }
+                                    setNewUc({
+                                      ...newUc,
+                                      horariosTSimultaneas: selecionado ? atuais.filter(h => h !== bloco.inicio) : [...atuais, bloco.inicio],
+                                    });
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg border text-[9px] font-bold transition-colors ${selecionado ? "bg-[#148A96] border-[#148A96] text-white" : "bg-white border-stone-200 text-stone-500"}`}
+                                >
+                                  {bloco.inicio}–{bloco.fim}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <button onClick={handleAddUc} className="w-full py-1.5 bg-stone-900 border border-stone-900 text-white rounded-lg font-bold hover:bg-stone-850 cursor-pointer text-[10.5px] transition-colors shadow-3xs uppercase tracking-wide">Gravar Disciplina</button>

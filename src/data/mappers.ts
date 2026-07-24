@@ -46,23 +46,36 @@ export const ucToRow = (u: UC) => ({
   max_simultaneo_tp: u.maxSimultaneoTP ?? null,
   max_simultaneo_pl: u.maxSimultaneoPL ?? null,
   plano_distribuicao: u.planoDistribucao ?? null,
-  turmas_config: u.turmasConfig ?? [],
+  turmas_config: (u.turmasConfig ?? []).map(t => t.tipo === "Teórica" ? {
+    ...t,
+    tSimultanea: u.turmasTSimultaneas ?? false,
+    horariosTSimultaneos: u.horariosTSimultaneas ?? ["10:00", "16:00"],
+  } : t),
 });
-export const rowToUc = (r: any): UC => ({
-  id: r.id, nome: r.nome, sigla: r.sigla, cursoId: r.curso_id, anoCurricular: r.ano_curricular,
-  cargaHorariaTeorica: r.carga_horaria_teorica, cargaHorariaPratica: r.carga_horaria_pratica,
-  cargaHorariaTP: r.carga_horaria_tp, cargaHorariaS: r.carga_horaria_s ?? 0,
-  cargaHorariaE: r.carga_horaria_e, ects: r.ects, semestre: r.semestre,
-  semanaInicio: r.semana_inicio ?? undefined, semanaFim: r.semana_fim ?? undefined,
-  numSemanas: r.num_semanas, dataInicio: r.data_inicio ?? undefined, dataFim: r.data_fim ?? undefined,
-  periodo: r.periodo ?? undefined, observacoes: r.observacoes ?? undefined,
-  semanasPL: r.semanas_pl ?? undefined,
-  maxSimultaneoT: r.max_simultaneo_t ?? undefined,
-  maxSimultaneoTP: r.max_simultaneo_tp ?? undefined,
-  maxSimultaneoPL: r.max_simultaneo_pl ?? undefined,
-  planoDistribucao: r.plano_distribuicao ?? undefined,
-  turmasConfig: r.turmas_config ?? [],
-});
+export const rowToUc = (r: any): UC => {
+  const turmasConfig = r.turmas_config ?? [];
+  const teoricas = turmasConfig.filter((t: any) => t.tipo === "Teórica");
+  const temConfiguracao = teoricas.some((t: any) => typeof t.tSimultanea === "boolean");
+  const ehPsiS = String(r.sigla || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === "PSIS";
+  const primeiraConfig = teoricas.find((t: any) => Array.isArray(t.horariosTSimultaneos));
+  return {
+    id: r.id, nome: r.nome, sigla: r.sigla, cursoId: r.curso_id, anoCurricular: r.ano_curricular,
+    cargaHorariaTeorica: r.carga_horaria_teorica, cargaHorariaPratica: r.carga_horaria_pratica,
+    cargaHorariaTP: r.carga_horaria_tp, cargaHorariaS: r.carga_horaria_s ?? 0,
+    cargaHorariaE: r.carga_horaria_e, ects: r.ects, semestre: r.semestre,
+    semanaInicio: r.semana_inicio ?? undefined, semanaFim: r.semana_fim ?? undefined,
+    numSemanas: r.num_semanas, dataInicio: r.data_inicio ?? undefined, dataFim: r.data_fim ?? undefined,
+    periodo: r.periodo ?? undefined, observacoes: r.observacoes ?? undefined,
+    semanasPL: r.semanas_pl ?? undefined,
+    maxSimultaneoT: r.max_simultaneo_t ?? undefined,
+    maxSimultaneoTP: r.max_simultaneo_tp ?? undefined,
+    maxSimultaneoPL: r.max_simultaneo_pl ?? undefined,
+    turmasTSimultaneas: temConfiguracao ? teoricas.some((t: any) => t.tSimultanea === true) : ehPsiS,
+    horariosTSimultaneas: primeiraConfig?.horariosTSimultaneos ?? ["10:00", "16:00"],
+    planoDistribucao: r.plano_distribuicao ?? undefined,
+    turmasConfig,
+  };
+};
 
 // --- Docente -------------------------------------------------------------
 export const docenteToRow = (d: Docente) => ({

@@ -91,7 +91,11 @@ export const ucsIniciais: UC[] = [
   createUcEseuc("uc_emc", "Enfermagem Médico-Cirúrgica", "EMC", 4, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 26, 8, 18, "360 estudantes; 2 turmas; mesma restrição do auditório. Semana 15 + fecho até 20/05/2027."),
   createUcEseuc("uc_essr", "Enfermagem de Saúde Sexual e Reprodutiva", "ESSR", 4, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 16, 28, 8, "Corresponde à Saúde materna indicada. Semana 15 + fecho até 20/05/2027."),
   createUcEseuc("uc_esmp", "Enfermagem de Saúde Mental e Psiquiátrica", "ESMP", 4, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 16, 20, 16, "2 turmas T; 4 TP e 12 PL por turma quando aplicável. Semana 15 + fecho até 20/05/2027."),
-  createUcEseuc("uc_psis", "Psicologia da Saúde", "PsiS", 3, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 20, 18, 0, "Mantida no 2.º semestre por adequação à informação indicada. Semana 15 + fecho até 20/05/2027.")
+  {
+    ...createUcEseuc("uc_psis", "Psicologia da Saúde", "PsiS", 3, 2, "2.º semestre, bloco final", 9, 14, "2027-03-30", "2027-05-20", 20, 18, 0, "Mantida no 2.º semestre por adequação à informação indicada. Semana 15 + fecho até 20/05/2027."),
+    turmasTSimultaneas: true,
+    horariosTSimultaneas: ["10:00", "16:00"],
+  }
 ];
 export const docentesIniciais: Docente[] = [
   {
@@ -448,6 +452,5 @@ export const versoesIniciais: VersaoHorario[] = [
   }
 ];
 export const solverRunsIniciais: SolverRun[] = [];
-
 
 

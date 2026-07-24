@@ -42,6 +42,7 @@ export interface RelatorioValidacao {
   violacoesAlmoco: number;           // aluno com 12:00 e 14:00 no mesmo dia
   violacoesCronologia: { sigla: string; familia: string; problema: string }[];
   tpPlMesmaUC: string[];             // chaves ano|semana|dia|hora|UC com TP e PL juntas
+  violacoesTSimultaneas: string[];    // UCs configuradas cujas turmas T não estão juntas/no bloco permitido
 }
 
 // alvo (nº de blocos) por (UC, tipo), considerando que as UCs "-I"/"-II" do 2.º ano só
@@ -100,6 +101,31 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
   const tpPlMesmaUC: string[] = [];
   for (const [k, set] of tipoNaMancha) if (set.has("TP") && set.has("PL")) tpPlMesmaUC.push(k);
 
+  // --- Turmas T simultâneas e horários permitidos (configuração por UC) ---
+  const violacoesTSimultaneas: string[] = [];
+  for (const uc of ucs.filter(u => u.turmasTSimultaneas)) {
+    const turmasT = (uc.turmasConfig || []).filter(t => t.tipo === "Teórica").map(t => t.nome);
+    const permitidos = new Set(uc.horariosTSimultaneas?.length ? uc.horariosTSimultaneas : ["10:00", "16:00"]);
+    const sessoesT = sessoes.filter(s => s.ucSigla === uc.sigla && s.tipoAula === "T");
+    const porMomento = new Map<string, SessaoHorario[]>();
+    for (const s of sessoesT) {
+      const k = `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+      if (!porMomento.has(k)) porMomento.set(k, []);
+      porMomento.get(k)!.push(s);
+      if (!["Segunda", "Quarta"].includes(s.diaSemana) || !permitidos.has(s.horaInicio)) {
+        violacoesTSimultaneas.push(`${uc.sigla}: ${k} fora dos blocos permitidos`);
+      }
+    }
+    for (const [momento, grupo] of porMomento) {
+      const presentes = new Set(grupo.map(s => s.turma));
+      const faltam = turmasT.filter(t => !presentes.has(t));
+      const duplicadas = grupo.length !== presentes.size;
+      if (faltam.length || duplicadas || presentes.size !== turmasT.length) {
+        violacoesTSimultaneas.push(`${uc.sigla}: ${momento} não reúne todas as turmas T (${[...presentes].join(", ") || "nenhuma"})`);
+      }
+    }
+  }
+
   // --- Cronologia T→TP→PL por (UC, família) ---
   const minT = new Map<string, number>(), minTP = new Map<string, number>(), minPL = new Map<string, number>();
   for (const s of sessoes) {
@@ -147,7 +173,8 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
   const pctGlobal = alvoTot ? Math.round((colocTot / alvoTot) * 100) : 100;
 
   const ok = sobreposicoes === 0 && maxBlocosDia <= 4 && violacoesAlmoco === 0
-    && violacoesCronologia.length === 0 && tpPlMesmaUC.length === 0;
+    && violacoesCronologia.length === 0 && tpPlMesmaUC.length === 0
+    && violacoesTSimultaneas.length === 0;
 
   return {
     ok,
@@ -159,5 +186,6 @@ export function validarHorario(sessoes: SessaoHorario[], ucs: UC[]): RelatorioVa
     violacoesAlmoco,
     violacoesCronologia,
     tpPlMesmaUC,
+    violacoesTSimultaneas,
   };
 }

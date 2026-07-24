@@ -56,6 +56,10 @@ export interface UC {
   maxSimultaneoT?: number;
   maxSimultaneoTP?: number;
   maxSimultaneoPL?: number;
+  /** Quando ativa, todas as turmas teóricas desta UC decorrem no mesmo bloco. */
+  turmasTSimultaneas?: boolean;
+  /** Horas de início permitidas para o bloco T conjunto (ex.: 10:00 e 16:00). */
+  horariosTSimultaneas?: string[];
   planoDistribucao?: Record<string, { blocoT: number; blocoTP: number; blocoPL: number; blocoS: number }>;
   turmasConfig?: {
     id: string;
@@ -63,6 +67,8 @@ export interface UC {
     tipo: "Teórica" | "Prática" | "TeoricoPratica" | "Seminário";
     docenteId?: string; // ID of the allocated teacher
     tipologiaSalaDesejada?: string; // Preferred room typology (e.g. Laboratório PL, Sala de Computadores)
+    tSimultanea?: boolean; // Configuração da UC persistida no JSONB turmas_config
+    horariosTSimultaneos?: string[];
   }[];
 }
 

@@ -890,6 +890,8 @@ export function gerarSessoesConjunto(
     maxSimultaneoT?: number;
     maxSimultaneoTP?: number;
     maxSimultaneoPL?: number;
+    turmasTSimultaneas: boolean;
+    horariosTSimultaneas: string[];
   }
 
   const buildWeeks = (semanas: SemanaInfo[], offset: number): WeekRef[] =>
@@ -946,6 +948,8 @@ export function gerarSessoesConjunto(
         maxSimultaneoT: uc.maxSimultaneoT,
         maxSimultaneoTP: uc.maxSimultaneoTP,
         maxSimultaneoPL: uc.maxSimultaneoPL,
+        turmasTSimultaneas: !!uc.turmasTSimultaneas,
+        horariosTSimultaneas: uc.horariosTSimultaneas?.length ? uc.horariosTSimultaneas : ["10:00", "16:00"],
       });
       const s = getStat(`${uc.id}|${family}`);
       if (tipo === "T") s.totalT += total; else if (tipo === "TP") s.totalTP += total; else if (tipo === "PL") s.totalPL += total;
@@ -1055,6 +1059,10 @@ export function gerarSessoesConjunto(
     const i = TODOS_PERIODOS.indexOf(hora);
     return (i > 0 && set.has(TODOS_PERIODOS[i - 1])) || (i < 5 && set.has(TODOS_PERIODOS[i + 1]));
   };
+  const grupoTeoricoConjunto = (t: Task): Task[] =>
+    t.tipo === "T" && t.turmasTSimultaneas
+      ? tasks.filter(x => x.tipo === "T" && x.ucKey === t.ucKey && x.ano === t.ano)
+      : [t];
 
   // Atualiza TODA a contabilidade do motor para uma sessão neste slot (ocupação, conflitos,
   // cronologia, carga diária, espelho). Partilhado por commit (geração) e seedFixa (fixas).
@@ -1203,6 +1211,19 @@ export function gerarSessoesConjunto(
     if (opts.semRegras) {
       const bloq = new Set(wk.diasBloqueados || []);
       pool = DIAS_SEMANA.filter(d => !bloq.has(d)).flatMap(d => TODOS_PERIODOS.map(hora => ({ dia: d, hora })));
+    }
+    // Configuração da UC: as turmas T são um único acontecimento pedagógico.
+    // O grupo inteiro só pode entrar num dos blocos explicitamente selecionados no
+    // modal da disciplina (por defeito 10–12 ou 16–18).
+    const grupoTConjunto = grupoTeoricoConjunto(t);
+    if (!opts.semRegras && t.tipo === "T" && t.turmasTSimultaneas) {
+      const permitidos = new Set(t.horariosTSimultaneas);
+      pool = pool.filter(s => ["Segunda", "Quarta"].includes(s.dia) && permitidos.has(s.hora));
+      pool = pool.filter(s => grupoTConjunto.every(g =>
+        g.placed < g.total &&
+        !ocupacao.has(slotKey(g.ano, wk.semanaGlobal, g.turmaNome, s.dia, s.hora)) &&
+        gruposAlunoFolha(g.turmaNome).every(f => (diaCount.get(diaKey(g.ano, wk.semanaGlobal, s.dia, f)) || 0) < MAX_BLOCOS_DIA)
+      ));
     }
     // Semanas de turma única (ex.: 8-15 só B, 16-23 só A no 2.º ano): Preferência pelo período da manhã (Regra Soft).
     // Permite usar a tarde como recurso se a carga for muito elevada (evitando incumprimento do limite de 6h).
@@ -1376,7 +1397,7 @@ export function gerarSessoesConjunto(
       }
     }
     // Enforce UC-specific maximum simultaneous limits for T, TP, and PL
-    if (t.tipo === "T" && t.maxSimultaneoT != null && t.maxSimultaneoT > 0) {
+    if (t.tipo === "T" && !t.turmasTSimultaneas && t.maxSimultaneoT != null && t.maxSimultaneoT > 0) {
       pool = pool.filter(s => {
         const current = ucSimultaneoCount.get(ucSimKey(t.ucKey, wk.semanaGlobal, s.dia, s.hora, "T")) || 0;
         return current + 1 <= t.maxSimultaneoT!;
@@ -1413,9 +1434,13 @@ export function gerarSessoesConjunto(
       });
     }
 
-      const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
+    const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool);
     if (!slot) return false;
-    commit(t, wk, slot);
+    if (!opts.semRegras && t.tipo === "T" && t.turmasTSimultaneas) {
+      for (const g of grupoTConjunto) commit(g, wk, slot);
+    } else {
+      commit(t, wk, slot);
+    }
     if (sibling) commit(sibling, wk, slot);
     return true;
   };
@@ -1486,7 +1511,9 @@ export function gerarSessoesConjunto(
         if (ratio < bestRatio) { bestRatio = ratio; best = a; }
       }
       if (!best) break;
-      if (tryPlace(best.t, best.wk)) done.set(best.t, (done.get(best.t) || 0) + 1);
+      if (tryPlace(best.t, best.wk)) {
+        for (const colocada of grupoTeoricoConjunto(best.t)) done.set(colocada, (done.get(colocada) || 0) + 1);
+      }
       else stuck.add(best.t);
     }
   };
@@ -1621,4 +1648,3 @@ export function gerarSessoesConjunto(
 
   return sessoes;
 }
-
