@@ -12,6 +12,8 @@ export type PadraoBloco100Id =
 export interface ConfiguracaoBlocos100 {
   exigirCoberturaTotal: boolean;
   preferirSextaLivre: boolean;
+  /** Turma A: true = manhã, false = tarde, por `${ano}|${semestre}`. A B usa o turno oposto. */
+  prefTurmaAManha?: Record<string, boolean>;
   padroesAtivos: PadraoBloco100Id[];
   padraoAEvitar: PadraoBloco100Id;
   cargaDiariaEstudante: {
@@ -375,6 +377,10 @@ export function organizarBlocos100(
     || Number(a.padrao === cfg.padraoAEvitar) - Number(b.padrao === cfg.padraoAEvitar))) {
     const uc = ucPorSigla.get(bloco.sessoes[0].ucSigla)!;
     const fam = familiaTeorica(bloco.sessoes[0].turma)!;
+    const semestreBloco = bloco.semanaPreferida <= 15 ? 1 : 2;
+    const turmaAManha = cfg.prefTurmaAManha?.[`${uc.anoCurricular}|${semestreBloco}`] ?? (semestreBloco === 1);
+    const familiaManha = fam === "A" ? turmaAManha : !turmaAManha;
+    const horasDoTurno = familiaManha ? new Set(["08:00", "10:00", "12:00"]) : new Set(["14:00", "16:00", "18:00"]);
     const idsUcsBloco = [...new Set(bloco.sessoes.map(s => ucPorSigla.get(s.ucSigla)?.id).filter((id): id is string => !!id))];
     const semInicio = bloco.semanaPreferida <= 15 ? 1 : 16;
     const semFim = bloco.semanaPreferida <= 15 ? 15 : 30;
@@ -385,6 +391,7 @@ export function organizarBlocos100(
     const maxBlocos = Math.max(alvoBlocos, Math.floor(cfg.cargaDiariaEstudante.maxHoras / 2));
     const candidatosSlot: { semana: number; dia: string; hora: string; custo: number }[] = [];
     for (const semana of semanas) for (const dia of ordemDias) for (const hora of HORAS) {
+      if (!horasDoTurno.has(hora)) continue;
       if (dia === "Sexta" && hora === "18:00") continue;
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;

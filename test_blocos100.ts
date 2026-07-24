@@ -33,6 +33,14 @@ executar([
   ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
 ], "TP3_PL3");
 
+const turnosRigidos = organizarBlocos100([
+  ...[1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`)),
+  ...[5, 6, 7, 8].map(n => s("U1", "TP", `TP${n}`)),
+], catalogo, { prefTurmaAManha: { "1|1": true } });
+assert.equal(turnosRigidos.naoAlocadas.length, 0);
+assert.ok(turnosRigidos.sessoes.filter(x => /^TP[1-4]$/.test(x.turma)).every(x => ["08:00", "10:00", "12:00"].includes(x.horaInicio)));
+assert.ok(turnosRigidos.sessoes.filter(x => /^TP[5-8]$/.test(x.turma)).every(x => ["14:00", "16:00", "18:00"].includes(x.horaInicio)));
+
 const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
 assert.equal(incompleto.sessoes.length, 0);
 assert.equal(incompleto.naoAlocadas.length, 1);
@@ -65,6 +73,6 @@ const cargaExcecional = organizarBlocos100(
   {},
   [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça", "Quinta", "Sexta"] }], semanaGlobalOffset: 0 }],
 );
-assert.equal(cargaExcecional.naoAlocadas.length, 0);
-assert.equal(cargaExcecional.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quarta").length, 4);
+assert.equal(cargaExcecional.naoAlocadas.length, 4, "o quarto bloco não deve invadir o turno oposto");
+assert.equal(cargaExcecional.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quarta").length, 3);
 console.log("blocos100: 8 cenários validados");

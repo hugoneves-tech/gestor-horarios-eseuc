@@ -1885,6 +1885,7 @@ export default function App() {
           ...CONFIGURACAO_BLOCOS_100_DEFAULT,
           ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
           ...(motorAI.blocos100 || {}),
+          prefTurmaAManha,
           cargaDiariaEstudante: motorAI.cargaDiariaEstudante ?? CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
         };
         allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);

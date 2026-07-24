@@ -282,10 +282,6 @@ function poolDoTipo(
   // Período preferido DEPENDE DO DIA (rotação dia-a-dia): cada UC avança um período de
   // um dia para o outro. Ex.: FT quinta@08 → sexta@10. (rotacao = base da UC + semana.)
   const periodosPrefDia = (dia: string) => baseMetade;
-  // Bloco de AJUSTE na metade oposta — SEMPRE um único bloco adjacente ao almoço,
-  // igual para T/TP e PL (manhã→16h, depois do almoço 14-16; tarde→10h, antes do
-  // almoço 12-14). Aí cabem 2 TP + 6 PL (emparelhamento) = 180 alunos no bloco extra.
-  const periodosOver = manha ? ["16:00"] : ["10:00"];
   const avail = WEEKDAYS.filter(d => !diasBloqueados.includes(d));
   if (!avail.length) return [];
 
@@ -305,7 +301,7 @@ function poolDoTipo(
   // seguinte e a 6ª encha sequencialmente (08→10→12), ambas as turmas no mesmo período.
   // Nos outros dias de T (2ª/4ª) usa a metade da família (com rotação).
   const periodosTDia = (dia: string) =>
-    dia === "Sexta" ? PERIODOS_MANHA : periodosPrefDia(dia);
+    dia === "Sexta" ? (manha ? PERIODOS_MANHA : []) : periodosPrefDia(dia);
 
 
 
@@ -343,17 +339,13 @@ function poolDoTipo(
   const parcialSem = isFirstWeekS1 && !avail.includes("Segunda") && !avail.includes("Terça");
 
   for (const dia of ordemDias) {
-    let periodos = tipo === "T" ? periodosTDia(dia) : (dia === "Sexta" ? PERIODOS_MANHA : periodosPrefDia(dia));
+    let periodos = tipo === "T" ? periodosTDia(dia) : periodosPrefDia(dia);
     if (dia === "Quarta" && parcialSem) {
         if (tipo !== "T") continue;
         periodos = PERIODOS_MANHA;
     }
     for (const hora of periodos) slots.push({ dia, hora });
     
-    if (tipo === "PL" || tipo === "TP") {
-       if (dia === "Quarta" && parcialSem) continue;
-       for (const hora of periodosOver) slots.push({ dia, hora });
-    }
   }
 
   return slots.filter(s => !(s.dia === "Sexta" && s.hora === "18:00"));
@@ -1152,6 +1144,7 @@ export function gerarSessoesConjunto(
   // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
   const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
     if (dia === "Sexta" && hora === "18:00") return false;
+    if (!opts.semRegras && !(t.manha ? PERIODOS_MANHA : PERIODOS_TARDE).includes(hora)) return false;
     // Cronologia GLOBAL T→TP→PL também nas passagens de recuperação.
     if (t.tipo === "TP" || t.tipo === "PL") {
       const st0 = getStat(statKeyOf(t));
@@ -1201,10 +1194,11 @@ export function gerarSessoesConjunto(
     // Rotação por UC: base distinta por UC (período de arranque) + variação por semana.
     // Em poolDoTipo soma-se ainda o índice do dia → rotação dia-a-dia (FT qui@08→sex@10).
     const rotacao = t.rotaBase + wk.semanaGlobal - 1;
-    // Semanas de uma só turma → essa turma arranca de manhã (não há a outra na tarde),
-    // com a tarde disponível em ajuste para a carga alta destas semanas (bloco 2/4).
+    // O turno é rígido: a Turma A e a Turma B mantêm metades opostas do dia.
+    // As exceções explícitas (T simultâneas e semana inicial parcial) são tratadas
+    // abaixo, sem transformar genericamente a Turma B numa turma da manhã.
     // Semana PARCIAL (1.ª semana do 2.º ano): permite 2 UCs no bloco de TP (16-18 da 6ª).
-    const manhaEf = soUmaTurma(t.ano, wk.semanaGlobal) ? true : t.manha;
+    const manhaEf = t.manha;
     let pool = poolDoTipo(t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel, semestre === 1 && wk.semanaGlobal === 1);
     // MODO SEM REGRAS: SEM nenhuma regra — todos os dias úteis e TODOS os períodos (08-18),
     // sem turnos, sem almoço, sem teto de 8h. Só não duplica a mesma turma. Para comparar.
@@ -1227,11 +1221,6 @@ export function gerarSessoesConjunto(
         !ocupacao.has(slotKey(g.ano, wk.semanaGlobal, g.turmaNome, s.dia, s.hora)) &&
         gruposAlunoFolha(g.turmaNome).every(f => (diaCount.get(diaKey(g.ano, wk.semanaGlobal, s.dia, f)) || 0) < MAX_BLOCOS_DIA)
       ));
-    }
-    // Semanas de turma única (ex.: 8-15 só B, 16-23 só A no 2.º ano): Preferência pelo período da manhã (Regra Soft).
-    // Permite usar a tarde como recurso se a carga for muito elevada (evitando incumprimento do limite de 6h).
-    if (!opts.semRegras && soUmaTurma(t.ano, wk.semanaGlobal)) {
-      pool = [...pool.filter(s => PERIODOS_MANHA.includes(s.hora)), ...pool.filter(s => !PERIODOS_MANHA.includes(s.hora))];
     }
     // Conflito de UCs (docentes partilhados): nunca na mesma mancha (ex.: ESDAC ∦ EIG).
     const emConflito = conflitoUC.get(t.ucSigla);
@@ -1641,11 +1630,11 @@ export function gerarSessoesConjunto(
   for (const [wg, wk] of wkByGlobal) {
     if (soUmaTurma(2, wg)) continue; // TODO: Pl recovery might need ano check. Assuming ano 2 for legacy behaviour for now
     if (wk.diasBloqueados?.includes("Sexta")) continue;        // 6ª feriado
-    for (const fam of ["A", "B"] as const) {                   // ambas as turmas, todas as 6ªs
+    for (const fam of ["A", "B"] as const) {                   // ambas as turmas, cada uma no seu turno
       const cand = plTasksRec
         .filter(t => t.family === fam && t.placed < t.total && t.weeks.some(w => w.semanaGlobal === wg))
         .sort((a, b) => (b.total - b.placed) - (a.total - a.placed)); // maior atraso primeiro
-      for (const t of cand) tryPlaceAt(t, wk, "Sexta", "16:00", true);
+      for (const t of cand) tryPlaceAt(t, wk, "Sexta", t.manha ? "10:00" : "16:00", true);
     }
   }
 
