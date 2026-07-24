@@ -41,6 +41,24 @@ assert.equal(turnosRigidos.naoAlocadas.length, 0);
 assert.ok(turnosRigidos.sessoes.filter(x => /^TP[1-4]$/.test(x.turma)).every(x => ["08:00", "10:00", "12:00"].includes(x.horaInicio)));
 assert.ok(turnosRigidos.sessoes.filter(x => /^TP[5-8]$/.test(x.turma)).every(x => ["14:00", "16:00", "18:00"].includes(x.horaInicio)));
 
+const externaB = (horaInicio: "14:00" | "16:00", horaFim: "16:00" | "18:00"): SessaoHorario => ({
+  ...s("U1", "TP", "TP5"),
+  tipoAula: "T",
+  turma: "Turma B",
+  diaSemana: "Sexta",
+  horaInicio,
+  horaFim,
+});
+const sexta18 = organizarBlocos100(
+  [5, 6, 7, 8].map(n => s("U1", "TP", `TP${n}`)),
+  catalogo,
+  { prefTurmaAManha: { "1|1": true } },
+  [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça", "Quarta", "Quinta"] }], semanaGlobalOffset: 0 }],
+  [externaB("14:00", "16:00"), externaB("16:00", "18:00")],
+);
+assert.equal(sexta18.naoAlocadas.length, 0);
+assert.ok(sexta18.sessoes.every(x => x.diaSemana === "Sexta" && x.horaInicio === "18:00"));
+
 const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
 assert.equal(incompleto.sessoes.length, 0);
 assert.equal(incompleto.naoAlocadas.length, 1);
@@ -75,4 +93,4 @@ const cargaExcecional = organizarBlocos100(
 );
 assert.equal(cargaExcecional.naoAlocadas.length, 4, "o quarto bloco não deve invadir o turno oposto");
 assert.equal(cargaExcecional.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quarta").length, 3);
-console.log("blocos100: 8 cenários validados");
+console.log("blocos100: combinações, turnos e sexta 18h–20h validados");

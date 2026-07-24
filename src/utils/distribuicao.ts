@@ -293,7 +293,7 @@ function poolDoTipo(
     // para tapar buracos das sextas que sobram livres depois de esgotadas as T.
     const ordem = avail.filter(d => d !== "Sexta").concat(avail.includes("Sexta") ? ["Sexta"] : []);
     for (const dia of ordem) for (const hora of periodosPrefDia(dia)) slotsF.push({ dia, hora });
-    return slotsF.filter(s => !(s.dia === "Sexta" && s.hora === "18:00"));
+    return slotsF;
   }
 
   // Períodos da T: na 6ª-feira é SEMPRE de manhã, em ORDEM FIXA [08,10,12] (sem rotação)
@@ -348,7 +348,7 @@ function poolDoTipo(
     
   }
 
-  return slots.filter(s => !(s.dia === "Sexta" && s.hora === "18:00"));
+  return slots;
 }
 
 // ---------------------------------------------------------------------------
@@ -1143,7 +1143,6 @@ export function gerarSessoesConjunto(
   // Colocação FORÇADA num slot específico (para a passagem de "encher blocos extra"),
   // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
   const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
-    if (dia === "Sexta" && hora === "18:00") return false;
     if (!opts.semRegras && !(t.manha ? PERIODOS_MANHA : PERIODOS_TARDE).includes(hora)) return false;
     // Cronologia GLOBAL T→TP→PL também nas passagens de recuperação.
     if (t.tipo === "TP" || t.tipo === "PL") {
@@ -1634,7 +1633,12 @@ export function gerarSessoesConjunto(
       const cand = plTasksRec
         .filter(t => t.family === fam && t.placed < t.total && t.weeks.some(w => w.semanaGlobal === wg))
         .sort((a, b) => (b.total - b.placed) - (a.total - a.placed)); // maior atraso primeiro
-      for (const t of cand) tryPlaceAt(t, wk, "Sexta", t.manha ? "10:00" : "16:00", true);
+      for (const t of cand) {
+        const horasSexta = t.manha ? PERIODOS_MANHA : PERIODOS_TARDE;
+        for (const hora of horasSexta) {
+          if (tryPlaceAt(t, wk, "Sexta", hora, true)) break;
+        }
+      }
     }
   }
 

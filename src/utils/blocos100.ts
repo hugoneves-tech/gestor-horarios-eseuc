@@ -392,7 +392,6 @@ export function organizarBlocos100(
     const candidatosSlot: { semana: number; dia: string; hora: string; custo: number }[] = [];
     for (const semana of semanas) for (const dia of ordemDias) for (const hora of HORAS) {
       if (!horasDoTurno.has(hora)) continue;
-      if (dia === "Sexta" && hora === "18:00") continue;
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (ocupados.has(k)) continue;
