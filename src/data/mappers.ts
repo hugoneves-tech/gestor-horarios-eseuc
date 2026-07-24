@@ -165,6 +165,23 @@ export const rowToRegra = (r: any): RegraHorario => {
       },
     };
   }
+  // Compatibilidade com a configuração anterior, que só admitia um dia de
+  // 8h. O autosave persiste no Supabase o novo limite depois do carregamento.
+  if (r.id === "h_carga_diaria_estudantes") {
+    config = {
+      ...config,
+      traducaoSimples: "O motor procura limitar cada dia a 6h. Para completar a carga na semana correta, permite 8h até três dias por semana, sem nunca ultrapassar 8h.",
+      motor: {
+        ...(config.motor || {}),
+        cargaDiariaEstudante: {
+          ...(config.motor?.cargaDiariaEstudante || {}),
+          alvoHoras: 6,
+          maxHoras: 8,
+          maxDiasNoMaximoPorSemana: 3,
+        },
+      },
+    };
+  }
   return {
     id: r.id, nome: r.nome, tipo: r.tipo, categoria: r.categoria ?? "", descricao: r.descricao ?? "",
     escopo: r.escopo ?? undefined,

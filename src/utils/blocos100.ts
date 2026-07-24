@@ -28,7 +28,7 @@ export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   preferirSextaLivre: false,
   padroesAtivos: ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
   padraoAEvitar: "TP3_PL3",
-  cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 },
+  cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 3 },
 };
 
 export const DESCRICAO_PADROES_BLOCOS_100: Record<PadraoBloco100Id, string> = {
@@ -380,7 +380,10 @@ export function organizarBlocos100(
     const semestreBloco = bloco.semanaPreferida <= 15 ? 1 : 2;
     const turmaAManha = cfg.prefTurmaAManha?.[`${uc.anoCurricular}|${semestreBloco}`] ?? (semestreBloco === 1);
     const familiaManha = fam === "A" ? turmaAManha : !turmaAManha;
-    const horasDoTurno = familiaManha ? new Set(["08:00", "10:00", "12:00"]) : new Set(["14:00", "16:00", "18:00"]);
+    const horasPreferidas = familiaManha ? new Set(["08:00", "10:00", "12:00"]) : new Set(["14:00", "16:00", "18:00"]);
+    // Quarto bloco excecional com pausa de almoço: A 08-14 + 16-18; B 10-12 + 14-20.
+    const horaAjuste8h = familiaManha ? "16:00" : "10:00";
+    const horasDoTurno = new Set([...horasPreferidas, horaAjuste8h]);
     const idsUcsBloco = [...new Set(bloco.sessoes.map(s => ucPorSigla.get(s.ucSigla)?.id).filter((id): id is string => !!id))];
     const semInicio = bloco.semanaPreferida <= 15 ? 1 : 16;
     const semFim = bloco.semanaPreferida <= 15 ? 15 : 30;
@@ -395,6 +398,10 @@ export function organizarBlocos100(
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (ocupados.has(k)) continue;
+      const cargasAtuais = folhasBloco.map(folha => cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0);
+      // O bloco fora do turno só pode ser o quarto bloco do dia, nunca um atalho
+      // para colocar a Turma B de manhã ou a Turma A à tarde.
+      if (hora === horaAjuste8h && cargasAtuais.some(carga => carga < alvoBlocos)) continue;
       if (folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= maxBlocos)) continue;
       const criaDiaMaximo = folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) + 1 === maxBlocos);
       if (criaDiaMaximo && cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana >= 0) {
@@ -404,15 +411,15 @@ export function organizarBlocos100(
         });
         if (excedeDias) continue;
       }
-      const folhasAcimaAlvo = folhasBloco.filter(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= alvoBlocos).length;
+      const criaDia8h = cargasAtuais.some(carga => carga >= alvoBlocos);
       const distanciaSemana = Math.abs(semana - bloco.semanaPreferida);
       const rotacaoDia = (semana - 1) % DIAS.length;
       const indiceDia = cfg.preferirSextaLivre
         ? DIAS.indexOf(dia)
         : (DIAS.indexOf(dia) - rotacaoDia + DIAS.length) % DIAS.length;
-      const custo = folhasAcimaAlvo * 1_000_000
+      const custo = Number(criaDia8h) * 10_000
         + Number(cfg.preferirSextaLivre && dia === "Sexta") * 10_000
-        + distanciaSemana * 100 + indiceDia * 10 + HORAS.indexOf(hora);
+        + distanciaSemana * 100_000 + indiceDia * 10 + HORAS.indexOf(hora);
       candidatosSlot.push({ semana, dia, hora, custo });
     }
     const escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;

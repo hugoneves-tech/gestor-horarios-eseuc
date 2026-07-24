@@ -303,6 +303,7 @@ function poolDoTipo(
   // Nos outros dias de T (2ª/4ª) usa a metade da família (com rotação).
   const periodosTDia = (dia: string) =>
     dia === "Sexta" ? (manha ? PERIODOS_MANHA : []) : periodosPrefDia(dia);
+  const periodoAjuste8h = manha ? "16:00" : "10:00";
 
 
 
@@ -347,7 +348,7 @@ function poolDoTipo(
         periodos = PERIODOS_MANHA;
     }
     for (const hora of periodos) slots.push({ dia, hora });
-    
+    if (tipo === "TP" || tipo === "PL") slots.push({ dia, hora: periodoAjuste8h });
   }
 
   return slots;
@@ -1029,8 +1030,10 @@ export function gerarSessoesConjunto(
   const tpManchaKey = (ano: number, week: number, dia: string, hora: string) => `${ano}|${week}|${dia}|${hora}`;
   const ucSimultaneoCount = new Map<string, number>(); // `${ucKey}|${week}|${dia}|${hora}|${tipo}` → count
   const ucSimKey = (ucKey: string, week: number, dia: string, hora: string, tipo: string) => `${ucKey}|${week}|${dia}|${hora}|${tipo}`;
-  // Carga diária por aluno (grupo-folha PL): base de 6h (3 blocos) numa só metade do dia
-  // e, no MÁXIMO, UM dia por semana a 8h (4 blocos). Nunca mais de 8h.
+  // Carga diária por aluno (grupo-folha PL): base de 6h (3 blocos) numa só
+  // metade do dia. O organizador final pode completar até três dias por semana
+  // com 8h (4 blocos), sem nunca ultrapassar esse teto.
+  const ALVO_BLOCOS_DIA = 3;    // objetivo normal = 6h/dia
   const MAX_BLOCOS_DIA = 4;     // teto absoluto = 8h/dia
   const diaCount = new Map<string, number>(); // `${ano}|${week}|${dia}|${plGroup}` → nº de blocos
   const diaKey = (ano: number, week: number, dia: string, g: string) => `${ano}|${week}|${dia}|${g}`;
@@ -1146,7 +1149,8 @@ export function gerarSessoesConjunto(
   // Colocação FORÇADA num slot específico (para a passagem de "encher blocos extra"),
   // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
   const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
-    if (!opts.semRegras && !(t.manha ? PERIODOS_MANHA : PERIODOS_TARDE).includes(hora)) return false;
+    const horaAjuste8h = t.manha ? "16:00" : "10:00";
+    if (!opts.semRegras && !(t.manha ? PERIODOS_MANHA : PERIODOS_TARDE).includes(hora) && hora !== horaAjuste8h) return false;
     // Cronologia GLOBAL T→TP→PL também nas passagens de recuperação.
     if (t.tipo === "TP" || t.tipo === "PL") {
       const st0 = getStat(statKeyOf(t));
@@ -1161,7 +1165,9 @@ export function gerarSessoesConjunto(
     const smk = tpManchaKey(t.ano, wk.semanaGlobal, dia, hora);
     const emConflito = conflitoUC.get(t.ucSigla);
     if (emConflito) { const set = siglaMancha.get(smk); if (set) for (const sig of set) if (emConflito.has(sig)) return false; }
-    if (gruposAlunoFolha(t.turmaNome).some(g => (diaCount.get(diaKey(t.ano, wk.semanaGlobal, dia, g)) || 0) >= MAX_BLOCOS_DIA)) return false;
+    const folhasDoTurno = gruposAlunoFolha(t.turmaNome);
+    if (!opts.semRegras && hora === horaAjuste8h && folhasDoTurno.some(g => (diaCount.get(diaKey(t.ano, wk.semanaGlobal, dia, g)) || 0) < ALVO_BLOCOS_DIA)) return false;
+    if (folhasDoTurno.some(g => (diaCount.get(diaKey(t.ano, wk.semanaGlobal, dia, g)) || 0) >= MAX_BLOCOS_DIA)) return false;
     if (t.tipo === "TP") {
       const set = tpUCs.get(smk);
       if (!relaxPLuc && set && !(set.size === 1 && set.has(t.ucKey))) return false; // só a mesma UC nas TP
@@ -1334,6 +1340,9 @@ export function gerarSessoesConjunto(
     // Carga diária: teto absoluto de 8h/dia (4 blocos). No modo SEM REGRAS não se aplica.
     const folhas = gruposAlunoFolha(t.turmaNome);
     if (!opts.semRegras) {
+      const horaAjuste8h = manhaEf ? "16:00" : "10:00";
+      pool = pool.filter(s => s.hora !== horaAjuste8h || folhas.every(g =>
+        (diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0) >= ALVO_BLOCOS_DIA));
       pool = pool.filter(s => folhas.every(g =>
         (diaCount.get(diaKey(t.ano, wk.semanaGlobal, s.dia, g)) || 0) < MAX_BLOCOS_DIA));
       // ALVO 6h/dia: preferir dias em que os alunos ainda têm <3 blocos; o 4.º bloco

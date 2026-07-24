@@ -14,6 +14,11 @@ const regraLegada = rowToRegra({
   config: { motor: { blocos100: { preferirSextaLivre: true } } },
 });
 assert.equal((regraLegada.config as any).motor.blocos100.preferirSextaLivre, false);
+const cargaLegada = rowToRegra({
+  id: "h_carga_diaria_estudantes", nome: "Carga diária", tipo: "hard", ativa: true,
+  config: { motor: { cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 } } },
+});
+assert.equal((cargaLegada.config as any).motor.cargaDiariaEstudante.maxDiasNoMaximoPorSemana, 3);
 let id = 0;
 const s = (ucSigla: string, tipoAula: "TP" | "PL", turma: string): SessaoHorario => ({
   id: ++id, ucNome: ucSigla, ucSigla, tipoAula, turma, docente: "", sala: "", salaTipo: "",
@@ -108,6 +113,22 @@ const cargaExcecional = organizarBlocos100(
   {},
   [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça", "Quinta", "Sexta"] }], semanaGlobalOffset: 0 }],
 );
-assert.equal(cargaExcecional.naoAlocadas.length, 4, "o quarto bloco não deve invadir o turno oposto");
-assert.equal(cargaExcecional.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quarta").length, 3);
-console.log("blocos100: combinações, turnos e sexta 18h–20h validados");
+assert.equal(cargaExcecional.naoAlocadas.length, 0, "o quarto bloco controlado deve permitir completar a semana");
+const quartaExcecional = cargaExcecional.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quarta");
+assert.equal(quartaExcecional.length, 4);
+assert.ok(quartaExcecional.some(x => x.horaInicio === "16:00"), "a Turma A deve usar 16h–18h como quarto bloco, preservando o almoço");
+
+const dozeBlocos = Array.from({ length: 12 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
+const tresDiasExcecionais = organizarBlocos100(
+  dozeBlocos,
+  catalogo,
+  {},
+  [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça"] }], semanaGlobalOffset: 0 }],
+);
+const cargaTresDias = new Map<string, number>();
+for (const sessao of tresDiasExcecionais.sessoes.filter(x => x.turma === "TP1")) {
+  cargaTresDias.set(sessao.diaSemana, (cargaTresDias.get(sessao.diaSemana) || 0) + 1);
+}
+assert.equal(tresDiasExcecionais.naoAlocadas.length, 0, "três dias de 8h devem completar uma semana de carga elevada");
+assert.equal([...cargaTresDias.values()].filter(carga => carga === 4).length, 3);
+console.log("blocos100: combinações, turnos, sexta 18h–20h e dias de 8h validados");
