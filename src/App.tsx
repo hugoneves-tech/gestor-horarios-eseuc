@@ -1940,6 +1940,9 @@ export default function App() {
           ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
           ...(motorAI.blocos100 || {}),
           prefTurmaAManha,
+          // Semanas de turma única: a família ativa pode usar o dia inteiro (manhã preferida).
+          semanasSoTurmaA: motorAI.semanasSoTurmaA,
+          semanasSoTurmaB: motorAI.semanasSoTurmaB,
           maxPLporMancha: motorAI.maxPLporMancha ?? CONFIGURACAO_BLOCOS_100_DEFAULT.maxPLporMancha,
           cargaDiariaEstudante: motorAI.cargaDiariaEstudante ?? CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
         };

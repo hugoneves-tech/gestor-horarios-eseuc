@@ -16,6 +16,14 @@ export interface ConfiguracaoBlocos100 {
   maxPLporMancha: number;
   /** Turma A: true = manhã, false = tarde, por `${ano}|${semestre}`. A B usa o turno oposto. */
   prefTurmaAManha?: Record<string, boolean>;
+  /**
+   * Semanas GLOBAIS (1-30) em que só a Turma A tem aulas — a B está em estágio —, por ano
+   * curricular. Nessas semanas não há contenção entre as duas famílias, por isso a família
+   * ativa pode ocupar o dia inteiro (manhã e tarde), com a manhã preferida no custo.
+   */
+  semanasSoTurmaA?: Record<number, number[]>;
+  /** Idem para as semanas em que só a Turma B tem aulas. */
+  semanasSoTurmaB?: Record<number, number[]>;
   padroesAtivos: PadraoBloco100Id[];
   padraoAEvitar: PadraoBloco100Id;
   cargaDiariaEstudante: {
@@ -357,6 +365,16 @@ export function organizarBlocos100(
   // Cada bloco usa a turma teórica completa; por isso recebe um slot exclusivo por
   // (ano, semestre, família). Segunda a quinta são sempre tentadas antes de sexta.
   const ocupados = new Set<string>();
+  // Manchas já ocupadas por (ano, família, semana) — a carga semanal do estudante. É o termo
+  // DOMINANTE do custo: entre os slots viáveis escolhe-se sempre o da semana menos carregada
+  // dessa família (guloso "semana menos carregada primeiro"), o que espalha os blocos por
+  // toda a janela de semanas das suas UCs em vez de saturar as primeiras.
+  const cargaSemana = new Map<string, number>();
+  const chaveCargaSemana = (ano: number, familia: Familia, semana: number) => `${ano}|${familia}|${semana}`;
+  // Sem `entradasAtivas` não conhecemos a janela real de semanas de cada UC (os candidatos
+  // abrangeriam o semestre inteiro), pelo que espalhar seria mover blocos para fora do
+  // período letivo da sua UC. Nesse caso mantém-se o comportamento anterior.
+  const equilibrarSemanas = slotsPermitidosPorUc !== null;
   const plPorMancha = new Map<string, number>();
   const chavePL = (semana: number, dia: string, hora: string) => `${semana}|${dia}|${hora}`;
   const cargaDia = new Map<string, number>();
@@ -371,7 +389,15 @@ export function organizarBlocos100(
   };
   for (const s of [...preservadas, ...sessoesExternas]) {
     const uc = ucPorSigla.get(s.ucSigla); const fam = familiaTeorica(s.turma);
-    if (uc && fam && s.semana != null) ocupados.add(`${uc.anoCurricular}|${fam}|${s.semana}|${s.diaSemana}|${s.horaInicio}`);
+    if (uc && fam && s.semana != null) {
+      const mancha = `${uc.anoCurricular}|${fam}|${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+      // As T e as sessões de outros anos já colocadas contam para o equilíbrio semanal.
+      if (!ocupados.has(mancha)) {
+        ocupados.add(mancha);
+        const chave = chaveCargaSemana(uc.anoCurricular, fam, s.semana);
+        cargaSemana.set(chave, (cargaSemana.get(chave) || 0) + 1);
+      }
+    }
     if (s.tipoAula === "PL" && s.semana != null) {
       const chave = chavePL(s.semana, s.diaSemana, s.horaInicio);
       plPorMancha.set(chave, (plPorMancha.get(chave) || 0) + 1);
@@ -389,10 +415,16 @@ export function organizarBlocos100(
     const semestreBloco = bloco.semanaPreferida <= 15 ? 1 : 2;
     const turmaAManha = cfg.prefTurmaAManha?.[`${uc.anoCurricular}|${semestreBloco}`] ?? (semestreBloco === 1);
     const familiaManha = fam === "A" ? turmaAManha : !turmaAManha;
-    const horasPreferidas = familiaManha ? new Set(["08:00", "10:00", "12:00"]) : new Set(["14:00", "16:00", "18:00"]);
+    const horasManha = ["08:00", "10:00", "12:00"];
+    const horasTurno = familiaManha ? horasManha : ["14:00", "16:00", "18:00"];
     // Quarto bloco excecional com pausa de almoço: A 08-14 + 16-18; B 10-12 + 14-20.
     const horaAjuste8h = familiaManha ? "16:00" : "10:00";
-    const horasDoTurno = new Set([...horasPreferidas, horaAjuste8h]);
+    // Semanas em que só esta família tem aulas (a outra está em estágio): não há contenção
+    // de laboratórios entre turmas, por isso o dia inteiro fica disponível — mas a manhã é a
+    // preferida e a tarde continua reservada ao quarto bloco do dia (preserva o almoço).
+    const semanasSoDestaFamilia = new Set(
+      (fam === "A" ? cfg.semanasSoTurmaA : cfg.semanasSoTurmaB)?.[uc.anoCurricular] ?? [],
+    );
     const idsUcsBloco = [...new Set(bloco.sessoes.map(s => ucPorSigla.get(s.ucSigla)?.id).filter((id): id is string => !!id))];
     const semInicio = bloco.semanaPreferida <= 15 ? 1 : 16;
     const semFim = bloco.semanaPreferida <= 15 ? 15 : 30;
@@ -403,7 +435,17 @@ export function organizarBlocos100(
     const alvoBlocos = Math.max(1, Math.floor(cfg.cargaDiariaEstudante.alvoHoras / 2));
     const maxBlocos = Math.max(alvoBlocos, Math.floor(cfg.cargaDiariaEstudante.maxHoras / 2));
     const candidatosSlot: { semana: number; dia: string; hora: string; custo: number }[] = [];
-    for (const semana of semanas) for (const dia of ordemDias) for (const hora of HORAS) {
+    for (const semana of semanas) {
+      // Numa semana de turma única a família ativa passa a ser "de manhã" e ganha a tarde
+      // toda como reserva; fora dessas semanas mantém-se o modelo de turnos rígido, que é o
+      // que evita a contenção dos 6 laboratórios entre as duas turmas teóricas.
+      const soEstaFamilia = semanasSoDestaFamilia.has(semana);
+      const horasPreferidas = new Set(soEstaFamilia ? horasManha : horasTurno);
+      const horasReserva = soEstaFamilia
+        ? ["16:00", "14:00", "18:00"].filter(h => !horasPreferidas.has(h))
+        : [horaAjuste8h];
+      const horasDoTurno = new Set([...horasPreferidas, ...horasReserva]);
+      for (const dia of ordemDias) for (const hora of HORAS) {
       if (!horasDoTurno.has(hora)) continue;
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
@@ -412,7 +454,7 @@ export function organizarBlocos100(
       const cargasAtuais = folhasBloco.map(folha => cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0);
       // O bloco fora do turno só pode ser o quarto bloco do dia, nunca um atalho
       // para colocar a Turma B de manhã ou a Turma A à tarde.
-      if (hora === horaAjuste8h && cargasAtuais.some(carga => carga < alvoBlocos)) continue;
+      if (!horasPreferidas.has(hora) && cargasAtuais.some(carga => carga < alvoBlocos)) continue;
       if (folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= maxBlocos)) continue;
       const criaDiaMaximo = folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) + 1 === maxBlocos);
       if (criaDiaMaximo && cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana >= 0) {
@@ -428,14 +470,33 @@ export function organizarBlocos100(
       const indiceDia = cfg.preferirSextaLivre
         ? DIAS.indexOf(dia)
         : (DIAS.indexOf(dia) - rotacaoDia + DIAS.length) % DIAS.length;
-      const custo = Number(criaDia8h) * 10_000
-        + Number(cfg.preferirSextaLivre && dia === "Sexta") * 10_000
-        + distanciaSemana * 100_000 + indiceDia * 10 + HORAS.indexOf(hora);
+      // Preferência suave por manhã (ou, fora das semanas de turma única, pelo turno da
+      // família): as horas de reserva ficam sempre atrás das preferidas, e dentro de cada
+      // grupo prefere-se a hora mais cedo. A reserva começa nas 16h para preservar o almoço.
+      const custoHora = horasPreferidas.has(hora)
+        ? HORAS.indexOf(hora)
+        : 10 + Math.max(0, horasReserva.indexOf(hora));
+      // Prioridades, da mais forte para a mais fraca:
+      //   1. equilíbrio da carga semanal da turma teórica  (objetivo primário)
+      //   2. sexta livre, quando configurada
+      //   3. proximidade à semana preferida do bloco
+      //   4. evitar dias de 8h, rotação de dias e preferência por manhã
+      const cargaDaSemana = equilibrarSemanas
+        ? (cargaSemana.get(chaveCargaSemana(uc.anoCurricular, fam, semana)) || 0)
+        : 0;
+      const custo = cargaDaSemana * 1_000_000
+        + Number(cfg.preferirSextaLivre && dia === "Sexta") * 100_000
+        + distanciaSemana * 1_000
+        + Number(criaDia8h) * 100
+        + indiceDia * 10 + custoHora;
       candidatosSlot.push({ semana, dia, hora, custo });
+      }
     }
     const escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;
     if (!escolhido) { sobras.push(...bloco.sessoes); continue; }
     ocupados.add(`${uc.anoCurricular}|${fam}|${escolhido.semana}|${escolhido.dia}|${escolhido.hora}`);
+    const chaveSemana = chaveCargaSemana(uc.anoCurricular, fam, escolhido.semana);
+    cargaSemana.set(chaveSemana, (cargaSemana.get(chaveSemana) || 0) + 1);
     if (plNesteBloco) {
       const chave = chavePL(escolhido.semana, escolhido.dia, escolhido.hora);
       plPorMancha.set(chave, (plPorMancha.get(chave) || 0) + plNesteBloco);
