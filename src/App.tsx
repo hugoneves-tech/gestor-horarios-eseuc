@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { criarHtmlHorarioPdf } from "./utils/exportarPdf";
 
 function calcCoverage(sessoes: import('./types').SessaoHorario[]) {
   const plCovered = new Set<string>();
@@ -5572,52 +5573,58 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
-                      // Build a print window with one week per page
-                      const weeks = Array.from({ length: 50 }, (_, i) => i + 1);
-                      const diasSemanaisP = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
-                      const blocosP = [
-                        { start: "08:00", end: "10:00" }, { start: "10:00", end: "12:00" },
-                        { start: "12:00", end: "14:00" }, { start: "14:00", end: "16:00" },
-                        { start: "16:00", end: "18:00" }, { start: "18:00", end: "20:00" }
-                      ];
                       if (!activeVersao) { alert("Gere primeiro a distribuição."); return; }
-                      const allSessoes = activeVersao.sessoes;
-                      const weeksWithData = weeks.filter(w => allSessoes.some(s => s.semana === w));
+                      const anoSelecionado = selectedYearFilter === "todos" ? null : Number(selectedYearFilter);
+                      const siglasSelecionadas = new Set(
+                        ucs.filter(u => anoSelecionado == null || Number(u.anoCurricular) === anoSelecionado)
+                          .map(u => u.sigla),
+                      );
+                      const sessoesPdf = activeVersao.sessoes.filter(s => siglasSelecionadas.has(s.ucSigla));
+                      if (!sessoesPdf.length) { alert("Não existem sessões para o âmbito selecionado."); return; }
+                      const semanasPdf = Array.from({ length: 30 }, (_, indice) => {
+                        const numero = indice + 1;
+                        const semestre = numero <= 15 ? 1 : 2;
+                        const relativa = semestre === 1 ? numero : numero - 15;
+                        const calendario = anosSemestres.find(item =>
+                          item.anoLetivo === selectedAnoLetivo && item.semestre === semestre);
+                        const personalizada = calendario?.semanasPersonalizadas?.find(
+                          semana => semana.numero === relativa);
+                        const dataInicio = personalizada?.dataSegunda
+                          ? new Date(`${personalizada.dataSegunda}T12:00:00`)
+                          : null;
+                        let dataFim = dataInicio ? new Date(dataInicio.getTime() + 4 * 86400000) : null;
+                        if (dataFim && personalizada?.dataSexta) {
+                          const fimConfigurado = new Date(`${personalizada.dataSexta}T12:00:00`);
+                          if (fimConfigurado < dataFim) dataFim = fimConfigurado;
+                        }
+                        const dataPt = (data: Date) => data.toLocaleDateString("pt-PT", {
+                          day: "2-digit", month: "2-digit", year: "numeric",
+                        });
+                        const intervalo = dataInicio && dataFim
+                          ? `${dataPt(dataInicio)} a ${dataPt(dataFim)}`
+                          : getWeekLabel(numero);
+                        const pausa = personalizada?.isPausa
+                          ? ` (Pausa: ${personalizada.motivoPausa || "Férias"})`
+                          : "";
+                        return {
+                          numero,
+                          semestre,
+                          intervalo: `${intervalo}${pausa}`,
+                        };
+                      });
+                      const rotuloAno = anoSelecionado == null ? "CLE" : `${anoSelecionado}.º Ano`;
+                      const html = criarHtmlHorarioPdf({
+                        sessoes: sessoesPdf,
+                        semanas: semanasPdf,
+                        anoLetivo: selectedAnoLetivo,
+                        anoCurricular: rotuloAno,
+                        proposta: activeVersao.nome,
+                      });
                       const win = window.open("", "_blank");
                       if (!win) return;
-                      win.document.write(`<html><head><title>Horário ESEUC</title><style>
-                        body { font-family: Arial, sans-serif; font-size: 9px; margin: 0; }
-                        .page { page-break-after: always; padding: 12px; }
-                        .page:last-child { page-break-after: avoid; }
-                        h2 { font-size: 12px; margin: 0 0 6px; }
-                        table { width: 100%; border-collapse: collapse; }
-                        th, td { border: 1px solid #ddd; padding: 3px 4px; vertical-align: top; }
-                        th { background: #f5f5f5; font-size: 8px; text-align: center; }
-                        .slot-hora { font-size: 8px; color: #666; white-space: nowrap; }
-                        .card { margin: 1px 0; padding: 2px 3px; border-radius: 3px; border: 1px solid #ccc; font-size: 7.5px; }
-                        .card-t { background: #f9f9f9; } .card-tp { background: #EEF4FA; border-color: #B9CDEC; }
-                        .card-pl { background: #FAF1EE; border-color: #ECC4B9; } .card-s { background: #F3EEFA; border-color: #D6CBE8; }
-                        @page { size: A4 landscape; margin: 8mm; }
-                        @media print { body { -webkit-print-color-adjust: exact; } }
-                      </style></head><body>`);
-                      weeksWithData.forEach(w => {
-                        const isSem2 = w > 15;
-                        const label = `${isSem2 ? "2.º" : "1.º"} Semestre — Semana ${w}`;
-                        win.document.write(`<div class="page"><h2>ESEUC · ${label} · ${selectedAnoLetivo}</h2><table>`);
-                        win.document.write(`<tr><th>Período</th>${diasSemanaisP.map(d => `<th>${d}</th>`).join("")}</tr>`);
-                        blocosP.forEach(bloco => {
-                          win.document.write(`<tr><td class="slot-hora">${bloco.start}–${bloco.end}</td>`);
-                          diasSemanaisP.forEach(dia => {
-                            const slotSess = allSessoes.filter(s => s.semana === w && s.diaSemana === dia && s.horaInicio === bloco.start);
-                            win.document.write(`<td>${slotSess.map(s => `<div class="card card-${s.tipoAula.toLowerCase()}"><strong>${s.ucSigla}</strong> (${s.tipoAula}) ${rotuloTurma(s.turma)}</div>`).join("")}</td>`);
-                          });
-                          win.document.write(`</tr>`);
-                        });
-                        win.document.write(`</table></div>`);
-                      });
-                      win.document.write("</body></html>");
+                      win.document.write(html);
                       win.document.close();
-                      setTimeout(() => win.print(), 500);
+                      setTimeout(() => { win.focus(); win.print(); }, 700);
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-[10px] font-semibold border border-stone-200 cursor-pointer transition-all"
                   >
