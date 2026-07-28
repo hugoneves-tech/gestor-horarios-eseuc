@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { organizarBlocos100, validarBlocos100, type PadraoBloco100Id } from "./src/utils/blocos100";
 import type { SessaoHorario, UC } from "./src/types";
 import { rowToRegra } from "./src/data/mappers";
+import { validarHorario } from "./src/utils/validacao";
 
 const uc = (id: string): UC => ({
   id, nome: id, sigla: id, cursoId: "CLE", anoCurricular: 1,
@@ -121,8 +122,9 @@ const sextaComoDiaNormal = organizarBlocos100(
 );
 assert.equal(sextaComoDiaNormal.naoAlocadas.length, 0);
 assert.ok(
-  sextaComoDiaNormal.sessoes.some(x => x.diaSemana === "Sexta" && x.horaInicio === "18:00"),
-  "sem a preferência de sexta livre, o bloco 18h–20h deve entrar na rotação normal",
+  sextaComoDiaNormal.sessoes.some(x => x.diaSemana === "Quinta")
+    && sextaComoDiaNormal.sessoes.every(x => ["08:00", "10:00", "12:00"].includes(x.horaInicio)),
+  "uma semana de turma única deve preencher quinta-feira e usar a manhã antes da tarde",
 );
 
 const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
@@ -211,4 +213,69 @@ for (const sessao of tresDiasExcecionais.sessoes.filter(x => x.turma === "TP1"))
 }
 assert.equal(tresDiasExcecionais.naoAlocadas.length, 0, "três dias de 8h devem completar uma semana de carga elevada");
 assert.equal([...cargaTresDias.values()].filter(carga => carga === 4).length, 3);
+
+const catalogoSequencia = [
+  { ...uc("U1"), cargaHorariaTeorica: 2, cargaHorariaTP: 2, cargaHorariaPratica: 2 },
+  uc("U2"),
+];
+const sequenciaGeral = organizarBlocos100([
+  t(1, "Segunda", "08:00"),
+  ...[1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`)),
+  s("U2", "TP", "TP3"), s("U2", "TP", "TP4"),
+  ...[1, 2, 3, 4, 5, 6].map(n => s("U1", "PL", `PL${n}`)),
+], catalogoSequencia);
+assert.equal(sequenciaGeral.naoAlocadas.length, 0);
+const primeiroMomento = (tipo: "T" | "TP" | "PL") =>
+  Math.min(...sequenciaGeral.sessoes.filter(x => x.ucSigla === "U1" && x.tipoAula === tipo).map(ordem));
+assert.ok(primeiroMomento("T") < primeiroMomento("TP"));
+assert.ok(primeiroMomento("TP") < primeiroMomento("PL"));
+
+const blocosFamiliasComUcPartilhada = organizarBlocos100([
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3, 4, 5, 6].map(n => s("U2", "PL", `PL${n}`)),
+  s("U3", "TP", "TP7"), s("U3", "TP", "TP8"),
+  ...[13, 14, 15, 16, 17, 18].map(n => s("U1", "PL", `PL${n}`)),
+], catalogo, {
+  semanasSoTurmaA: { 1: [1] },
+  semanasSoTurmaB: { 1: [1] },
+}, [
+  ...catalogo.map(ucAtiva => ({ uc: ucAtiva, semanas: [{ numero: 1 }], semanaGlobalOffset: 0 })),
+]);
+assert.equal(blocosFamiliasComUcPartilhada.naoAlocadas.length, 0);
+const tiposU1PorSlot = new Map<string, Set<string>>();
+for (const sessao of blocosFamiliasComUcPartilhada.sessoes.filter(x => x.ucSigla === "U1")) {
+  const chave = `${sessao.semana}|${sessao.diaSemana}|${sessao.horaInicio}`;
+  if (!tiposU1PorSlot.has(chave)) tiposU1PorSlot.set(chave, new Set());
+  tiposU1PorSlot.get(chave)!.add(sessao.tipoAula);
+}
+assert.ok([...tiposU1PorSlot.values()].every(tipos => !(tipos.has("TP") && tipos.has("PL"))));
+
+const dezasseisBlocos = Array.from({ length: 16 }, () =>
+  [1, 2, 3, 4].map(n => ({ ...s("U1", "TP", `TP${n}`), semana: 1 }))).flat();
+const semanaCincoDias = organizarBlocos100(
+  dezasseisBlocos,
+  catalogo,
+  { cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 3 } },
+  [{ uc: catalogo[0], semanas: [{ numero: 1 }], semanaGlobalOffset: 0 }],
+);
+const diasTp1 = new Map<string, number>();
+for (const sessao of semanaCincoDias.sessoes.filter(x => x.turma === "TP1")) {
+  diasTp1.set(sessao.diaSemana, (diasTp1.get(sessao.diaSemana) || 0) + 1);
+}
+assert.equal(semanaCincoDias.naoAlocadas.length, 0);
+assert.ok(diasTp1.has("Quinta"));
+assert.ok([...diasTp1.values()].filter(total => total === 4).length <= 3);
+
+const ucUmaFamilia: UC = {
+  ...uc("U-I"),
+  sigla: "U-I",
+  cargaHorariaTeorica: 2,
+  turmasConfig: [{ id: "t1", nome: "Turma A", tipo: "Teórica" }],
+};
+const sessaoUmaFamilia: SessaoHorario = {
+  ...t(1, "Segunda", "08:00"),
+  ucNome: "U-I",
+  ucSigla: "U-I",
+};
+assert.equal(validarHorario([sessaoUmaFamilia], [ucUmaFamilia]).completude.pct, 100);
 console.log("blocos100: combinações, turnos, sexta 18h–20h e dias de 8h validados");

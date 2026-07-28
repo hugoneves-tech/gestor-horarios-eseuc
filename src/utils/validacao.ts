@@ -39,6 +39,7 @@ export interface RelatorioValidacao {
   sobreposicoes: number;             // mesmo aluno em dois sítios no mesmo bloco
   maxBlocosDia: number;              // máx blocos/aluno/dia (×2 = horas)
   excedeu8h: boolean;
+  excessosDias8h: { chave: string; total: number }[];
   violacoesAlmoco: number;           // aluno com 12:00 e 14:00 no mesmo dia
   violacoesCronologia: { sigla: string; familia: string; problema: string }[];
   tpPlMesmaUC: string[];             // chaves ano|semana|dia|hora|UC com TP e PL juntas
@@ -65,15 +66,11 @@ function alvoUC(uc: UC) {
   const nTP = tc.filter(t => t.tipo === "TeoricoPratica").length;
   const nPL = tc.filter(t => t.tipo === "Prática").length;
   const nS = tc.filter(t => t.tipo === "Seminário").length;
-  const soUmaFam = Number(uc.anoCurricular) === 2 && /-(I|II)$/.test(uc.sigla);
-  const fT = soUmaFam ? Math.ceil(nT / 2) : nT;
-  const fTP = soUmaFam ? nTP / 2 : nTP;
-  const fPL = soUmaFam ? nPL / 2 : nPL;
   const bloco = (carga: number | undefined, n: number) => Math.floor((carga || 0) / 2) * n;
   return {
-    T: bloco(uc.cargaHorariaTeorica, fT),
-    TP: bloco(uc.cargaHorariaTP, fTP),
-    PL: bloco(uc.cargaHorariaPratica, fPL),
+    T: bloco(uc.cargaHorariaTeorica, nT),
+    TP: bloco(uc.cargaHorariaTP, nTP),
+    PL: bloco(uc.cargaHorariaPratica, nPL),
     S: bloco(uc.cargaHorariaS, nS),
   };
 }
@@ -107,6 +104,16 @@ export function validarHorario(
     }
   }
   const maxBlocosDia = Math.max(0, ...blocosDia.values());
+  const dias8hPorSemanaAluno = new Map<string, number>();
+  for (const [chave, blocos] of blocosDia) {
+    if (blocos < 4) continue;
+    const [ano, semana, , folha] = chave.split("|");
+    const semanaAluno = `${ano}|${semana}|${folha}`;
+    dias8hPorSemanaAluno.set(semanaAluno, (dias8hPorSemanaAluno.get(semanaAluno) || 0) + 1);
+  }
+  const excessosDias8h = [...dias8hPorSemanaAluno]
+    .filter(([, total]) => total > 3)
+    .map(([chave, total]) => ({ chave, total }));
   let violacoesAlmoco = 0;
   for (const hs of horasAluno.values()) if (hs.has("12:00") && hs.has("14:00")) violacoesAlmoco++;
 
@@ -244,7 +251,7 @@ export function validarHorario(
   }
   const pctGlobal = alvoTot ? Math.round((colocTot / alvoTot) * 100) : 100;
 
-  const ok = sobreposicoes === 0 && maxBlocosDia <= 4 && violacoesAlmoco === 0
+  const ok = sobreposicoes === 0 && maxBlocosDia <= 4 && excessosDias8h.length === 0 && violacoesAlmoco === 0
     && violacoesCronologia.length === 0 && tpPlMesmaUC.length === 0
     && excessosPLPorBloco.length === 0 && violacoesTSimultaneas.length === 0
     && violacoesTConjuntas.length === 0;
@@ -256,6 +263,7 @@ export function validarHorario(
     sobreposicoes,
     maxBlocosDia,
     excedeu8h: maxBlocosDia > 4,
+    excessosDias8h,
     violacoesAlmoco,
     violacoesCronologia,
     tpPlMesmaUC,

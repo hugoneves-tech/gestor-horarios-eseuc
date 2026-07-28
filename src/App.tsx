@@ -5716,6 +5716,7 @@ export default function App() {
                               <span className={relatorioImport.sobreposicoes ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.sobreposicoes ? "✗" : "✓"} Sobreposições: {relatorioImport.sobreposicoes}</span>
                               <span className={relatorioImport.excedeu8h ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excedeu8h ? "✗" : "✓"} Máx/dia: {relatorioImport.maxBlocosDia * 2}h</span>
                               <span className={relatorioImport.violacoesAlmoco ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesAlmoco ? "✗" : "✓"} Almoço: {relatorioImport.violacoesAlmoco}</span>
+                              <span className={relatorioImport.excessosDias8h.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excessosDias8h.length ? "✗" : "✓"} Semanas com mais de 3 dias de 8h: {relatorioImport.excessosDias8h.length}</span>
                               <span className={relatorioImport.violacoesCronologia.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesCronologia.length ? "✗" : "✓"} Cronologia: {relatorioImport.violacoesCronologia.length}</span>
                               <span className={relatorioImport.tpPlMesmaUC.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.tpPlMesmaUC.length ? "✗" : "✓"} TP+PL mesma UC: {relatorioImport.tpPlMesmaUC.length}</span>
                               <span className={relatorioImport.excessosPLPorBloco.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excessosPLPorBloco.length ? "✗" : "✓"} Limite global de 6 PL: {relatorioImport.excessosPLPorBloco.length}</span>
@@ -6161,11 +6162,8 @@ export default function App() {
                 let alvo = 0;
                 for (const u of ucsAno) {
                   const tc = u.turmasConfig || [];
-                  let nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length;
+                  const nT = tc.filter(t => t.tipo === "Teórica").length, nTP = tc.filter(t => t.tipo === "TeoricoPratica").length, nPL = tc.filter(t => t.tipo === "Prática").length;
                   const nS = tc.filter(t => t.tipo === "Seminário").length;
-                  // UCs de bloco do 2.º ano ("-I" só T1/Turma A nas sem. 8-15, "-II" só T2/Turma B
-                  // nas 16-23): apenas metade das turmas frequenta — o alvo conta só a presente.
-                  if (Number(u.anoCurricular) === 2 && /-(I|II)$/.test(u.sigla)) { nT = Math.ceil(nT / 2); nTP = nTP / 2; nPL = nPL / 2; }
                   alvo += Math.floor((u.cargaHorariaTeorica || 0) / 2) * nT + Math.floor((u.cargaHorariaTP || 0) / 2) * nTP + Math.floor((u.cargaHorariaPratica || 0) / 2) * nPL + Math.floor((u.cargaHorariaS || 0) / 2) * nS;
                 }
                 const sigSet = new Set(ucsAno.map(u => u.sigla));

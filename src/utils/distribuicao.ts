@@ -980,6 +980,17 @@ export function gerarSessoesConjunto(
       add(t.nome, "S", "Sala Comum TP", turmaAManha, "A", Math.floor((uc.cargaHorariaS ?? 0) / 2));
     });
   }
+  // A configuração explícita continua a prevalecer, mas UCs já divididas por
+  // família (-I/-II ou catálogo equivalente) permitem inferir semanas de turma
+  // única diretamente das tarefas. Nessas semanas a família presente usa a manhã.
+  const familiasAtivasPorAnoSemana = new Map<string, Set<"A" | "B">>();
+  for (const tarefa of tasks) for (const semana of tarefa.weeks) {
+    const chave = `${tarefa.ano}|${semana.semanaGlobal}`;
+    if (!familiasAtivasPorAnoSemana.has(chave)) familiasAtivasPorAnoSemana.set(chave, new Set());
+    familiasAtivasPorAnoSemana.get(chave)!.add(tarefa.family);
+  }
+  const soUmaTurmaEfetiva = (ano: number, week: number) =>
+    soUmaTurma(ano, week) || familiasAtivasPorAnoSemana.get(`${ano}|${week}`)?.size === 1;
 
   // Meios-cohorts de TP presentes em cada mancha (de QUALQUER UC). Serve o
   // emparelhamento cruzado TP∥PL: a PL de um meio-cohort encosta-se a uma mancha que
@@ -1206,8 +1217,9 @@ export function gerarSessoesConjunto(
   // Colocação FORÇADA num slot específico (para a passagem de "encher blocos extra"),
   // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
   const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
-    const horaAjuste8h = t.manha ? "16:00" : "10:00";
-    if (!opts.semRegras && !(t.manha ? PERIODOS_MANHA : PERIODOS_TARDE).includes(hora) && hora !== horaAjuste8h) return false;
+    const manhaEfetiva = soUmaTurmaEfetiva(t.ano, wk.semanaGlobal) ? true : t.manha;
+    const horaAjuste8h = manhaEfetiva ? "16:00" : "10:00";
+    if (!opts.semRegras && !(manhaEfetiva ? PERIODOS_MANHA : PERIODOS_TARDE).includes(hora) && hora !== horaAjuste8h) return false;
     // Cronologia GLOBAL T→TP→PL também nas passagens de recuperação.
     if (t.tipo === "TP" || t.tipo === "PL") {
       const st0 = getStat(statKeyOf(t));
@@ -1267,7 +1279,7 @@ export function gerarSessoesConjunto(
     // As exceções explícitas (T simultâneas e semana inicial parcial) são tratadas
     // abaixo, sem transformar genericamente a Turma B numa turma da manhã.
     // Semana PARCIAL (1.ª semana do 2.º ano): permite 2 UCs no bloco de TP (16-18 da 6ª).
-    const manhaEf = t.manha;
+    const manhaEf = soUmaTurmaEfetiva(t.ano, wk.semanaGlobal) ? true : t.manha;
     let pool = poolDoTipo(
       t.tipo, wk.diasBloqueados, manhaEf, rotacao, t.flexivel,
       semestre === 1 && wk.semanaGlobal === 1,
@@ -1462,7 +1474,7 @@ export function gerarSessoesConjunto(
       // ESPELHO A↔B (preferência principal): se a OUTRA família já tem esta (UC, tipo)
       // nesta semana, preferir o slot espelhado (mesmo dia, manhã↔tarde). Nas Teóricas
       // o MESMO slot também conta (momento em comum: ambas as turmas no anfiteatro).
-      if (!soUmaTurma(t.ano, wk.semanaGlobal)) {
+      if (!soUmaTurmaEfetiva(t.ano, wk.semanaGlobal)) {
         const outro = espelho.get(`${t.ano}|${wk.semanaGlobal}|${t.ucKey}|${t.tipo}|${t.family === "A" ? "B" : "A"}`);
         if (outro && outro.size) {
           const alvos = new Set<string>();
@@ -1793,14 +1805,16 @@ export function gerarSessoesConjunto(
   // recuperar a carga de PL atrasada (FT/ESDAC). O cap global (6) limita cada bloco.
   const plTasksRec = tasks.filter(t => (t.tipo === "PL" || t.tipo === "TP") && t.salaPool !== "comp");
   for (const [wg, wk] of wkByGlobal) {
-    if (soUmaTurma(2, wg)) continue; // TODO: Pl recovery might need ano check. Assuming ano 2 for legacy behaviour for now
+    if (soUmaTurmaEfetiva(2, wg)) continue; // TODO: Pl recovery might need ano check. Assuming ano 2 for legacy behaviour for now
     if (wk.diasBloqueados?.includes("Sexta")) continue;        // 6ª feriado
     for (const fam of ["A", "B"] as const) {                   // ambas as turmas, cada uma no seu turno
       const cand = plTasksRec
         .filter(t => t.family === fam && t.placed < t.total && t.weeks.some(w => w.semanaGlobal === wg))
         .sort((a, b) => (b.total - b.placed) - (a.total - a.placed)); // maior atraso primeiro
       for (const t of cand) {
-        const horasSexta = t.manha ? PERIODOS_MANHA : PERIODOS_TARDE;
+        const horasSexta = soUmaTurmaEfetiva(t.ano, wg)
+          ? PERIODOS_MANHA
+          : (t.manha ? PERIODOS_MANHA : PERIODOS_TARDE);
         for (const hora of horasSexta) {
           if (tryPlaceAt(t, wk, "Sexta", hora, true)) break;
         }

@@ -79,7 +79,7 @@ export const DESCRICAO_PADROES_BLOCOS_100: Record<PadraoBloco100Id, string> = {
 
 type Familia = "A" | "B";
 type Item = { sessao: SessaoHorario; ucId: string; ucSigla: string; quarto: number; tipo: "TP" | "PL" };
-type Bloco = { sessoes: SessaoHorario[]; padrao: PadraoBloco100Id; semanaPreferida: number };
+type Bloco = { sessoes: SessaoHorario[]; padrao: PadraoBloco100Id; semanaPreferida: number; arranqueTP?: boolean };
 
 export interface ResultadoBlocos100 {
   sessoes: SessaoHorario[];
@@ -150,17 +150,35 @@ function resolverPoolExato(
   evitar: PadraoBloco100Id,
   slotsPermitidosPorUc: Map<string, Set<string>> | null,
   maxSimultaneoPLPorUc: Map<string, number>,
+  reservarArranqueTP = true,
 ): { blocos: Bloco[]; sobras: Item[] } {
+  const poolTrabalho = [...poolOriginal];
+  const blocosArranque: Bloco[] = [];
+  if (reservarArranqueTP && ativos.has("TP4_MESMA_UC")) {
+    const ucsComPL = new Set(poolTrabalho.filter(x => x.tipo === "PL").map(x => x.ucId));
+    const ucsTP = [...new Set(poolTrabalho.filter(x => x.tipo === "TP").map(x => x.ucId))];
+    for (const ucId of ucsTP.filter(id => ucsComPL.has(id))) {
+      const disponivel = [0, 1, 2, 3].every(quarto =>
+        poolTrabalho.some(x => x.tipo === "TP" && x.ucId === ucId && x.quarto === quarto));
+      if (!disponivel) continue;
+      const itens = [0, 1, 2, 3].flatMap(quarto =>
+        take(poolTrabalho, "TP", ucId, quarto, 1) ?? []);
+      if (itens.length === 4) {
+        blocosArranque.push({ ...criarBloco(itens, "TP4_MESMA_UC"), arranqueTP: true });
+      }
+    }
+  }
+
   const recursos = new Map<string, { tipo: "TP" | "PL"; ucId: string; quarto: number; quantidade: number }>();
   const chaveRecurso = (tipo: "TP" | "PL", ucId: string, quarto: number) => `${tipo}|${ucId}|${quarto}`;
-  for (const item of poolOriginal) {
+  for (const item of poolTrabalho) {
     const chave = chaveRecurso(item.tipo, item.ucId, item.quarto);
     const atual = recursos.get(chave);
     if (atual) atual.quantidade++;
     else recursos.set(chave, { tipo: item.tipo, ucId: item.ucId, quarto: item.quarto, quantidade: 1 });
   }
-  const tpUcs = [...new Set(poolOriginal.filter(x => x.tipo === "TP").map(x => x.ucId))];
-  const plUcs = [...new Set(poolOriginal.filter(x => x.tipo === "PL").map(x => x.ucId))];
+  const tpUcs = [...new Set(poolTrabalho.filter(x => x.tipo === "TP").map(x => x.ucId))];
+  const plUcs = [...new Set(poolTrabalho.filter(x => x.tipo === "PL").map(x => x.ucId))];
   const candidatos: CandidatoBloco[] = [];
   const adicionar = (padrao: PadraoBloco100Id, consumos: Consumo[]) => {
     if (!consumos.every(c => recursos.has(chaveRecurso(c.tipo, c.ucId, c.quarto)))) return;
@@ -241,10 +259,22 @@ function resolverPoolExato(
   });
   const modelo: Model = { optimize: "custo", opType: "min", constraints, variables, ints, options: { timeout: 15000, presolve: true } };
   const solucao = solver.Solve(modelo) as SolveResult;
-  if (!solucao.feasible) return { blocos: [], sobras: [...poolOriginal] };
+  if (!solucao.feasible) {
+    if (blocosArranque.length) {
+      return resolverPoolExato(
+        poolOriginal,
+        ativos,
+        evitar,
+        slotsPermitidosPorUc,
+        maxSimultaneoPLPorUc,
+        false,
+      );
+    }
+    return { blocos: [], sobras: [...poolOriginal] };
+  }
 
-  const pool = [...poolOriginal];
-  const blocos: Bloco[] = [];
+  const pool = [...poolTrabalho];
+  const blocos: Bloco[] = [...blocosArranque];
   candidatos.forEach((candidato, i) => {
     const repeticoes = Math.round(Number(solucao[`b${i}`] ?? 0));
     for (let n = 0; n < repeticoes; n++) {
@@ -387,6 +417,15 @@ export function organizarBlocos100(
   if (!cfg.exigirCoberturaTotal) return { sessoes, naoAlocadas: [], blocosPorPadrao: {}, avisos: [] };
 
   const ucPorSigla = new Map(ucsCatalogo.map(u => [u.sigla, u]));
+  const familiasOriginaisPorAnoSemana = new Map<string, Set<Familia>>();
+  for (const sessao of sessoes) {
+    const uc = ucPorSigla.get(sessao.ucSigla);
+    const familia = familiaTeorica(sessao.turma);
+    if (!uc || !familia || sessao.semana == null) continue;
+    const chave = `${uc.anoCurricular}|${sessao.semana}`;
+    if (!familiasOriginaisPorAnoSemana.has(chave)) familiasOriginaisPorAnoSemana.set(chave, new Set());
+    familiasOriginaisPorAnoSemana.get(chave)!.add(familia);
+  }
   const slotsPermitidosPorUc = entradasAtivas.length ? new Map<string, Set<string>>() : null;
   if (slotsPermitidosPorUc) for (const entrada of entradasAtivas) {
     const slots = new Set<string>();
@@ -447,15 +486,27 @@ export function organizarBlocos100(
   const equilibrarSemanas = slotsPermitidosPorUc !== null;
   const plPorMancha = new Map<string, number>();
   const chavePL = (semana: number, dia: string, hora: string) => `${semana}|${dia}|${hora}`;
+  const tipologiasPorUcMancha = new Map<string, Set<"TP" | "PL">>();
+  const chaveTipologia = (semana: number, dia: string, hora: string, sigla: string) =>
+    `${semana}|${dia}|${hora}|${sigla}`;
   const cargaDia = new Map<string, number>();
   const chaveCarga = (ano: number, semana: number, dia: string, folha: string) => `${ano}|${semana}|${dia}|${folha}`;
+  const horasDia = new Map<string, Set<string>>();
   const registarCarga = (s: SessaoHorario) => {
     const uc = ucPorSigla.get(s.ucSigla);
     if (!uc || s.semana == null) return;
     for (const folha of gruposFolha(s.turma)) {
       const chave = chaveCarga(uc.anoCurricular, s.semana, s.diaSemana, folha);
       cargaDia.set(chave, (cargaDia.get(chave) || 0) + 1);
+      if (!horasDia.has(chave)) horasDia.set(chave, new Set());
+      horasDia.get(chave)!.add(s.horaInicio);
     }
+  };
+  const registarTipologia = (s: SessaoHorario) => {
+    if ((s.tipoAula !== "TP" && s.tipoAula !== "PL") || s.semana == null) return;
+    const chave = chaveTipologia(s.semana, s.diaSemana, s.horaInicio, s.ucSigla);
+    if (!tipologiasPorUcMancha.has(chave)) tipologiasPorUcMancha.set(chave, new Set());
+    tipologiasPorUcMancha.get(chave)!.add(s.tipoAula);
   };
   for (const s of [...preservadas, ...sessoesExternas]) {
     const uc = ucPorSigla.get(s.ucSigla); const fam = familiaTeorica(s.turma);
@@ -473,6 +524,7 @@ export function organizarBlocos100(
       plPorMancha.set(chave, (plPorMancha.get(chave) || 0) + 1);
     }
     registarCarga(s);
+    registarTipologia(s);
   }
   const blocosPorPadrao: Partial<Record<PadraoBloco100Id, number>> = {};
   const alocadas: SessaoHorario[] = [];
@@ -500,6 +552,37 @@ export function organizarBlocos100(
     }
     return true;
   };
+  const penalizacaoCronologiaGeral = (bloco: Bloco, semana: number, dia: string, hora: string): number => {
+    const candidatoOrd = ordemSlot(semana, dia, hora);
+    const anteriores = [...preservadas, ...alocadas, ...sessoesExternas];
+    let faltas = 0;
+    for (const depois of bloco.sessoes) {
+      const ucDepois = ucPorSigla.get(depois.ucSigla);
+      const familia = familiaTeorica(depois.turma);
+      if (!ucDepois || !familia) continue;
+      const tipoAntes = depois.tipoAula === "TP" && Number(ucDepois.cargaHorariaTeorica || 0) > 0
+        ? "T"
+        : depois.tipoAula === "PL" && Number(ucDepois.cargaHorariaTP || 0) > 0
+          ? "TP"
+          : null;
+      if (!tipoAntes) continue;
+      const existeAnterior = anteriores.some(s =>
+        s.tipoAula === tipoAntes && s.ucSigla === depois.ucSigla
+        && familiaTeorica(s.turma) === familia && s.semana != null
+        && ordemSlot(s.semana, s.diaSemana, s.horaInicio) < candidatoOrd);
+      if (!existeAnterior) faltas++;
+    }
+    return faltas;
+  };
+  const cumpreSeparacaoTipologias = (bloco: Bloco, semana: number, dia: string, hora: string): boolean =>
+    bloco.sessoes.every(sessao => {
+      if (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") return true;
+      const existentes = tipologiasPorUcMancha.get(
+        chaveTipologia(semana, dia, hora, sessao.ucSigla),
+      );
+      const oposta = sessao.tipoAula === "TP" ? "PL" : "TP";
+      return !existentes?.has(oposta);
+    });
   const cumpreRestricoesUC = (bloco: Bloco, semana: number, dia: string, hora: string): boolean => {
     const periodo = Number(hora.slice(0, 2)) < 14 ? "manha" : "tarde";
     return !bloco.sessoes.some(sessao => (cfg.restricoesUC ?? []).some(regra => {
@@ -516,7 +599,12 @@ export function organizarBlocos100(
     }));
   };
 
-  for (const bloco of blocos.sort((a, b) => a.semanaPreferida - b.semanaPreferida
+  const prioridadeBloco = (bloco: Bloco) =>
+    bloco.arranqueTP ? 0 : bloco.sessoes.some(s => s.tipoAula === "PL") ? 1 : 2;
+  for (const bloco of blocos.sort((a, b) =>
+    prioridadeBloco(a) - prioridadeBloco(b)
+    || b.sessoes.filter(s => s.tipoAula === "PL").length - a.sessoes.filter(s => s.tipoAula === "PL").length
+    || a.semanaPreferida - b.semanaPreferida
     || Number(a.padrao === cfg.padraoAEvitar) - Number(b.padrao === cfg.padraoAEvitar))) {
     const uc = ucPorSigla.get(bloco.sessoes[0].ucSigla)!;
     const fam = familiaTeorica(bloco.sessoes[0].turma)!;
@@ -547,8 +635,16 @@ export function organizarBlocos100(
       // Numa semana de turma única a família ativa passa a ser "de manhã" e ganha a tarde
       // toda como reserva; fora dessas semanas mantém-se o modelo de turnos rígido, que é o
       // que evita a contenção dos 6 laboratórios entre as duas turmas teóricas.
-      const soEstaFamilia = semanasSoDestaFamilia.has(semana);
-      const horasPreferidas = new Set(soEstaFamilia ? horasManha : horasTurno);
+      const soEstaFamilia = semanasSoDestaFamilia.has(semana)
+        || familiasOriginaisPorAnoSemana.get(`${uc.anoCurricular}|${semana}`)?.size === 1;
+      const temFixosNoTurnoOriginal = soEstaFamilia && [...preservadas, ...sessoesExternas].some(sessao => {
+        const ucFixa = ucPorSigla.get(sessao.ucSigla);
+        return ucFixa?.anoCurricular === uc.anoCurricular && sessao.semana === semana
+          && familiaTeorica(sessao.turma) === fam && horasTurno.includes(sessao.horaInicio);
+      });
+      const horasPreferidas = new Set(
+        soEstaFamilia && !temFixosNoTurnoOriginal ? horasManha : horasTurno,
+      );
       const horasReserva = soEstaFamilia
         ? ["16:00", "14:00", "18:00"].filter(h => !horasPreferidas.has(h))
         : [horaAjuste8h];
@@ -558,21 +654,28 @@ export function organizarBlocos100(
       if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
       if (!cumprePrecedencias(bloco, semana, dia, hora)) continue;
       if (!cumpreRestricoesUC(bloco, semana, dia, hora)) continue;
+      if (!cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (ocupados.has(k)) continue;
       if ((plPorMancha.get(chavePL(semana, dia, hora)) || 0) + plNesteBloco > cfg.maxPLporMancha) continue;
       const cargasAtuais = folhasBloco.map(folha => cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0);
+      const violaAlmoco = folhasBloco.some(folha => {
+        const horas = horasDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha));
+        return (hora === "12:00" && horas?.has("14:00"))
+          || (hora === "14:00" && horas?.has("12:00"));
+      });
+      if (violaAlmoco) continue;
       // O bloco fora do turno só pode ser o quarto bloco do dia, nunca um atalho
       // para colocar a Turma B de manhã ou a Turma A à tarde.
       if (!horasPreferidas.has(hora) && cargasAtuais.some(carga => carga < alvoBlocos)) continue;
       if (folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) >= maxBlocos)) continue;
       const criaDiaMaximo = folhasBloco.some(folha => (cargaDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) || 0) + 1 === maxBlocos);
+      let excedeDiasNoMaximo = false;
       if (criaDiaMaximo && cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana >= 0) {
-        const excedeDias = folhasBloco.some(folha => {
+        excedeDiasNoMaximo = folhasBloco.some(folha => {
           const diasJaNoMaximo = DIAS.filter(d => d !== dia && (cargaDia.get(chaveCarga(uc.anoCurricular, semana, d, folha)) || 0) >= maxBlocos).length;
           return diasJaNoMaximo >= cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana;
         });
-        if (excedeDias) continue;
       }
       const criaDia8h = cargasAtuais.some(carga => carga >= alvoBlocos);
       const abreNovoDia = cargasAtuais.every(carga => carga === 0);
@@ -589,7 +692,9 @@ export function organizarBlocos100(
         && cargasAtuais.some(carga => carga < minimoPrioritario);
       const distanciaSemana = Math.abs(semana - bloco.semanaPreferida);
       const rotacaoDia = (semana - 1) % DIAS.length;
-      const indiceDia = cfg.preferirSextaLivre
+      const indiceDia = soEstaFamilia
+        ? DIAS.indexOf(dia)
+        : cfg.preferirSextaLivre
         ? DIAS.indexOf(dia)
         : (DIAS.indexOf(dia) - rotacaoDia + DIAS.length) % DIAS.length;
       // Preferência suave por manhã (ou, fora das semanas de turma única, pelo turno da
@@ -604,10 +709,14 @@ export function organizarBlocos100(
         ? (cargaSemana.get(chaveCargaSemana(uc.anoCurricular, fam, semana)) || 0)
         : 0;
       const custo = Number(faltaPreencherDataPrioritaria) * -100_000_000
+        + penalizacaoCronologiaGeral(bloco, semana, dia, hora) * 20_000_000
         + Number(completaDiaAberto) * -10_000_000
         + Number(fragmentaDia) * 10_000_000
         + Number(criaDia8h) * 5_000_000
+        + Number(excedeDiasNoMaximo) * 15_000_000
         + cargaDaSemana * 100_000
+        + Number(soEstaFamilia && (dia === "Terça" || dia === "Quinta")) * -1_000_000
+        + Number(soEstaFamilia && dia === "Sexta") * 1_000_000
         + Number(cfg.preferirSextaLivre && dia === "Sexta") * 50_000
         + distanciaSemana * 1_000
         + indiceDia * 10 + custoHora;
@@ -627,9 +736,19 @@ export function organizarBlocos100(
       ...s, semana: escolhido.semana, diaSemana: escolhido.dia, horaInicio: escolhido.hora,
       horaFim: `${String(Number(escolhido.hora.slice(0, 2)) + 2).padStart(2, "0")}:00`,
     });
+    for (const sessao of bloco.sessoes) {
+      registarTipologia({
+        ...sessao,
+        semana: escolhido.semana,
+        diaSemana: escolhido.dia,
+        horaInicio: escolhido.hora,
+      });
+    }
     for (const folha of folhasBloco) {
       const chave = chaveCarga(uc.anoCurricular, escolhido.semana, escolhido.dia, folha);
       cargaDia.set(chave, (cargaDia.get(chave) || 0) + 1);
+      if (!horasDia.has(chave)) horasDia.set(chave, new Set());
+      horasDia.get(chave)!.add(escolhido.hora);
     }
     blocosPorPadrao[bloco.padrao] = (blocosPorPadrao[bloco.padrao] ?? 0) + 1;
   }
@@ -673,15 +792,31 @@ export function organizarBlocos100(
   }
 
   const plCompactado = new Map<string, number>();
+  const tipologiasCompactadas = new Map<string, Set<"TP" | "PL">>();
+  const registarTipologiaCompactada = (sessao: SessaoHorario) => {
+    if ((sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") || sessao.semana == null) return;
+    const chave = chaveTipologia(sessao.semana, sessao.diaSemana, sessao.horaInicio, sessao.ucSigla);
+    if (!tipologiasCompactadas.has(chave)) tipologiasCompactadas.set(chave, new Set());
+    tipologiasCompactadas.get(chave)!.add(sessao.tipoAula);
+  };
   for (const sessao of sessoesExternas.filter(s => s.tipoAula === "PL" && s.semana != null)) {
     const chave = chavePL(sessao.semana!, sessao.diaSemana, sessao.horaInicio);
     plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
   }
+  for (const sessao of sessoesExternas) registarTipologiaCompactada(sessao);
   const padroesDia = (familiaManha: boolean) => ({
     seis: familiaManha ? ["08:00", "10:00", "12:00"] : ["14:00", "16:00", "18:00"],
     oito: familiaManha ? ["08:00", "10:00", "12:00", "16:00"] : ["10:00", "14:00", "16:00", "18:00"],
   });
-
+  const familiasPorAnoSemana = new Map<string, Set<Familia>>();
+  for (const sessao of [...preservadas, ...alocadas]) {
+    const uc = ucPorSigla.get(sessao.ucSigla);
+    const familia = familiaTeorica(sessao.turma);
+    if (!uc || !familia || sessao.semana == null) continue;
+    const chave = `${uc.anoCurricular}|${sessao.semana}`;
+    if (!familiasPorAnoSemana.has(chave)) familiasPorAnoSemana.set(chave, new Set());
+    familiasPorAnoSemana.get(chave)!.add(familia);
+  }
   for (const [grupo, eventos] of eventosPorGrupo) {
     const [anoTexto, semanaTexto, familiaTexto] = grupo.split("|");
     const ano = Number(anoTexto);
@@ -689,9 +824,11 @@ export function organizarBlocos100(
     const familia = familiaTexto as Familia;
     const semestreGrupo = semana <= 15 ? 1 : 2;
     const turmaAManha = cfg.prefTurmaAManha?.[`${ano}|${semestreGrupo}`] ?? (semestreGrupo === 1);
-    const semanaSoFamilia = new Set(
+    const semanaSoFamiliaConfigurada = new Set(
       (familia === "A" ? cfg.semanasSoTurmaA : cfg.semanasSoTurmaB)?.[ano] ?? [],
     ).has(semana);
+    const semanaSoFamilia = semanaSoFamiliaConfigurada
+      || (familiasPorAnoSemana.get(`${ano}|${semana}`)?.size === 1);
     const familiaManha = semanaSoFamilia || (familia === "A" ? turmaAManha : !turmaAManha);
     const padroes = padroesDia(familiaManha);
 
@@ -710,6 +847,9 @@ export function organizarBlocos100(
     const nomeDia = (dia: string) => `dia_${DIAS.indexOf(dia)}`;
     const nomeSlot = (dia: string, hora: string) => `slot_${DIAS.indexOf(dia)}_${HORAS.indexOf(hora)}`;
     eventos.forEach((_, i) => { constraints[nomeEvento(i)] = { equal: 1 }; });
+    constraints.dias_oito = {
+      max: Math.max(0, cfg.cargaDiariaEstudante.maxDiasNoMaximoPorSemana),
+    };
     for (const dia of DIAS) {
       constraints[nomeDia(dia)] = { equal: 1 };
       for (const hora of HORAS) {
@@ -722,18 +862,40 @@ export function organizarBlocos100(
         .filter(p => p.semana === semana && p.minimoBlocos > 0)
         .map(p => p.dia),
     );
+    const slotsFixos = new Set(
+      [...fixosPorDia].flatMap(([dia, horas]) => [...horas].map(hora => `${dia}|${hora}`)),
+    ).size;
+    if (semanaSoFamilia && slotsFixos + eventos.length >= 3
+      && !(fixosPorDia.get("Quinta")?.size)) {
+      prioridade.add("Quinta");
+    }
+    if (semanaSoFamilia && slotsFixos + eventos.length >= 6
+      && !(fixosPorDia.get("Terça")?.size)) {
+      prioridade.add("Terça");
+    }
     for (const dia of DIAS) {
       const fixos = fixosPorDia.get(dia) ?? new Set<string>();
-      const candidatosPadrao = [
+      const candidatosBase = [
         { id: "vazio", horas: [] as string[], custo: 0 },
         { id: "seis", horas: padroes.seis, custo: 10 + Number(dia === "Sexta") },
         { id: "oito", horas: padroes.oito, custo: 10_000 + Number(dia === "Sexta") },
-      ].filter(padrao =>
+      ];
+      // Uma T conjunta pode obrigar excecionalmente a família da tarde a ter
+      // manhã nesse dia. Nesse caso, usa-se o padrão matinal completo, nunca 12h+14h.
+      if (fixos.size && ![...fixos].every(hora => padroes.oito.includes(hora))) {
+        const alternativo = padroesDia(!familiaManha);
+        candidatosBase.push(
+          { id: "seis_alt", horas: alternativo.seis, custo: 20 },
+          { id: "oito_alt", horas: alternativo.oito, custo: 10_010 },
+        );
+      }
+      const candidatosPadrao = candidatosBase.filter(padrao =>
         !(padrao.id === "vazio" && prioridade.has(dia))
         && [...fixos].every(hora => padrao.horas.includes(hora)));
       for (const padrao of candidatosPadrao) {
         const nome = `padrao_${DIAS.indexOf(dia)}_${padrao.id}`;
         variables[nome] = { custo: padrao.custo, [nomeDia(dia)]: 1 };
+        if (padrao.id.startsWith("oito")) variables[nome].dias_oito = 1;
         for (const hora of padrao.horas) variables[nome][nomeSlot(dia, hora)] = -1;
         ints[nome] = 1;
       }
@@ -750,11 +912,26 @@ export function organizarBlocos100(
         const blocoEvento: Bloco = { sessoes: evento.sessoes, padrao: "T1", semanaPreferida: semana };
         if (!cumpreRestricoesUC(blocoEvento, semana, dia, hora)) continue;
         if (!cumprePrecedencias(blocoEvento, semana, dia, hora)) continue;
+        const misturaTipologias = evento.sessoes.some(sessao => {
+          if (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") return false;
+          const existentes = tipologiasCompactadas.get(
+            chaveTipologia(semana, dia, hora, sessao.ucSigla),
+          );
+          return existentes?.has(sessao.tipoAula === "TP" ? "PL" : "TP");
+        });
+        if (misturaTipologias) continue;
         if (plEvento && (plCompactado.get(chavePL(semana, dia, hora)) || 0) + plEvento > cfg.maxPLporMancha) continue;
         const nome = `x_${i}_${DIAS.indexOf(dia)}_${HORAS.indexOf(hora)}`;
         const deslocado = dia !== evento.diaOriginal || hora !== evento.horaOriginal;
+        const ordemNaSemana = DIAS.indexOf(dia) * HORAS.length + HORAS.indexOf(hora);
+        // Dentro do padrão diário escolhido, as TP puras ficam tão cedo quanto
+        // possível e os blocos que contêm PL tão tarde quanto possível. Isto
+        // preserva a sequência T→TP→PL sem voltar a excluir blocos completos.
+        const custoCronologia = plEvento
+          ? (DIAS.length * HORAS.length - ordemNaSemana) * 50
+          : ordemNaSemana * 50;
         variables[nome] = {
-          custo: deslocado ? 2 : 0,
+          custo: custoCronologia + (deslocado ? 2 : 0),
           [nomeEvento(i)]: 1,
           [nomeSlot(dia, hora)]: 1,
         };
@@ -771,7 +948,16 @@ export function organizarBlocos100(
       options: { timeout: 15000, presolve: true },
     };
     const solucao = solver.Solve(modelo) as SolveResult;
-    if (!solucao.feasible) continue;
+    if (!solucao.feasible) {
+      for (const evento of eventos) for (const sessao of evento.sessoes) {
+        registarTipologiaCompactada(sessao);
+        if (sessao.tipoAula === "PL" && sessao.semana != null) {
+          const chave = chavePL(sessao.semana, sessao.diaSemana, sessao.horaInicio);
+          plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
+        }
+      }
+      continue;
+    }
     eventos.forEach((evento, i) => {
       for (const dia of DIAS) for (const hora of HORAS) {
         const nome = `x_${i}_${DIAS.indexOf(dia)}_${HORAS.indexOf(hora)}`;
@@ -781,13 +967,15 @@ export function organizarBlocos100(
           sessao.horaInicio = hora;
           sessao.horaFim = `${String(Number(hora.slice(0, 2)) + 2).padStart(2, "0")}:00`;
         }
-        const plEvento = evento.sessoes.filter(s => s.tipoAula === "PL").length;
-        if (plEvento) {
-          const chave = chavePL(semana, dia, hora);
-          plCompactado.set(chave, (plCompactado.get(chave) || 0) + plEvento);
-        }
       }
     });
+    for (const evento of eventos) for (const sessao of evento.sessoes) {
+      registarTipologiaCompactada(sessao);
+      if (sessao.tipoAula === "PL" && sessao.semana != null) {
+        const chave = chavePL(sessao.semana, sessao.diaSemana, sessao.horaInicio);
+        plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
+      }
+    }
   }
 
   const avisos = sobras.length
