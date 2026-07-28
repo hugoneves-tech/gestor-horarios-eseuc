@@ -1,6 +1,6 @@
 import { supabase, supabaseConfigured } from "./supabaseClient";
 import type { DadosAcademicos, Repositorio } from "./repositorio";
-import type { VersaoHorario, SolverRun } from "../types";
+import type { VersaoHorario, SolverRun, RegraHorario, AnoLetivoSemestre } from "../types";
 import * as M from "./mappers";
 
 /** Ordem de tabelas que respeita as foreign keys ao inserir/apagar. */
@@ -13,6 +13,14 @@ const TABELAS_CATALOGO = [
  * Implementação do Repositorio sobre Supabase (PostgreSQL).
  */
 export class SupabaseRepo implements Repositorio {
+  private filaGravacao: Promise<void> = Promise.resolve();
+
+  private emFila<T>(operacao: () => Promise<T>): Promise<T> {
+    const seguinte = this.filaGravacao.then(operacao, operacao);
+    this.filaGravacao = seguinte.then(() => undefined, () => undefined);
+    return seguinte;
+  }
+
   disponivel(): boolean {
     return supabaseConfigured && supabase !== null;
   }
@@ -61,7 +69,8 @@ export class SupabaseRepo implements Repositorio {
    * não violar foreign keys.
    */
   async guardarTudo(d: Partial<DadosAcademicos>): Promise<void> {
-    const db = this.cli();
+    return this.emFila(async () => {
+      const db = this.cli();
 
     const up = async (t: string, rows: any[]) => {
       if (!rows?.length) return;
@@ -105,13 +114,32 @@ export class SupabaseRepo implements Repositorio {
     await apagarEmFalta("turmas", d.turmas);
     await apagarEmFalta("ucs", d.ucs);
     await apagarEmFalta("anos_semestres", d.anosSemestres);
-    await apagarEmFalta("cursos", d.cursos);
+      await apagarEmFalta("cursos", d.cursos);
+    });
   }
 
   async guardarVersao(v: VersaoHorario): Promise<void> {
     const db = this.cli();
     const { error } = await db.from("versoes").upsert(M.versaoToRow(v));
     if (error) throw new Error(`[versoes] ${error.message}`);
+  }
+
+  /** Persiste uma regra imediatamente, evitando que a sincronização em tempo real
+   * recarregue a versão anterior durante o debounce do snapshot completo. */
+  async guardarRegra(r: RegraHorario): Promise<void> {
+    return this.emFila(async () => {
+      const db = this.cli();
+      const { error } = await db.from("regras").upsert(M.regraToRow(r));
+      if (error) throw new Error(`[regras] ${error.message}`);
+    });
+  }
+
+  async guardarAnoSemestre(a: AnoLetivoSemestre): Promise<void> {
+    return this.emFila(async () => {
+      const db = this.cli();
+      const { error } = await db.from("anos_semestres").upsert(M.anoSemToRow(a));
+      if (error) throw new Error(`[anos_semestres] ${error.message}`);
+    });
   }
 
   async guardarSolverRun(s: SolverRun): Promise<void> {

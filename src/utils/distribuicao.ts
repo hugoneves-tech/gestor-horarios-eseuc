@@ -62,35 +62,15 @@ export function calcularEndWeek(
 }
 
 /**
- * Maps pedagogical week numbers to physical week numbers (1-based index of custom calendar).
- * For example, if week 7 is a pause week, pedagogical week 7 is physical week 8, and pedagogical week 8 is physical week 9.
+ * A numeração oficial das semanas é fixa. Uma pausa continua a ocupar o seu
+ * número de semana (com fator 0) e nunca empurra aulas para uma semana 31/32.
  */
 export function mapearSemanasPedagogicasParaFisicas(
   semanaInicioPed: number,
   semanaFimPed: number,
-  semanasPersonalizadas?: SemanaPersonalizada[]
+  _semanasPersonalizadas?: SemanaPersonalizada[]
 ): { start: number; end: number } {
-  const pedagogicalToPhysical: Record<number, number> = {};
-  let activeCount = 0;
-  let maxWeekNum = 35;
-  if (semanasPersonalizadas && semanasPersonalizadas.length > 0) {
-    const maxNum = Math.max(...semanasPersonalizadas.map(x => x.numero));
-    if (maxNum > maxWeekNum) {
-      maxWeekNum = maxNum;
-    }
-  }
-  const maxWeeksToProcess = Math.max(52, maxWeekNum);
-  for (let w = 1; w <= maxWeeksToProcess; w++) {
-    const cp = semanasPersonalizadas?.find(x => x.numero === w);
-    if (!cp?.isPausa) {
-      activeCount++;
-      pedagogicalToPhysical[activeCount] = w;
-    }
-  }
-
-  const start = pedagogicalToPhysical[semanaInicioPed] || semanaInicioPed;
-  const end = pedagogicalToPhysical[semanaFimPed] || semanaFimPed;
-  return { start, end };
+  return { start: semanaInicioPed, end: semanaFimPed };
 }
 
 /**
@@ -133,7 +113,7 @@ export function calcularSemanas(
       seg = new Date(base);
       seg.setDate(base.getDate() + (w - 1) * 7);
       sex = new Date(seg);
-      sex.setDate(seg.getDate() + 6);
+      sex.setDate(seg.getDate() + 4);
     }
 
     const diasBloqueados: string[] = [];
@@ -150,6 +130,12 @@ export function calcularSemanas(
 
         // Days before semester start
         if (dia < actualStart) {
+          diasBloqueados.push(nomeDia);
+          continue;
+        }
+        // Uma semana personalizada pode terminar antes de sexta-feira
+        // (por exemplo, a última semana letiva termina a 20/05, quinta-feira).
+        if (dia > sex) {
           diasBloqueados.push(nomeDia);
           continue;
         }
@@ -818,6 +804,26 @@ export interface OpcoesDistribuicao {
     tipos?: ("T" | "TP" | "PL" | "S")[];       // restringe a estes tipos de aula (vazio = todos)
     semanasRestritas?: number[];               // semanas globais em que esta regra se aplica (vazio = todas)
   }[];
+  // Precedências pedagógicas configuradas em regras do Supabase. O motor apenas
+  // interpreta a regra; não contém siglas nem quantidades específicas.
+  precedenciasUC?: {
+    siglas: string[];
+    tipoAntes: "T" | "TP";
+    tipoDepois: "TP" | "PL";
+    minimoAntes: number;
+    contagem?: "porTurma" | "sessoesTodasTurmas";
+    unidade?: "blocos" | "horas";
+  }[];
+  /** Janelas em que T1 e T2 têm a mesma UC, no mesmo bloco e na mesma sala. */
+  aulasTConjuntas?: {
+    anos?: number[];
+    semanas: number[];
+    dias: string[];
+    horarios?: string[];
+    sala?: string;
+    obrigatoriaPorDia?: boolean;
+    siglasObrigatorias?: string[];
+  }[];
 }
 
 export function gerarSessoesConjunto(
@@ -830,6 +836,9 @@ export function gerarSessoesConjunto(
 ): SessaoHorario[] {
   const sessoes: SessaoHorario[] = [];
   let id = idStart;
+  const normalizarSigla = (sigla: string) => String(sigla || "").trim().toLocaleUpperCase("pt-PT");
+  const listaTemSigla = (siglas: string[] | undefined, sigla: string) =>
+    !!siglas?.some(s => normalizarSigla(s) === normalizarSigla(sigla));
   // Preferência manhã/tarde da Turma A por ano (e semestre desta chamada).
   const turmaAManhaDe = (ano: number): boolean =>
     opts.prefTurmaAManha?.[`${ano}|${semestre}`] ?? (semestre === 1);
@@ -1011,9 +1020,13 @@ export function gerarSessoesConjunto(
     for (const r of rs) {
       if (r.tipos.size && !r.tipos.has(tipo)) continue;
       if (r.semanasRestritas.size && !r.semanasRestritas.has(semanaGlobal)) continue;
-      if (r.dias.has(dia)) return true;
-      if (r.manha && ehManha) return true;
-      if (r.tarde && !ehManha) return true;
+      const restringeDias = r.dias.size > 0;
+      const restringePeriodos = r.manha || r.tarde;
+      const diaCoincide = r.dias.has(dia);
+      const periodoCoincide = (r.manha && ehManha) || (r.tarde && !ehManha);
+      // Dia + período significam a interseção ("quarta à tarde"). Quando só
+      // existe um dos campos, esse campo vale isoladamente.
+      if (restringeDias && restringePeriodos ? diaCoincide && periodoCoincide : diaCoincide || periodoCoincide) return true;
     }
     return false;
   };
@@ -1057,6 +1070,15 @@ export function gerarSessoesConjunto(
   const espelho = new Map<string, Set<string>>(); // `${ano}|${week}|${ucKey}|${tipo}|${family}` → {"dia|hora"}
   const HORA_ESPELHO: Record<string, string> = { "08:00": "14:00", "10:00": "16:00", "12:00": "18:00", "14:00": "08:00", "16:00": "10:00", "18:00": "12:00" };
   const ttKey = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string) => `${ano}|${week}|${dia}|${ucKey}|${turma}|${tipo}`;
+  const tUcPorMancha = new Map<string, string>();
+  const tManchaKey = (ano: number, week: number, dia: string, hora: string) => `${ano}|${week}|${dia}|${hora}`;
+  const regraTConjuntaNoSlot = (t: Task, week: number, dia: string, hora: string) =>
+    (opts.aulasTConjuntas || []).find(r =>
+      (!r.anos?.length || r.anos.includes(t.ano))
+      && r.semanas.includes(week)
+      && r.dias.includes(dia)
+      && (!r.horarios?.length || r.horarios.includes(hora))
+    );
   const adjacenteOcupado = (ano: number, week: number, dia: string, ucKey: string, turma: string, tipo: string, hora: string) => {
     const set = turmaPeriodos.get(ttKey(ano, week, dia, ucKey, turma, tipo));
     if (!set) return false;
@@ -1066,6 +1088,11 @@ export function gerarSessoesConjunto(
   const grupoTeoricoConjunto = (t: Task): Task[] =>
     t.tipo === "T" && t.turmasTSimultaneas
       ? tasks.filter(x => x.tipo === "T" && x.ucKey === t.ucKey && x.ano === t.ano)
+      : [t];
+  const grupoTeoricoNoSlot = (t: Task, week: number, dia: string, hora: string): Task[] =>
+    t.tipo === "T" && (t.turmasTSimultaneas || regraTConjuntaNoSlot(t, week, dia, hora))
+      ? tasks.filter(x => x.tipo === "T" && x.ucKey === t.ucKey && x.ano === t.ano
+        && x.weeks.some(w => w.semanaGlobal === week))
       : [t];
 
   // Atualiza TODA a contabilidade do motor para uma sessão neste slot (ocupação, conflitos,
@@ -1079,6 +1106,7 @@ export function gerarSessoesConjunto(
     let sset = siglaMancha.get(smk); if (!sset) { sset = new Set(); siglaMancha.set(smk, sset); }
     sset.add(t.ucSigla);
     if (t.tipo === "T") {
+      tUcPorMancha.set(tManchaKey(t.ano, wk.semanaGlobal, slot.dia, slot.hora), t.ucKey);
       const tk = ttKey(t.ano, wk.semanaGlobal, slot.dia, t.ucKey, t.turmaNome, t.tipo);
       let set = turmaPeriodos.get(tk); if (!set) { set = new Set(); turmaPeriodos.set(tk, set); }
       set.add(slot.hora);
@@ -1127,14 +1155,14 @@ export function gerarSessoesConjunto(
   };
 
   // Coloca e CONTABILIZA uma sessão gerada (adiciona-a ao output).
-  const commit = (t: Task, wk: WeekRef, slot: Slot) => {
+  const commit = (t: Task, wk: WeekRef, slot: Slot, sala = "") => {
     registar(t, wk, slot);
     t.placed++;
     const s = getStat(statKeyOf(t));
     if (t.tipo === "T") s.placedT++; else if (t.tipo === "TP") s.placedTP++; else if (t.tipo === "PL") s.placedPL++;
     sessoes.push({
       id: ++id, ucNome: t.ucNome, ucSigla: t.ucSigla, tipoAula: t.tipo,
-      docente: "", sala: "", salaTipo: t.salaTipo,
+      docente: "", sala, salaTipo: t.salaTipo,
       turma: t.turmaNome, diaSemana: slot.dia, horaInicio: slot.hora,
       horaFim: addHours(slot.hora, 2), bloqueado: false, semana: wk.semanaGlobal,
     });
@@ -1152,6 +1180,29 @@ export function gerarSessoesConjunto(
     else if (t.tipo === "PL") { if (s.totalPL > 0) s.totalPL--; }
   };
 
+  // Momento da última T que tem obrigatoriamente de anteceder a TP. Quando a
+  // regra conta sessões de todas as turmas, duas turmas no mesmo bloco contam
+  // como duas sessões, mas a TP só pode surgir depois do último bloco contado.
+  const ordemTMinimaExigida = (t: Task): number | undefined => {
+    const regras = (opts.precedenciasUC || []).filter(r =>
+      r.tipoAntes === "T" && r.tipoDepois === "TP" && listaTemSigla(r.siglas, t.ucSigla));
+    let ordemExigida: number | undefined;
+    for (const regra of regras) {
+      const minimo = Math.max(1, Math.floor(regra.minimoAntes));
+      const blocosMinimos = regra.unidade === "horas" ? Math.ceil(minimo / 2) : minimo;
+      const ordens = sessoes
+        .filter(s => s.ucSigla === t.ucSigla && s.tipoAula === "T" && s.semana != null
+          && (regra.contagem === "sessoesTodasTurmas"
+            || s.turma === (t.family === "A" ? "Turma A" : "Turma B")))
+        .map(s => ordSlot(s.semana!, s.diaSemana, s.horaInicio))
+        .sort((a, b) => a - b);
+      if (ordens.length < blocosMinimos) return undefined;
+      const ordemRegra = ordens[blocosMinimos - 1];
+      if (ordemExigida === undefined || ordemRegra > ordemExigida) ordemExigida = ordemRegra;
+    }
+    return ordemExigida;
+  };
+
   // Colocação FORÇADA num slot específico (para a passagem de "encher blocos extra"),
   // verificando ocupação, conflito de UC, teto de 8h e cap de PL/TP.
   const tryPlaceAt = (t: Task, wk: WeekRef, dia: string, hora: string, relaxPLuc = false): boolean => {
@@ -1161,13 +1212,17 @@ export function gerarSessoesConjunto(
     if (t.tipo === "TP" || t.tipo === "PL") {
       const st0 = getStat(statKeyOf(t));
       const ref = t.tipo === "TP"
-        ? tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`)
+        ? (ordemTMinimaExigida(t) ?? tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`))
         : (st0.totalTP > 0 ? tpMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`) : tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`));
       if (ref === undefined || ordSlot(wk.semanaGlobal, dia, hora) <= ref) return false;
     }
     if (t.placed >= t.total) return false;
     if (!opts.semRegras && slotProibido(t.ucSigla, t.tipo, dia, hora, wk.semanaGlobal)) return false; // restrição genérica por UC
     if (ocupacao.has(slotKey(t.ano, wk.semanaGlobal, t.turmaNome, dia, hora))) return false;
+    if (t.tipo === "T") {
+      const ucExistente = tUcPorMancha.get(tManchaKey(t.ano, wk.semanaGlobal, dia, hora));
+      if (ucExistente && ucExistente !== t.ucKey) return false;
+    }
     const smk = tpManchaKey(t.ano, wk.semanaGlobal, dia, hora);
     const emConflito = conflitoUC.get(t.ucSigla);
     if (emConflito) { const set = siglaMancha.get(smk); if (set) for (const sig of set) if (emConflito.has(sig)) return false; }
@@ -1229,7 +1284,15 @@ export function gerarSessoesConjunto(
     // modal da disciplina (por defeito 10–12 ou 16–18).
     const grupoTConjunto = grupoTeoricoConjunto(t);
     if (!opts.semRegras && t.tipo === "T" && t.turmasTSimultaneas) {
-      const permitidos = new Set(t.horariosTSimultaneas);
+      // Uma T conjunta tem de caber simultaneamente no padrão da família da
+      // manhã e no da família da tarde. Só 10h (reserva da tarde) e 16h
+      // (reserva da manhã) permitem completar depois um dia contínuo de 6h
+      // ou o padrão excecional de 8h com almoço.
+      const configuradosSeguros = t.horariosTSimultaneas.filter(hora =>
+        hora === "10:00" || hora === "16:00");
+      const permitidos = new Set(configuradosSeguros.length
+        ? configuradosSeguros
+        : ["10:00", "16:00"]);
       pool = pool.filter(s =>
         permitidos.has(s.hora) &&
         (["Segunda", "Quarta"].includes(s.dia) || (s.dia === "Sexta" && s.hora === "10:00"))
@@ -1239,6 +1302,24 @@ export function gerarSessoesConjunto(
         !ocupacao.has(slotKey(g.ano, wk.semanaGlobal, g.turmaNome, s.dia, s.hora)) &&
         gruposAlunoFolha(g.turmaNome).every(f => (diaCount.get(diaKey(g.ano, wk.semanaGlobal, s.dia, f)) || 0) < MAX_BLOCOS_DIA)
       ));
+    }
+    // Uma T numa janela conjunta nunca entra sozinha: T1 e T2 têm de caber,
+    // e o auditório não pode já conter outra UC no mesmo bloco.
+    if (!opts.semRegras && t.tipo === "T") {
+      pool = pool.filter(s => {
+        const regra = regraTConjuntaNoSlot(t, wk.semanaGlobal, s.dia, s.hora);
+        const ucExistente = tUcPorMancha.get(tManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora));
+        if (ucExistente && ucExistente !== t.ucKey) return false;
+        if (!regra) return true;
+        const grupo = grupoTeoricoNoSlot(t, wk.semanaGlobal, s.dia, s.hora);
+        return grupo.length >= 2 && grupo.every(g =>
+          g.placed < g.total
+          && !ocupacao.has(slotKey(g.ano, wk.semanaGlobal, g.turmaNome, s.dia, s.hora))
+          && !slotProibido(g.ucSigla, g.tipo, s.dia, s.hora, wk.semanaGlobal)
+          && gruposAlunoFolha(g.turmaNome).every(f =>
+            (diaCount.get(diaKey(g.ano, wk.semanaGlobal, s.dia, f)) || 0) < MAX_BLOCOS_DIA)
+        );
+      });
     }
     // Conflito de UCs (docentes partilhados): nunca na mesma mancha (ex.: ESDAC ∦ EIG).
     const emConflito = conflitoUC.get(t.ucSigla);
@@ -1273,7 +1354,7 @@ export function gerarSessoesConjunto(
         const tMin = tMinOrd.get(t.ano + "|" + t.ucKey + "|" + t.family);
       }
 
-        const tMin = tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`);
+        const tMin = ordemTMinimaExigida(t) ?? tMinOrd.get(`${t.ano}|${t.ucKey}|${t.family}`);
         pool = pool.filter(s => tMin !== undefined && ordSlot(wk.semanaGlobal, s.dia, s.hora) > tMin);
       }
       pool = pool.filter(s => (tpCount.get(tpManchaKey(t.ano, wk.semanaGlobal, s.dia, s.hora) + "|" + t.ucKey) || 0) < MAX_TP_POR_UC_MANCHA);
@@ -1451,8 +1532,13 @@ export function gerarSessoesConjunto(
 
     const slot = encontrarSlotLivre(pool, t.ano, wk.semanaGlobal, t.turmaNome, t.tipo, ocupacao, plCount, 0, t.salaPool, MAX_PL_POR_MANCHA);
     if (!slot) return false;
-    if (!opts.semRegras && t.tipo === "T" && t.turmasTSimultaneas) {
-      for (const g of grupoTConjunto) commit(g, wk, slot);
+    const regraConjunta = !opts.semRegras && t.tipo === "T"
+      ? regraTConjuntaNoSlot(t, wk.semanaGlobal, slot.dia, slot.hora)
+      : undefined;
+    if (!opts.semRegras && t.tipo === "T" && (t.turmasTSimultaneas || regraConjunta)) {
+      for (const g of grupoTeoricoNoSlot(t, wk.semanaGlobal, slot.dia, slot.hora)) {
+        commit(g, wk, slot, regraConjunta?.sala || "");
+      }
     } else {
       commit(t, wk, slot);
     }
@@ -1465,6 +1551,18 @@ export function gerarSessoesConjunto(
   // within each UC, no TP happens before a T and no PL before a TP.
   const canTP = (t: Task): boolean => {
     const s = getStat(statKeyOf(t));
+    const regrasPrecedencia = (opts.precedenciasUC ?? [])
+      .filter(r => r.tipoAntes === "T" && r.tipoDepois === "TP" && listaTemSigla(r.siglas, t.ucSigla));
+    for (const regra of regrasPrecedencia) {
+      const minimo = Math.max(1, Math.floor(regra.minimoAntes));
+      const blocosColocados = regra.contagem === "sessoesTodasTurmas"
+        ? [...stats.entries()]
+          .filter(([chave]) => chave.startsWith(`${t.ucKey}|`))
+          .reduce((total, [, stat]) => total + stat.placedT, 0)
+        : s.placedT;
+      const quantidadeColocada = regra.unidade === "horas" ? blocosColocados * 2 : blocosColocados;
+      if (quantidadeColocada < minimo) return false;
+    }
     return s.totalT === 0 || (s.placedT / s.totalT) > (s.placedTP / s.totalTP);
   };
   const canPL = (t: Task): boolean => {
@@ -1566,6 +1664,50 @@ export function gerarSessoesConjunto(
   }
 
   const allWeeks = [...new Set(tasks.flatMap(t => t.weeks.map(w => w.semanaGlobal)))].sort((a, b) => a - b);
+  // Reserva pelo menos um bloco T conjunto em cada dia obrigatório antes de
+  // distribuir TP/PL, para que essas atividades nunca consumam o auditório.
+  if (!opts.semRegras) {
+    for (const regra of (opts.aulasTConjuntas || []).filter(r => r.obrigatoriaPorDia)) {
+      for (const week of regra.semanas) for (const dia of regra.dias) {
+        const wk = tasks.flatMap(t => t.weeks).find(w => w.semanaGlobal === week);
+        if (!wk || wk.diasBloqueados.includes(dia)) continue;
+        const horas = regra.horarios?.length ? regra.horarios : TODOS_PERIODOS;
+        let colocado = false;
+        const candidatos = tTasks.filter(t =>
+          (!regra.anos?.length || regra.anos.includes(t.ano))
+          && (!regra.siglasObrigatorias?.length || listaTemSigla(regra.siglasObrigatorias, t.ucSigla))
+          && t.family === "A"
+          && t.placed < t.total
+          && t.weeks.some(w => w.semanaGlobal === week)
+        );
+        for (const t of candidatos) {
+          for (const hora of horas) {
+            const grupo = grupoTeoricoNoSlot(t, week, dia, hora);
+            if (grupo.length < 2 || !grupo.some(g => g.family === "B")) continue;
+            // A janela da regra cruza-se com a configuração própria da UC.
+            // Ex.: PsiS só admite T conjunta às 10h/16h e, à sexta, apenas às 10h.
+            if (grupo.some(g => g.turmasTSimultaneas && (
+              !g.horariosTSimultaneas.includes(hora)
+              || !(["Segunda", "Quarta"].includes(dia) || (dia === "Sexta" && hora === "10:00"))
+            ))) continue;
+            if (grupo.some(g =>
+              g.placed >= g.total
+              || slotProibido(g.ucSigla, g.tipo, dia, hora, week)
+              || ocupacao.has(slotKey(g.ano, week, g.turmaNome, dia, hora))
+              || gruposAlunoFolha(g.turmaNome).some(f =>
+                (diaCount.get(diaKey(g.ano, week, dia, f)) || 0) >= MAX_BLOCOS_DIA)
+            )) continue;
+            const ucExistente = tUcPorMancha.get(tManchaKey(t.ano, week, dia, hora));
+            if (ucExistente && ucExistente !== t.ucKey) continue;
+            for (const g of grupo) commit(g, wk, { dia, hora }, regra.sala || "");
+            colocado = true;
+            break;
+          }
+          if (colocado) break;
+        }
+      }
+    }
+  }
   // Chronological: each week lays T, then the gated TP, then the gated PL.
   const gTP = opts.semRegras ? null : canTP;   // sem regras: ignora a ordem T→TP→PL
   const gPL = opts.semRegras ? null : canPL;

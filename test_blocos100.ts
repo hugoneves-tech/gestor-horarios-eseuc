@@ -9,6 +9,9 @@ const uc = (id: string): UC => ({
   cargaHorariaE: 0, ects: 1, semestre: 1, numSemanas: 15,
 });
 const catalogo = ["U1", "U2", "U3"].map(uc);
+const catalogoMax3 = catalogo.map(u => (
+  u.id === "U2" || u.id === "U3" ? { ...u, maxSimultaneoPL: 3 } : u
+));
 const regraLegada = rowToRegra({
   id: "h_blocos_ocupacao_100", nome: "Blocos", tipo: "hard", ativa: true,
   config: { motor: { blocos100: { preferirSextaLivre: true } } },
@@ -24,21 +27,62 @@ const s = (ucSigla: string, tipoAula: "TP" | "PL", turma: string): SessaoHorario
   id: ++id, ucNome: ucSigla, ucSigla, tipoAula, turma, docente: "", sala: "", salaTipo: "",
   diaSemana: "Sexta", horaInicio: "16:00", horaFim: "18:00", bloqueado: false, semana: 1,
 });
-const executar = (sessoes: SessaoHorario[], esperado: PadraoBloco100Id) => {
-  const r = organizarBlocos100(sessoes, catalogo);
+const executar = (sessoes: SessaoHorario[], esperado: PadraoBloco100Id, catalogoTeste = catalogo) => {
+  const r = organizarBlocos100(sessoes, catalogoTeste);
   assert.equal(r.naoAlocadas.length, 0);
   assert.equal(r.blocosPorPadrao[esperado], 1);
   assert.ok(r.sessoes.every(x => x.diaSemana !== "Sexta"));
-  assert.deepEqual(validarBlocos100(r.sessoes, catalogo), []);
+  assert.deepEqual(validarBlocos100(r.sessoes, catalogoTeste), []);
 };
 
 executar([1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`)), "TP4_MESMA_UC");
 executar([s("U1", "TP", "TP1"), s("U1", "TP", "TP2"), s("U2", "TP", "TP3"), s("U2", "TP", "TP4")], "TP2_DUAS_UCS");
 executar([
   s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3, 4, 5, 6].map(n => s("U2", "PL", `PL${n}`)),
+], "TP2_PL6_DUAS_UCS");
+const tpEPlDaMesmaUc = [
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3, 4, 5, 6].map(n => s("U1", "PL", `PL${n}`)),
+];
+assert.equal(validarBlocos100(tpEPlDaMesmaUc, catalogo).length, 1);
+
+const t = (semana: number, diaSemana: string, horaInicio: string): SessaoHorario => ({
+  id: ++id, ucNome: "U1", ucSigla: "U1", tipoAula: "T", turma: "Turma A",
+  docente: "", sala: "", salaTipo: "", diaSemana, horaInicio,
+  horaFim: `${String(Number(horaInicio.slice(0, 2)) + 2).padStart(2, "0")}:00`,
+  bloqueado: false, semana,
+});
+const quatroT = [
+  t(1, "Segunda", "08:00"), t(1, "Segunda", "10:00"),
+  t(1, "Segunda", "12:00"), t(1, "Terça", "08:00"),
+];
+const blocoDepoisDasQuatroT = [
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3, 4, 5, 6].map(n => s("U2", "PL", `PL${n}`)),
+];
+const comPrecedencia = organizarBlocos100([...quatroT, ...blocoDepoisDasQuatroT], catalogo, {
+  precedenciasUC: [{ siglas: ["U1"], tipoAntes: "T", tipoDepois: "TP", minimoAntes: 4 }],
+});
+assert.equal(comPrecedencia.naoAlocadas.length, 0);
+const primeiraTP = comPrecedencia.sessoes.find(x => x.ucSigla === "U1" && x.tipoAula === "TP")!;
+const ordem = (x: SessaoHorario) => (x.semana ?? 0) * 1000
+  + ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"].indexOf(x.diaSemana) * 10
+  + ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"].indexOf(x.horaInicio);
+assert.ok(ordem(primeiraTP) > ordem(quatroT[3]));
+
+executar([
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
   ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
   ...[4, 5, 6].map(n => s("U3", "PL", `PL${n}`)),
-], "TP2_PL3_PL3");
+], "TP2_PL3_PL3", catalogoMax3);
+
+const seisPlAcimaDoMaximo = organizarBlocos100([
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3, 4, 5, 6].map(n => s("U2", "PL", `PL${n}`)),
+], catalogoMax3);
+assert.equal(seisPlAcimaDoMaximo.sessoes.length, 0);
+assert.equal(seisPlAcimaDoMaximo.naoAlocadas.length, 8);
 executar([
   s("U1", "TP", "TP2"), s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
   ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
@@ -94,6 +138,29 @@ const semanaParcial = organizarBlocos100(
 assert.equal(semanaParcial.naoAlocadas.length, 0);
 assert.ok(semanaParcial.sessoes.every(x => x.diaSemana !== "Segunda" && x.diaSemana !== "Terça"));
 
+const tardeQuartaBloqueada = organizarBlocos100(
+  [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`)),
+  catalogo,
+  {
+    restricoesUC: [{
+      siglas: ["U1"],
+      diasProibidos: ["Quarta"],
+      periodosProibidos: ["tarde"],
+      semanasRestritas: [1],
+    }],
+  },
+  [{ uc: catalogo[0], semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça", "Quinta", "Sexta"] }], semanaGlobalOffset: 0 }],
+);
+assert.equal(tardeQuartaBloqueada.naoAlocadas.length, 0);
+assert.ok(
+  tardeQuartaBloqueada.sessoes.every(x => !(x.semana === 1 && x.diaSemana === "Quarta" && Number(x.horaInicio.slice(0, 2)) >= 14)),
+  "a reorganização TP/PL também tem de respeitar a tarde bloqueada pela regra do Supabase",
+);
+assert.ok(
+  tardeQuartaBloqueada.sessoes.some(x => x.semana === 1 && x.diaSemana === "Quarta" && Number(x.horaInicio.slice(0, 2)) < 14),
+  "bloquear quarta à tarde não pode bloquear a quarta-feira de manhã",
+);
+
 const cincoBlocos = Array.from({ length: 5 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
 const cargaPreferida = organizarBlocos100(
   cincoBlocos,
@@ -105,6 +172,19 @@ const cargaPorDia = new Map<string, number>();
 for (const sessao of cargaPreferida.sessoes.filter(x => x.turma === "TP1")) cargaPorDia.set(sessao.diaSemana, (cargaPorDia.get(sessao.diaSemana) || 0) + 1);
 assert.equal(cargaPreferida.naoAlocadas.length, 0);
 assert.ok(Math.max(...cargaPorDia.values()) <= 3, "deve preferir até 6h por dia quando há alternativa");
+
+const dataPrioritaria = organizarBlocos100(
+  Array.from({ length: 3 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat(),
+  catalogo,
+  { diasPrioritarios: [{ semana: 1, dia: "Quinta", minimoBlocos: 3 }] },
+  [{ uc: catalogo[0], semanas: [{ numero: 1 }], semanaGlobalOffset: 0 }],
+);
+assert.equal(dataPrioritaria.naoAlocadas.length, 0);
+assert.equal(
+  dataPrioritaria.sessoes.filter(x => x.turma === "TP1" && x.diaSemana === "Quinta").length,
+  3,
+  "as datas assinaladas nas regras do Supabase devem receber os três blocos prioritários",
+);
 
 const quatroBlocos = Array.from({ length: 4 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
 const cargaExcecional = organizarBlocos100(

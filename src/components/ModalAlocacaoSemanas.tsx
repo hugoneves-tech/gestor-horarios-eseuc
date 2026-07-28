@@ -6,7 +6,7 @@ import type { AnoLetivoSemestre, SemanaPersonalizada } from "../types";
 interface Props {
   anoSem: AnoLetivoSemestre;
   anosSemestres: AnoLetivoSemestre[];
-  onSave: (v: AnoLetivoSemestre[]) => void;
+  onSave: (v: AnoLetivoSemestre[]) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -137,11 +137,11 @@ export function ModalAlocacaoSemanas({
     setConfirmRecalcular(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const nextList = anosSemestres.map(a =>
       a.id === anoSem.id ? { ...a, semanasPersonalizadas: semanas } : a
     );
-    onSave(nextList);
+    await onSave(nextList);
     onClose();
   };
 
@@ -192,7 +192,7 @@ export function ModalAlocacaoSemanas({
             <div>
               <p className="font-bold">Efeito no Planeamento Semanal</p>
               <p className="font-light mt-0.5 leading-relaxed text-[11px]">
-                Semanas marcadas como <strong>Pausa</strong> terão 0 dias úteis e 0 aulas. O motor de distribuição ajustará automaticamente as semanas letivas seguintes (por exemplo, se a S14 for marcada como Pausa, a semana letiva seguinte passa a ser a S14 pedagógica).
+                Semanas marcadas como <strong>Pausa</strong> terão 0 dias úteis e 0 aulas. A numeração oficial mantém-se fixa: uma pausa ocupa a sua semana e não desloca as semanas seguintes.
               </p>
             </div>
           </div>
@@ -273,16 +273,18 @@ export function ModalAlocacaoSemanas({
                     <td className="p-3">
                       <input
                         type="date"
+                        aria-label={`Início da semana física ${s.numero}`}
                         value={s.dataSegunda}
-                        onChange={e => handleUpdateWeek(s.numero, "dataSegunda", e.target.value)}
+                        onInput={e => handleUpdateWeek(s.numero, "dataSegunda", e.currentTarget.value)}
                         className="w-full bg-white border border-stone-200 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none font-mono"
                       />
                     </td>
                     <td className="p-3">
                       <input
                         type="date"
+                        aria-label={`Fim da semana física ${s.numero}`}
                         value={s.dataSexta}
-                        onChange={e => handleUpdateWeek(s.numero, "dataSexta", e.target.value)}
+                        onInput={e => handleUpdateWeek(s.numero, "dataSexta", e.currentTarget.value)}
                         className="w-full bg-white border border-stone-200 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none font-mono"
                       />
                     </td>
@@ -336,4 +338,3 @@ export function ModalAlocacaoSemanas({
     document.body
   );
 }
-

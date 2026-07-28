@@ -17,7 +17,7 @@ values (
       "blocos100": {
         "exigirCoberturaTotal": true,
         "preferirSextaLivre": false,
-        "padroesAtivos": ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
+        "padroesAtivos": ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL6_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
         "padraoAEvitar": "TP3_PL3",
         "percentagens": { "T": 100, "TP": 25, "PL": 8.3333333333 }
       }

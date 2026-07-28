@@ -7,7 +7,7 @@ import { ModalAlocacaoSemanas } from "./ModalAlocacaoSemanas";
 
 interface Props {
   anosSemestres: AnoLetivoSemestre[];
-  setAnosSemestres: (v: AnoLetivoSemestre[]) => void;
+  setAnosSemestres: (v: AnoLetivoSemestre[]) => void | Promise<void>;
   ucs: UC[];
   setUcs: (ucs: UC[]) => void;
   feriados: FeriadoInterrupcao[];

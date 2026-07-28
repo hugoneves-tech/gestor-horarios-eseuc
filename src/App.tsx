@@ -167,6 +167,22 @@ export default function App() {
   // (flag podeGravar), para um erro de carregamento nunca disparar uma gravação que apague tudo.
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [anosSemestres, setAnosSemestres] = useState<AnoLetivoSemestre[]>([]);
+  const setAnosSemestresPersistentes = async (next: AnoLetivoSemestre[]): Promise<void> => {
+    if (!repo.disponivel()) {
+      setAnosSemestres(next);
+      return;
+    }
+    setCloudStatus("saving");
+    try {
+      await Promise.all(next.map(a => repo.guardarAnoSemestre(a)));
+      setAnosSemestres(next);
+      setCloudStatus("synced");
+    } catch (err) {
+      console.error("Erro a gravar calendário no Supabase:", err);
+      setCloudStatus("error");
+      throw err;
+    }
+  };
   const [cargasDocentesProvisorias, setCargasDocentesProvisorias] = useState<CargaDocenteProvisoria[]>([]);
   const [atribuicoesAulasDocenteProvisorias, setAtribuicoesAulasDocenteProvisorias] = useState<AtribuicaoAulaDocenteProvisoria[]>([]);
   const [ucs, setUcs] = useState<UC[]>([]);
@@ -175,6 +191,7 @@ export default function App() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [feriados, setFeriados] = useState<FeriadoInterrupcao[]>([]);
   const [regras, setRegras] = useState<RegraHorario[]>([]);
+  const regrasSyncSuspensaAteRef = useRef(0);
   const [versoes, setVersoes] = useState<VersaoHorario[]>([]);
   const [solverRuns, setSolverRuns] = useState<SolverRun[]>([]);
 
@@ -242,7 +259,7 @@ export default function App() {
   };
   // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
   // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
-  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "maxPLporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "blocos100", "cargaDiariaEstudante"] as const;
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "maxPLporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "precedenciasUC", "aulasTConjuntas", "blocos100", "cargaDiariaEstudante", "bloqueiosCalendario", "limitesCalendario"] as const;
   const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
     const m = (r.config as any)?.motor;
     if (!m || typeof m !== "object") return false;
@@ -1417,6 +1434,10 @@ export default function App() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'regras' },
           () => {
+            // Uma gravação local faz disparar vários eventos (o snapshot usa upsert).
+            // Durante essa janela, a resposta de uma consulta iniciada por um evento
+            // anterior não pode substituir no ecrã a edição acabada de guardar.
+            if (Date.now() < regrasSyncSuspensaAteRef.current) return;
             // Recarrega regras para todos os clientes sempre que houver alteração
             supabase.from('regras').select('*').then(({ data, error }) => {
               if (error) {
@@ -1687,7 +1708,7 @@ export default function App() {
     showToast(`Feriado "${item.nome}" registado no sistema!`);
   };
 
-  const handleAddRegra = () => {
+  const handleAddRegra = async () => {
     if (!newRegra.nome || !newRegra.descricao) return;
     // Coordenador/vice só pode criar regras do seu ano (escopo forçado).
     const ehDir = perfilAtivo.startsWith("diretor");
@@ -1711,6 +1732,14 @@ export default function App() {
       peso: Number(newRegra.peso) || 5,
       ativa: true
     };
+    try {
+      regrasSyncSuspensaAteRef.current = Date.now() + 5000;
+      if (repo.disponivel()) await repo.guardarRegra(item);
+    } catch (err) {
+      console.error("Erro a gravar regra:", err);
+      showToast("Não foi possível gravar a regra no Supabase.");
+      return;
+    }
     setRegras([item, ...regras]);
     setIsAddingRegra(false);
     setNewRegra({ nome: "", tipo: "hard", categoria: "Professor", descricao: "", escopo: "transversal", anoCurricular: "todos", peso: 5, ativa: true });
@@ -1794,18 +1823,80 @@ export default function App() {
         semanasSoTurmaA: {},
         semanasSoTurmaB: {}
       };
+      const converterDataEmSemana = (dataIso: string, anoCurricular: number) => {
+        const data = new Date(`${dataIso}T12:00:00`);
+        if (Number.isNaN(data.getTime())) return null;
+        const dias = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+        const dia = dias[data.getDay()];
+        if (!["Segunda", "Terça", "Quarta", "Quinta", "Sexta"].includes(dia)) return null;
+        for (const semestre of [1, 2]) {
+          const definicao = anosSemestres.find(a =>
+            a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === semestre);
+          if (!definicao?.dataInicioSemestre) continue;
+          const inicioEspecifico = semestre === 1
+            ? (definicao as any)[`dataInicioAno${anoCurricular}`]
+            : undefined;
+          const inicio = new Date(`${inicioEspecifico || definicao.dataInicioSemestre}T12:00:00`);
+          const deslocamentoSegunda = inicio.getDay() === 0 ? 6 : inicio.getDay() - 1;
+          inicio.setDate(inicio.getDate() - deslocamentoSegunda);
+          const semanaRelativa = Math.floor((data.getTime() - inicio.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+          if (semanaRelativa >= 1 && semanaRelativa <= 15) {
+            return { semana: semanaRelativa + (semestre === 2 ? 15 : 0), dia };
+          }
+        }
+        return null;
+      };
       for (const r of regras) {
         if (!regraNoAmbito(r) || !r.ativa) continue;
         
         // Suporte ao novo formato `parametros` e ao legado `config.motor`
         const m = (r.tipo === "motor_ai" ? r.parametros : (r.config as any)?.motor) || {};
+        const datasACompletar = (r.config as any)?.validacao?.datasQueTinhamApenasUmaAula;
+        if (Array.isArray(datasACompletar)) {
+          const anoRegra = anosDaRegra(r)[0]
+            ?? (selectedYearFilter === "todos" ? 2 : Number(selectedYearFilter));
+          for (const dataIso of datasACompletar) {
+            const convertida = converterDataEmSemana(String(dataIso), anoRegra);
+            if (convertida) {
+              motorAI.diasPrioritarios = [
+                ...(motorAI.diasPrioritarios || []),
+                { ...convertida, minimoBlocos: 3 },
+              ];
+            }
+          }
+        }
         
         if (Array.isArray(m.plDiasPermitidos) && m.plDiasPermitidos.length) motorAI.plDiasPermitidos = m.plDiasPermitidos;
         if (Array.isArray(m.ucConflitos)) motorAI.ucConflitos = [...(motorAI.ucConflitos || []), ...m.ucConflitos.filter((p: any) => Array.isArray(p) && p.length === 2)];
+        if (Array.isArray(m.precedenciasUC)) {
+          motorAI.precedenciasUC = [
+            ...(motorAI.precedenciasUC || []),
+            ...m.precedenciasUC.filter((p: any) => p && Array.isArray(p.siglas)
+              && ["T", "TP"].includes(p.tipoAntes) && ["TP", "PL"].includes(p.tipoDepois)
+              && Number(p.minimoAntes) > 0),
+          ];
+        }
+        if (Array.isArray(m.aulasTConjuntas)) {
+          motorAI.aulasTConjuntas = [
+            ...(motorAI.aulasTConjuntas || []),
+            ...m.aulasTConjuntas.filter((x: any) =>
+              x && Array.isArray(x.semanas) && x.semanas.length
+              && Array.isArray(x.dias) && x.dias.length),
+          ];
+        }
         if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
         if (typeof m.maxPLporMancha === "number" && m.maxPLporMancha > 0) motorAI.maxPLporMancha = Math.floor(m.maxPLporMancha);
         if (m.blocos100 && typeof m.blocos100 === "object") motorAI.blocos100 = m.blocos100;
         if (m.cargaDiariaEstudante && typeof m.cargaDiariaEstudante === "object") motorAI.cargaDiariaEstudante = m.cargaDiariaEstudante;
+        if (Array.isArray(m.bloqueiosCalendario)) {
+          motorAI.bloqueiosCalendario = [
+            ...(motorAI.bloqueiosCalendario || []),
+            ...m.bloqueiosCalendario.filter((b: any) => b?.dataInicio && b?.dataFim),
+          ];
+        }
+        if (m.limitesCalendario && typeof m.limitesCalendario === "object") {
+          motorAI.limitesCalendario = { ...(motorAI.limitesCalendario || {}), ...m.limitesCalendario };
+        }
         
         // Semanas exclusivas por ano
         for (const ano of [1, 2, 3, 4]) {
@@ -1844,6 +1935,30 @@ export default function App() {
       // Each semester is scheduled together so UCs share slots fairly (round-robin).
       const entradasS1: EntradaUC[] = [];
       const entradasS2: EntradaUC[] = [];
+      const feriadosEfetivos: FeriadoInterrupcao[] = [
+        ...feriados,
+        ...(motorAI.bloqueiosCalendario || []).map((b: any, i: number) => ({
+          id: `regra_cal_${i}_${b.dataInicio}`,
+          nome: b.nome || "Bloqueio definido nas regras",
+          tipo: b.tipo || "Interrupção Letiva",
+          dataInicio: b.dataInicio,
+          dataFim: b.dataFim,
+        })),
+      ];
+      const limiteCalendario = motorAI.limitesCalendario || {};
+      if (limiteCalendario.dataFim) {
+        feriadosEfetivos.push({
+          id: "regra_limite_data_fim",
+          nome: "Fim do período letivo",
+          tipo: "Interrupção Letiva",
+          dataInicio: (() => {
+            const d = new Date(`${limiteCalendario.dataFim}T12:00:00`);
+            d.setDate(d.getDate() + 1);
+            return d.toISOString().slice(0, 10);
+          })(),
+          dataFim: `${String(limiteCalendario.dataFim).slice(0, 4)}-12-31`,
+        });
+      }
       for (const uc of ucs) {
         if (!uc.turmasConfig?.length) continue;
         if (Number(uc.anoCurricular) === 3) continue; // 3.º ano é ensino clínico
@@ -1867,9 +1982,11 @@ export default function App() {
 
         const mappedWeeks = mapearSemanasPedagogicasParaFisicas(semStartPed, semEndPed, anoSem.semanasPersonalizadas);
         const semStart = mappedWeeks.start;
-        const semEnd = mappedWeeks.end;
+        const maxGlobal = Number(limiteCalendario.semanaMaximaGlobal || 0);
+        const maxRelativa = maxGlobal > semanaGlobalOffset ? maxGlobal - semanaGlobalOffset : 0;
+        const semEnd = maxRelativa > 0 ? Math.min(mappedWeeks.end, maxRelativa) : mappedWeeks.end;
 
-        const semanas = calcularSemanas(dataInicio, semStart, semEnd, feriados, anoSem.semanasPersonalizadas);
+        const semanas = calcularSemanas(dataInicio, semStart, semEnd, feriadosEfetivos, anoSem.semanasPersonalizadas);
         const entrada: EntradaUC = { uc, semanas, semanaGlobalOffset };
         (uc.semestre === 2 ? entradasS2 : entradasS1).push(entrada);
       }
@@ -1927,6 +2044,8 @@ export default function App() {
         sessoesFixas,
         // Restrições genéricas por UC (das regras IA): "X só de manhã", "Y não à sexta", …
         restricoesUC: motorAI.restricoesUC ?? [],
+        precedenciasUC: motorAI.precedenciasUC ?? [],
+        aulasTConjuntas: motorAI.aulasTConjuntas ?? [],
       };
 
       // Schedule each semester fairly across its UCs (round-robin per week).
@@ -1945,6 +2064,9 @@ export default function App() {
           semanasSoTurmaB: motorAI.semanasSoTurmaB,
           maxPLporMancha: motorAI.maxPLporMancha ?? CONFIGURACAO_BLOCOS_100_DEFAULT.maxPLporMancha,
           cargaDiariaEstudante: motorAI.cargaDiariaEstudante ?? CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
+          precedenciasUC: motorAI.precedenciasUC ?? [],
+          restricoesUC: motorAI.restricoesUC ?? [],
+          diasPrioritarios: motorAI.diasPrioritarios ?? [],
         };
         allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);
         const resultadoBlocos = organizarBlocos100(
@@ -1992,11 +2114,11 @@ export default function App() {
       }
       if (!semRegras) {
         const maxPLporMancha = motorAI.maxPLporMancha ?? 6;
-        const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs, maxPLporMancha);
+        const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs, maxPLporMancha, motorAI.aulasTConjuntas ?? []);
         if (relatorioFinal.violacoesTSimultaneas.length) {
           throw new Error(`A proposta viola a configuração de turmas T simultâneas: ${relatorioFinal.violacoesTSimultaneas[0]}. Reveja também as sessões importadas ou fixadas.`);
         }
-        const relatorioGlobal = validarHorario(merged, ucs, maxPLporMancha);
+        const relatorioGlobal = validarHorario(merged, ucs, maxPLporMancha, motorAI.aulasTConjuntas ?? []);
         if (relatorioGlobal.excessosPLPorBloco.length) {
           const excesso = relatorioGlobal.excessosPLPorBloco[0];
           throw new Error(`Capacidade dos laboratórios excedida em ${excesso.chave}: ${excesso.total} PL em simultâneo (máximo ${maxPLporMancha}). Reveja também as sessões importadas, fixadas ou semanas bloqueadas.`);
@@ -2382,7 +2504,7 @@ export default function App() {
     const next = cur.includes(anoLetivo) ? cur.filter(a => a !== anoLetivo) : [...cur, anoLetivo].sort();
     return { ...r, config: { ...(r.config || {}), anosLetivos: next } };
   });
-  const guardarRegraEditada = () => {
+  const guardarRegraEditada = async () => {
     if (!regraEmEdicao) return;
     const anos: number[] = Array.isArray((regraEmEdicao.config as any)?.anos) ? (regraEmEdicao.config as any).anos : [];
     const base: RegraHorario = {
@@ -2393,10 +2515,26 @@ export default function App() {
     };
     if (editProveniencia === "ia") {
       const realRule: RegraHorario = { ...base, id: "ai_rule_" + Date.now(), ativa: true };
+      try {
+        regrasSyncSuspensaAteRef.current = Date.now() + 5000;
+        if (repo.disponivel()) await repo.guardarRegra(realRule);
+      } catch (err) {
+        console.error("Erro a gravar regra:", err);
+        showToast("Não foi possível gravar a regra no Supabase.");
+        return;
+      }
       setRegras([realRule, ...regras]);
       setPendingAiRule(null);
       showToast(`Regra "${realRule.nome}" criada e ativada.`);
     } else {
+      try {
+        regrasSyncSuspensaAteRef.current = Date.now() + 5000;
+        if (repo.disponivel()) await repo.guardarRegra(base);
+      } catch (err) {
+        console.error("Erro a gravar regra:", err);
+        showToast("Não foi possível gravar a regra no Supabase.");
+        return;
+      }
       setRegras(regras.map(r => r.id === base.id ? base : r));
       showToast("Regra atualizada.");
     }
@@ -2533,13 +2671,20 @@ export default function App() {
   // Estimativa de alunos por turma (para a capacidade da sala).
   const alunosDaTurma = (turma: string): number =>
     turma.startsWith("Turma") ? 180 : /^TP\d+$/.test(turma) ? 45 : /^PL\d+$/.test(turma) ? 15 : 30;
+  const mesmoEventoT = (a: SessaoHorario, b: SessaoHorario): boolean =>
+    a.tipoAula === "T" && b.tipoAula === "T"
+    && a.ucSigla === b.ucSigla
+    && a.semana === b.semana
+    && a.diaSemana === b.diaSemana
+    && a.horaInicio === b.horaInicio;
   // Salas DISPONÍVEIS para uma sessão (para o override): tipo certo, capacidade suficiente e
   // livres naquele bloco (semana+dia+hora) — exceto a já atribuída a esta sessão.
   const salasDisponiveis = (sessao: SessaoHorario): Sala[] => {
     const tipo = tipoSalaAlvo(sessao);
     const necessario = alunosDaTurma(sessao.turma);
     const ocupadas = new Set((activeVersao?.sessoes || [])
-      .filter(s => s.id !== sessao.id && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio && s.sala)
+      .filter(s => s.id !== sessao.id && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio && s.sala
+        && !mesmoEventoT(s, sessao))
       .map(s => s.sala));
     const livre = (s: Sala) => !ocupadas.has(s.nome) || s.nome === sessao.sala;
     let comp = salas.filter(s => s.tipo === tipo && (s.capacidade || 0) >= necessario && livre(s));
@@ -2553,19 +2698,29 @@ export default function App() {
     if (!activeVersao) return;
     const slotKey = (s: SessaoHorario) => `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
     const ocup = new Map<string, Set<string>>();
+    const salaEventoT = new Map<string, string>();
     for (const s of activeVersao.sessoes) if (s.sala) {
       let set = ocup.get(slotKey(s)); if (!set) { set = new Set(); ocup.set(slotKey(s), set); } set.add(s.sala);
+      if (s.tipoAula === "T") salaEventoT.set(`${slotKey(s)}|${s.ucSigla}`, s.sala);
     }
     let atribuidas = 0, semSala = 0;
     const novas = activeVersao.sessoes.map(s => {
       if (s.sala) return s; // respeita override manual / já atribuída
       const k = slotKey(s); let usadas = ocup.get(k); if (!usadas) { usadas = new Set(); ocup.set(k, usadas); }
       const u = usadas;
+      const chaveEventoT = `${k}|${s.ucSigla}`;
+      const salaPartilhada = s.tipoAula === "T" ? salaEventoT.get(chaveEventoT) : undefined;
+      if (salaPartilhada) { atribuidas++; return { ...s, sala: salaPartilhada }; }
       const tipo = tipoSalaAlvo(s); const necessario = alunosDaTurma(s.turma);
       const cand = salas.filter(r => r.tipo === tipo && (r.capacidade || 0) >= necessario && !u.has(r.nome))
         .sort((a, b) => (a.capacidade || 0) - (b.capacidade || 0));
       const escolhida = cand[0] || salas.filter(r => r.tipo === tipo && !u.has(r.nome))[0];
-      if (escolhida) { u.add(escolhida.nome); atribuidas++; return { ...s, sala: escolhida.nome }; }
+      if (escolhida) {
+        u.add(escolhida.nome);
+        if (s.tipoAula === "T") salaEventoT.set(chaveEventoT, escolhida.nome);
+        atribuidas++;
+        return { ...s, sala: escolhida.nome };
+      }
       semSala++; return s;
     });
     setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, sessoes: novas } : v));
@@ -2575,7 +2730,7 @@ export default function App() {
   const avisoSala = (sessao: SessaoHorario): string | null => {
     if (!sessao.sala) return null;
     const mesmas = (activeVersao?.sessoes || []).filter(s => s.sala === sessao.sala && s.semana === sessao.semana && s.diaSemana === sessao.diaSemana && s.horaInicio === sessao.horaInicio);
-    if (mesmas.length > 1) return `Sala "${sessao.sala}" repetida neste bloco (${mesmas.length} aulas).`;
+    if (mesmas.length > 1 && !mesmas.every(s => mesmoEventoT(s, sessao))) return `Sala "${sessao.sala}" repetida neste bloco (${mesmas.length} aulas).`;
     const sala = salas.find(r => r.nome === sessao.sala);
     if (sala && (sala.capacidade || 0) < alunosDaTurma(sessao.turma)) return `Capacidade ${sala.capacidade} < ${alunosDaTurma(sessao.turma)} alunos.`;
     return null;
@@ -4562,6 +4717,41 @@ export default function App() {
                 <p className="text-[9px] text-stone-400 mt-1">Sem seleção = todos os anos letivos. Permite rever os padrões anualmente sem alterar código.</p>
               </div>
 
+              {regraEmEdicao.id === "h_blocos_ocupacao_100" && (() => {
+                const motor = (regraEmEdicao.config as any)?.motor || {};
+                const blocos100 = motor.blocos100 || {};
+                const ativos = Array.isArray(blocos100.padroesAtivos) ? blocos100.padroesAtivos : [];
+                const togglePadrao = (id: keyof typeof DESCRICAO_PADROES_BLOCOS_100) => {
+                  const padroesAtivos = ativos.includes(id)
+                    ? ativos.filter((atual: string) => atual !== id)
+                    : [...ativos, id];
+                  setRegraEmEdicao({
+                    ...regraEmEdicao,
+                    config: {
+                      ...(regraEmEdicao.config || {}),
+                      motor: { ...motor, blocos100: { ...blocos100, padroesAtivos } },
+                    },
+                  });
+                };
+                return (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">Combinações de ocupação a 100%</label>
+                    {(Object.entries(DESCRICAO_PADROES_BLOCOS_100) as [keyof typeof DESCRICAO_PADROES_BLOCOS_100, string][]).map(([id, descricao]) => (
+                      <label key={id} className="flex items-start gap-2 text-[10px] text-stone-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          aria-label={descricao}
+                          checked={ativos.includes(id)}
+                          onChange={() => togglePadrao(id)}
+                          className="mt-0.5 rounded text-emerald-700 focus:ring-emerald-600"
+                        />
+                        <span>{descricao}{id === "TP3_PL3" ? " — a evitar" : ""}</span>
+                      </label>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Unidades Curriculares (UCs) específicas</label>
                 <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-1.5 max-h-40 overflow-y-auto">
@@ -4757,6 +4947,61 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const motor = (regraEmEdicao!.config as any)?.motor || {};
+                const restricoes = Array.isArray(motor.restricoesUC) ? motor.restricoesUC : [];
+                const siglas = [...new Set(restricoes.flatMap((r: any) => Array.isArray(r.siglas) ? r.siglas : []))] as string[];
+                if (siglas.length === 0) return null;
+                const precedencias = Array.isArray(motor.precedenciasUC) ? motor.precedenciasUC : [];
+                const atual = precedencias[0];
+                const atualizar = (patch: any) => {
+                  const base = atual || { tipoAntes: "T", tipoDepois: "TP", minimoAntes: 1 };
+                  setRegraEmEdicao({
+                    ...regraEmEdicao!,
+                    config: {
+                      ...(regraEmEdicao!.config || {}),
+                      motor: { ...motor, precedenciasUC: [{ ...base, ...patch, siglas }] },
+                    },
+                  });
+                };
+                if (!atual) return (
+                  <button
+                    type="button"
+                    onClick={() => atualizar({})}
+                    className="w-full px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-[10px] font-bold hover:bg-indigo-100"
+                  >
+                    Adicionar precedência pedagógica entre tipos de aula
+                  </button>
+                );
+                return (
+                  <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 space-y-2">
+                    <span className="block text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Precedência pedagógica</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="text-[10px] text-stone-600">
+                        Primeiro
+                        <select aria-label="Tipo anterior" value={atual.tipoAntes} onChange={e => atualizar({ tipoAntes: e.target.value })} className="mt-1 w-full px-2 py-1 border rounded bg-white">
+                          <option value="T">T</option><option value="TP">TP</option>
+                        </select>
+                      </label>
+                      <label className="text-[10px] text-stone-600">
+                        Nº mínimo
+                        <input aria-label="Número mínimo anterior" type="number" min={1} value={atual.minimoAntes ?? 1} onChange={e => atualizar({ minimoAntes: Math.max(1, Number(e.target.value) || 1) })} className="mt-1 w-full px-2 py-1 border rounded bg-white" />
+                      </label>
+                      <label className="text-[10px] text-stone-600">
+                        Depois
+                        <select aria-label="Tipo posterior" value={atual.tipoDepois} onChange={e => atualizar({ tipoDepois: e.target.value })} className="mt-1 w-full px-2 py-1 border rounded bg-white">
+                          <option value="TP">TP</option><option value="PL">PL</option>
+                        </select>
+                      </label>
+                    </div>
+                    <button type="button" onClick={() => setRegraEmEdicao({
+                      ...regraEmEdicao!,
+                      config: { ...(regraEmEdicao!.config || {}), motor: { ...motor, precedenciasUC: [] } },
+                    })} className="text-[9px] font-bold text-rose-700">Remover precedência</button>
                   </div>
                 );
               })()}
@@ -5981,11 +6226,11 @@ export default function App() {
                 );
               })()}
 
-              {/* REGRAS CUMPRIDAS NA SEMANA SELECIONADA */}
+              {/* REGRAS ATIVAS NA SEMANA SELECIONADA — não equivale a validação de cumprimento. */}
               <div className="bg-emerald-50/40 border border-emerald-150 rounded-xl p-4 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Regras cumpridas — {getWeekLabel(selectedWeekFilter as number)}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Regras ativas — {getWeekLabel(selectedWeekFilter as number)}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {regras.filter(regraVisivel).filter(r => r.ativa).map(r => (
@@ -6001,7 +6246,7 @@ export default function App() {
                     <span className="text-[10px] text-stone-400 italic">Sem regras ativas para este âmbito.</span>
                   )}
                 </div>
-                <p className="text-[9px] text-emerald-700/70 leading-tight">As regras invioláveis são garantidas por construção pelo motor (a distribuição não as viola). As preferenciais são otimizadas conforme o peso.</p>
+                <p className="text-[9px] text-emerald-700/70 leading-tight">Esta lista confirma que as regras foram carregadas para o motor. O cumprimento efetivo deve ser confirmado pelos validadores do horário gerado.</p>
               </div>
             </div>
           </div>
@@ -6621,7 +6866,7 @@ export default function App() {
             {/* CALENDÁRIO E DISTRIBUIÇÃO SEMANAL */}
             <ConfiguracaoCalendario
               anosSemestres={anosSemestres}
-              setAnosSemestres={setAnosSemestres}
+              setAnosSemestres={setAnosSemestresPersistentes}
               ucs={ucs}
               setUcs={setUcs}
               feriados={feriados}
