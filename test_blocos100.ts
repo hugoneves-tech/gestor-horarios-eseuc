@@ -98,6 +98,29 @@ const seisPlAcimaDoMaximo = organizarBlocos100([
 ], catalogoMax3);
 assert.equal(seisPlAcimaDoMaximo.sessoes.length, 0);
 assert.equal(seisPlAcimaDoMaximo.naoAlocadas.length, 8);
+
+const tpMaximoGlobalDuasTurmas = [
+  s("U1", "TP", "TP1"), s("U1", "TP", "TP2"),
+  s("U2", "TP", "TP3"), s("U2", "TP", "TP4"),
+  s("U1", "TP", "TP5"), s("U1", "TP", "TP6"),
+  s("U2", "TP", "TP7"), s("U2", "TP", "TP8"),
+];
+const errosTpGlobais = validarBlocos100(tpMaximoGlobalDuasTurmas, catalogoTpMax2);
+assert.equal(errosTpGlobais.length, 1);
+assert.match(errosTpGlobais[0].motivo, /4 TP.*máximo global 2/);
+
+const plMaximoGlobalDuasTurmas = [
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
+  ...[4, 5, 6].map(n => s("U3", "PL", `PL${n}`)),
+  s("U1", "TP", "TP7"), s("U1", "TP", "TP8"),
+  ...[13, 14, 15].map(n => s("U2", "PL", `PL${n}`)),
+  ...[16, 17, 18].map(n => s("U3", "PL", `PL${n}`)),
+];
+const errosPlGlobais = validarBlocos100(plMaximoGlobalDuasTurmas, catalogoMax3);
+assert.equal(errosPlGlobais.length, 2);
+assert.ok(errosPlGlobais.every(erro => /6 PL.*máximo global 3/.test(erro.motivo)));
+
 executar([
   s("U1", "TP", "TP2"), s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
   ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),

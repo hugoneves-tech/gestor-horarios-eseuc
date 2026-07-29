@@ -2252,7 +2252,7 @@ export default function App() {
         );
         if (errosBlocos.length) {
           const e0 = errosBlocos[0];
-          avisosBlocos.push(`A proposta final contém ${errosBlocos.length} bloco(s) fora das combinações de 100%. Primeiro caso: ${e0.chave}, cobertura ${e0.cobertura}%. Reveja também as sessões importadas ou fixadas.`);
+          avisosBlocos.push(`A proposta final contém ${errosBlocos.length} bloco(s) inválido(s). Primeiro caso: ${e0.chave}. ${e0.motivo} Reveja também as sessões importadas ou fixadas.`);
         }
       }
       if (!semRegras) {
@@ -3805,7 +3805,7 @@ export default function App() {
                     <span>Restrição de Aulas em Simultâneo (Por Bloco Horário)</span>
                   </div>
                   <p className="text-[10px] text-stone-500 font-light leading-snug">
-                    Defina o número máximo de turmas desta UC que podem ter aulas decorrendo no mesmo bloco horário (em simultâneo). Deixe vazio ou 0 para sem limite.
+                    Defina o número máximo global de turmas desta UC no mesmo bloco horário. Nos limites TP e PL, a contagem soma as Turmas A e B; não existe um limite separado por turma. Deixe vazio ou 0 para sem limite.
                   </p>
                   <div className="grid grid-cols-3 gap-3">
                     <div>

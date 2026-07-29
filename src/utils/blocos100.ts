@@ -434,6 +434,28 @@ export function validarBlocos100(sessoes: SessaoHorario[], ucsCatalogo: UC[]): E
     valido = valido && limitesTpOk && limitesPlOk;
     if (!valido) erros.push({ chave, cobertura, motivo: `Combinação não autorizada (${t.length} T/S, ${tp.length} TP, ${pl.length} PL).` });
   }
+  const manchasGlobais = new Map<string, SessaoHorario[]>();
+  for (const sessao of sessoes) {
+    const uc = ucPorSigla.get(sessao.ucSigla);
+    if (!uc || sessao.semana == null
+      || (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL")) continue;
+    const chave = `${uc.anoCurricular}|${sessao.semana}|${sessao.diaSemana}|${sessao.horaInicio}`;
+    if (!manchasGlobais.has(chave)) manchasGlobais.set(chave, []);
+    manchasGlobais.get(chave)!.push(sessao);
+  }
+  for (const [chave, sessoesMancha] of manchasGlobais) {
+    for (const uc of ucsCatalogo) for (const tipo of ["TP", "PL"] as const) {
+      const quantidade = sessoesMancha.filter(sessao =>
+        sessao.ucSigla === uc.sigla && sessao.tipoAula === tipo).length;
+      const limite = tipo === "TP" ? uc.maxSimultaneoTP : uc.maxSimultaneoPL;
+      if (!limite || limite <= 0 || quantidade <= limite) continue;
+      erros.push({
+        chave: `${chave}|GLOBAL`,
+        cobertura: 0,
+        motivo: `${uc.sigla}: ${quantidade} ${tipo} em simultâneo nas duas turmas (máximo global ${limite}).`,
+      });
+    }
+  }
   return erros;
 }
 
@@ -557,6 +579,35 @@ export function organizarBlocos100(
   const tipologiasPorUcMancha = new Map<string, Set<"TP" | "PL">>();
   const chaveTipologia = (semana: number, dia: string, hora: string, sigla: string) =>
     `${semana}|${dia}|${hora}|${sigla}`;
+  // Os máximos TP/PL configurados na UC são globais por mancha horária:
+  // somam Turma A e Turma B, não recomeçam em cada família.
+  const simultaneoPorUcMancha = new Map<string, number>();
+  const chaveSimultaneo = (ucId: string, semana: number, dia: string, hora: string, tipo: "TP" | "PL") =>
+    `${ucId}|${semana}|${dia}|${hora}|${tipo}`;
+  const registarSimultaneo = (sessao: SessaoHorario) => {
+    if ((sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") || sessao.semana == null) return;
+    const uc = ucPorSigla.get(sessao.ucSigla);
+    if (!uc) return;
+    const chave = chaveSimultaneo(uc.id, sessao.semana, sessao.diaSemana, sessao.horaInicio, sessao.tipoAula);
+    simultaneoPorUcMancha.set(chave, (simultaneoPorUcMancha.get(chave) || 0) + 1);
+  };
+  const cumpreMaximosGlobais = (bloco: Bloco, semana: number, dia: string, hora: string) => {
+    const novas = new Map<string, number>();
+    for (const sessao of bloco.sessoes) {
+      if (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") continue;
+      const uc = ucPorSigla.get(sessao.ucSigla);
+      if (!uc) return false;
+      const chave = chaveSimultaneo(uc.id, semana, dia, hora, sessao.tipoAula);
+      novas.set(chave, (novas.get(chave) || 0) + 1);
+    }
+    return [...novas].every(([chave, quantidade]) => {
+      const [ucId, , , , tipo] = chave.split("|");
+      const limite = tipo === "TP"
+        ? maxSimultaneoTPPorUc.get(ucId)
+        : maxSimultaneoPLPorUc.get(ucId);
+      return !limite || (simultaneoPorUcMancha.get(chave) || 0) + quantidade <= limite;
+    });
+  };
   const cargaDia = new Map<string, number>();
   const chaveCarga = (ano: number, semana: number, dia: string, folha: string) => `${ano}|${semana}|${dia}|${folha}`;
   const horasDia = new Map<string, Set<string>>();
@@ -593,6 +644,7 @@ export function organizarBlocos100(
     }
     registarCarga(s);
     registarTipologia(s);
+    registarSimultaneo(s);
   }
   const blocosPorPadrao: Partial<Record<PadraoBloco100Id, number>> = {};
   const alocadas: SessaoHorario[] = [];
@@ -723,6 +775,7 @@ export function organizarBlocos100(
       if (!cumprePrecedencias(bloco, semana, dia, hora)) continue;
       if (!cumpreRestricoesUC(bloco, semana, dia, hora)) continue;
       if (!cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
+      if (!cumpreMaximosGlobais(bloco, semana, dia, hora)) continue;
       if (semana === primeiraSemanaS2 && dia === "Quinta" && grupoTemTresTIniciais(uc.anoCurricular, fam)) {
         const permitidas = ucsComTNaQuartaDoArranqueS2.get(`${uc.anoCurricular}|${fam}`)!;
         if (bloco.sessoes.some(sessao =>
@@ -823,7 +876,8 @@ export function organizarBlocos100(
         if (ocupados.has(`${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`)) continue;
         if (!cumprePrecedencias(bloco, semana, dia, hora)
           || !cumpreRestricoesUC(bloco, semana, dia, hora)
-          || !cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
+          || !cumpreSeparacaoTipologias(bloco, semana, dia, hora)
+          || !cumpreMaximosGlobais(bloco, semana, dia, hora)) continue;
         escolhido = { semana, dia, hora, custo: Number.MAX_SAFE_INTEGER };
         break procurarDestino;
       }
@@ -842,6 +896,12 @@ export function organizarBlocos100(
     });
     for (const sessao of bloco.sessoes) {
       registarTipologia({
+        ...sessao,
+        semana: escolhido.semana,
+        diaSemana: escolhido.dia,
+        horaInicio: escolhido.hora,
+      });
+      registarSimultaneo({
         ...sessao,
         semana: escolhido.semana,
         diaSemana: escolhido.dia,
@@ -917,7 +977,8 @@ export function organizarBlocos100(
           if (ocupados.has(`${ano}|${familia}|${semana}|${dia}|${hora}`)) continue;
           if (!cumprePrecedencias(bloco, semana, dia, hora)
             || !cumpreRestricoesUC(bloco, semana, dia, hora)
-            || !cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
+            || !cumpreSeparacaoTipologias(bloco, semana, dia, hora)
+            || !cumpreMaximosGlobais(bloco, semana, dia, hora)) continue;
           for (const sessao of sessoesBloco) {
             const nova = {
               ...sessao,
@@ -929,6 +990,7 @@ export function organizarBlocos100(
             alocadas.push(nova);
             registarCarga(nova);
             registarTipologia(nova);
+            registarSimultaneo(nova);
             sobras.splice(sobras.indexOf(sessao), 1);
           }
           ocupados.add(`${ano}|${familia}|${semana}|${dia}|${hora}`);
@@ -984,6 +1046,36 @@ export function organizarBlocos100(
 
   const plCompactado = new Map<string, number>();
   const tipologiasCompactadas = new Map<string, Set<"TP" | "PL">>();
+  const simultaneoCompactado = new Map<string, number>();
+  const registarSimultaneoCompactado = (sessao: SessaoHorario) => {
+    if ((sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") || sessao.semana == null) return;
+    const uc = ucPorSigla.get(sessao.ucSigla);
+    if (!uc) return;
+    const chave = chaveSimultaneo(uc.id, sessao.semana, sessao.diaSemana, sessao.horaInicio, sessao.tipoAula);
+    simultaneoCompactado.set(chave, (simultaneoCompactado.get(chave) || 0) + 1);
+  };
+  const eventoCabeNosMaximosGlobais = (
+    sessoesEvento: SessaoHorario[],
+    semana: number,
+    dia: string,
+    hora: string,
+  ) => {
+    const novas = new Map<string, number>();
+    for (const sessao of sessoesEvento) {
+      if (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") continue;
+      const uc = ucPorSigla.get(sessao.ucSigla);
+      if (!uc) return false;
+      const chave = chaveSimultaneo(uc.id, semana, dia, hora, sessao.tipoAula);
+      novas.set(chave, (novas.get(chave) || 0) + 1);
+    }
+    return [...novas].every(([chave, quantidade]) => {
+      const [ucId, , , , tipo] = chave.split("|");
+      const limite = tipo === "TP"
+        ? maxSimultaneoTPPorUc.get(ucId)
+        : maxSimultaneoPLPorUc.get(ucId);
+      return !limite || (simultaneoCompactado.get(chave) || 0) + quantidade <= limite;
+    });
+  };
   const registarTipologiaCompactada = (sessao: SessaoHorario) => {
     if ((sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") || sessao.semana == null) return;
     const chave = chaveTipologia(sessao.semana, sessao.diaSemana, sessao.horaInicio, sessao.ucSigla);
@@ -994,7 +1086,10 @@ export function organizarBlocos100(
     const chave = chavePL(sessao.semana!, sessao.diaSemana, sessao.horaInicio);
     plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
   }
-  for (const sessao of sessoesExternas) registarTipologiaCompactada(sessao);
+  for (const sessao of sessoesExternas) {
+    registarTipologiaCompactada(sessao);
+    registarSimultaneoCompactado(sessao);
+  }
   const padroesDia = (familiaManha: boolean) => ({
     seis: familiaManha ? ["08:00", "10:00", "12:00"] : ["14:00", "16:00", "18:00"],
     oito: familiaManha ? ["08:00", "10:00", "12:00", "16:00"] : ["10:00", "14:00", "16:00", "18:00"],
@@ -1131,6 +1226,7 @@ export function organizarBlocos100(
         });
         if (misturaTipologias) continue;
         if (plEvento && (plCompactado.get(chavePL(semana, dia, hora)) || 0) + plEvento > cfg.maxPLporMancha) continue;
+        if (!eventoCabeNosMaximosGlobais(evento.sessoes, semana, dia, hora)) continue;
         const nome = `x_${i}_${DIAS.indexOf(dia)}_${HORAS.indexOf(hora)}`;
         const deslocado = dia !== evento.diaOriginal || hora !== evento.horaOriginal;
         const ordemNaSemana = DIAS.indexOf(dia) * HORAS.length + HORAS.indexOf(hora);
@@ -1161,6 +1257,7 @@ export function organizarBlocos100(
     if (!solucao.feasible) {
       for (const evento of eventos) for (const sessao of evento.sessoes) {
         registarTipologiaCompactada(sessao);
+        registarSimultaneoCompactado(sessao);
         if (sessao.tipoAula === "PL" && sessao.semana != null) {
           const chave = chavePL(sessao.semana, sessao.diaSemana, sessao.horaInicio);
           plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
@@ -1181,6 +1278,7 @@ export function organizarBlocos100(
     });
     for (const evento of eventos) for (const sessao of evento.sessoes) {
       registarTipologiaCompactada(sessao);
+      registarSimultaneoCompactado(sessao);
       if (sessao.tipoAula === "PL" && sessao.semana != null) {
         const chave = chavePL(sessao.semana, sessao.diaSemana, sessao.horaInicio);
         plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
@@ -1296,6 +1394,34 @@ export function organizarBlocos100(
     for (const sessao of a) Object.assign(sessao, momentoB);
     for (const sessao of b) Object.assign(sessao, momentoA);
   };
+  const trocaRespeitaMaximosGlobais = (a: SessaoHorario[], b: SessaoHorario[]) => {
+    const excluidas = new Set([...a, ...b]);
+    const cabe = (evento: SessaoHorario[], destino: SessaoHorario) => {
+      const contagens = new Map<string, number>();
+      for (const sessao of evento) {
+        if (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL") continue;
+        const uc = ucPorSigla.get(sessao.ucSigla);
+        if (!uc) return false;
+        const chave = `${uc.id}|${sessao.tipoAula}`;
+        contagens.set(chave, (contagens.get(chave) || 0) + 1);
+      }
+      return [...contagens].every(([chave, novas]) => {
+        const [ucId, tipo] = chave.split("|");
+        const limite = tipo === "TP"
+          ? maxSimultaneoTPPorUc.get(ucId)
+          : maxSimultaneoPLPorUc.get(ucId);
+        if (!limite) return true;
+        const uc = ucsCatalogo.find(item => item.id === ucId);
+        if (!uc) return false;
+        const atuais = [...sessoesExternas, ...preservadas, ...alocadas].filter(sessao =>
+          !excluidas.has(sessao) && sessao.semana === destino.semana
+          && sessao.diaSemana === destino.diaSemana && sessao.horaInicio === destino.horaInicio
+          && sessao.ucSigla === uc.sigla && sessao.tipoAula === tipo).length;
+        return atuais + novas <= limite;
+      });
+    };
+    return cabe(a, b[0]) && cabe(b, a[0]);
+  };
   for (const sigla of ["ESDAC", "FT"]) for (const familia of ["A", "B"] as const) {
     const eventos = new Map<string, SessaoHorario[]>();
     for (const sessao of alocadas) {
@@ -1323,7 +1449,9 @@ export function organizarBlocos100(
       Number(b[0].diaSemana === primeiroPL[0].diaSemana)
       - Number(a[0].diaSemana === primeiroPL[0].diaSemana)
       || ordemMomento(a[0]) - ordemMomento(b[0]))[0];
-    if (candidatoTP) trocarMomento(primeiroPL, candidatoTP);
+    if (candidatoTP && trocaRespeitaMaximosGlobais(primeiroPL, candidatoTP)) {
+      trocarMomento(primeiroPL, candidatoTP);
+    }
   }
 
   // Fecho do 1.º semestre do 2.º ano: a última sexta-feira fica livre e a
