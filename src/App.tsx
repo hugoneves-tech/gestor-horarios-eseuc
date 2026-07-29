@@ -1859,7 +1859,12 @@ export default function App() {
       };
       // Gera apenas o semestre da semana aberta. O semestre oposto fica
       // preservado: não é regenerado, reorganizado nem revalidado.
-      const semestreAlvo: 1 | 2 = Number(selectedWeekFilter) >= 16 ? 2 : 1;
+      const semestreDaProposta = Number(
+        anosSemestres.find(item => item.id === activeVersao?.anoSemestreId)?.semestre,
+      );
+      const semestreAlvo: 1 | 2 = semestreDaProposta === 1 || semestreDaProposta === 2
+        ? semestreDaProposta
+        : Number(selectedWeekFilter) >= 16 ? 2 : 1;
       const sessaoNoSemestreAlvo = (s: SessaoHorario) =>
         s.semana != null && (semestreAlvo === 1 ? s.semana <= 15 : s.semana >= 16);
       const violaSemana1SemPL = (s: SessaoHorario) => {
@@ -6352,9 +6357,16 @@ export default function App() {
                   const uc = ucs.find(u => u.sigla === s.ucSigla); return uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
                 });
                 const horasTurmaDia = (grupos: string[], dia: string) => {
-                  const cnt: Record<string, number> = {};
-                  for (const s of wkSess) { if (s.diaSemana !== dia) continue; for (const g of folhasDe(s.turma)) if (grupos.includes(g)) cnt[g] = (cnt[g] || 0) + 1; }
-                  const max = Math.max(0, ...Object.values(cnt));
+                  const slots: Record<string, Set<string>> = {};
+                  for (const s of wkSess) {
+                    if (s.diaSemana !== dia) continue;
+                    for (const g of folhasDe(s.turma)) {
+                      if (!grupos.includes(g)) continue;
+                      if (!slots[g]) slots[g] = new Set<string>();
+                      slots[g].add(s.horaInicio);
+                    }
+                  }
+                  const max = Math.max(0, ...Object.values(slots).map(horas => horas.size));
                   return max * 2;
                 };
                 const gruposA = Array.from({ length: 12 }, (_, i) => "PL" + (i + 1));

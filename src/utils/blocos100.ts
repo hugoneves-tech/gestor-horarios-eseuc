@@ -804,7 +804,30 @@ export function organizarBlocos100(
       candidatosSlot.push({ semana, dia, hora, custo });
       }
     }
-    const escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;
+    let escolhido = candidatosSlot.sort((a, b) => a.custo - b.custo)[0] ?? null;
+    if (!escolhido && bloco.padrao === "TP2_DUAS_UCS"
+      && bloco.sessoes.every(sessao => sessao.tipoAula === "TP")) {
+      // Último recurso estritamente limitado: encaixa este único bloco TP2+TP2
+      // num dia que já tenha exatamente 6h para todos os seus estudantes.
+      // O novo slot transforma-o num padrão válido de 8h com pausa de almoço.
+      procurarDestino: for (const semana of semanas) for (const dia of [...DIAS.filter(d => d !== "Sexta"), "Sexta"]) {
+        if (slotsPermitidosPorUc && !idsUcsBloco.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
+        const extras = folhasBloco.map(folha => {
+          const horas = horasDia.get(chaveCarga(uc.anoCurricular, semana, dia, folha)) ?? new Set<string>();
+          if (horas.size === 3 && ["08:00", "10:00", "12:00"].every(h => horas.has(h))) return "16:00";
+          if (horas.size === 3 && ["14:00", "16:00", "18:00"].every(h => horas.has(h))) return "10:00";
+          return null;
+        });
+        const hora = extras[0];
+        if (!hora || extras.some(extra => extra !== hora)) continue;
+        if (ocupados.has(`${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`)) continue;
+        if (!cumprePrecedencias(bloco, semana, dia, hora)
+          || !cumpreRestricoesUC(bloco, semana, dia, hora)
+          || !cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
+        escolhido = { semana, dia, hora, custo: Number.MAX_SAFE_INTEGER };
+        break procurarDestino;
+      }
+    }
     if (!escolhido) { sobras.push(...bloco.sessoes); continue; }
     ocupados.add(`${uc.anoCurricular}|${fam}|${escolhido.semana}|${escolhido.dia}|${escolhido.hora}`);
     const chaveSemana = chaveCargaSemana(uc.anoCurricular, fam, escolhido.semana);
@@ -832,6 +855,88 @@ export function organizarBlocos100(
       horasDia.get(chave)!.add(escolhido.hora);
     }
     blocosPorPadrao[bloco.padrao] = (blocosPorPadrao[bloco.padrao] ?? 0) + 1;
+  }
+
+  // Recupera no máximo UM bloco TP2+TP2 residual, e apenas quando existe já
+  // um dia válido de 6h que o possa absorver como quarto bloco. Esta limitação
+  // impede que uma recuperação local volte a abrir ou redistribuir outros dias.
+  recuperarResidual: for (const [chaveGrupo, sessoesGrupo] of (() => {
+    const gruposResiduais = new Map<string, SessaoHorario[]>();
+    for (const sessao of sobras.filter(s => s.tipoAula === "TP" && s.semana != null)) {
+      const uc = ucPorSigla.get(sessao.ucSigla);
+      const familia = familiaTeorica(sessao.turma);
+      if (!uc || !familia) continue;
+      const semestre = sessao.semana! <= 15 ? 1 : 2;
+      const chave = `${uc.anoCurricular}|${semestre}|${familia}`;
+      if (!gruposResiduais.has(chave)) gruposResiduais.set(chave, []);
+      gruposResiduais.get(chave)!.push(sessao);
+    }
+    return gruposResiduais;
+  })()) {
+    const [anoTexto, semestreTexto, familiaTexto] = chaveGrupo.split("|");
+    const ano = Number(anoTexto);
+    const semestre = Number(semestreTexto);
+    const familia = familiaTexto as Familia;
+    const siglas = [...new Set(sessoesGrupo.map(s => s.ucSigla))];
+    for (let a = 0; a < siglas.length; a++) for (let b = a + 1; b < siglas.length; b++) {
+      const ucA = ucPorSigla.get(siglas[a]);
+      const ucB = ucPorSigla.get(siglas[b]);
+      if (!ucA || !ucB) continue;
+      if ((ucA.maxSimultaneoTP != null && ucA.maxSimultaneoTP > 0 && ucA.maxSimultaneoTP < 2)
+        || (ucB.maxSimultaneoTP != null && ucB.maxSimultaneoTP > 0 && ucB.maxSimultaneoTP < 2)) continue;
+      for (let mascara = 1; mascara < 15; mascara++) {
+        const quartosA = [0, 1, 2, 3].filter(q => mascara & (1 << q));
+        if (quartosA.length !== 2) continue;
+        const quartosB = [0, 1, 2, 3].filter(q => !quartosA.includes(q));
+        const itens = [
+          ...quartosA.map(q => sessoesGrupo.find(s => s.ucSigla === siglas[a] && familiaEQuarto(s.turma)?.quarto === q)),
+          ...quartosB.map(q => sessoesGrupo.find(s => s.ucSigla === siglas[b] && familiaEQuarto(s.turma)?.quarto === q)),
+        ];
+        if (itens.some(item => !item)) continue;
+        const sessoesBloco = itens as SessaoHorario[];
+        const bloco: Bloco = {
+          sessoes: sessoesBloco,
+          padrao: "TP2_DUAS_UCS",
+          semanaPreferida: modaSemana(sessoesBloco),
+        };
+        const folhas = [...new Set(sessoesBloco.flatMap(s => gruposFolha(s.turma)))];
+        const semInicio = semestre === 1 ? 1 : 16;
+        const semFim = semestre === 1 ? 15 : 30;
+        const semanas = Array.from({ length: semFim - semInicio + 1 }, (_, i) => semInicio + i)
+          .sort((x, y) => Math.abs(x - bloco.semanaPreferida) - Math.abs(y - bloco.semanaPreferida));
+        for (const semana of semanas) for (const dia of [...DIAS.filter(d => d !== "Sexta"), "Sexta"]) {
+          if (slotsPermitidosPorUc && ![ucA.id, ucB.id].every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
+          const extras = folhas.map(folha => {
+            const horas = horasDia.get(chaveCarga(ano, semana, dia, folha)) ?? new Set<string>();
+            if (horas.size === 3 && ["08:00", "10:00", "12:00"].every(h => horas.has(h))) return "16:00";
+            if (horas.size === 3 && ["14:00", "16:00", "18:00"].every(h => horas.has(h))) return "10:00";
+            return null;
+          });
+          const hora = extras[0];
+          if (!hora || extras.some(extra => extra !== hora)) continue;
+          if (ocupados.has(`${ano}|${familia}|${semana}|${dia}|${hora}`)) continue;
+          if (!cumprePrecedencias(bloco, semana, dia, hora)
+            || !cumpreRestricoesUC(bloco, semana, dia, hora)
+            || !cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
+          for (const sessao of sessoesBloco) {
+            const nova = {
+              ...sessao,
+              semana,
+              diaSemana: dia,
+              horaInicio: hora,
+              horaFim: `${String(Number(hora.slice(0, 2)) + 2).padStart(2, "0")}:00`,
+            };
+            alocadas.push(nova);
+            registarCarga(nova);
+            registarTipologia(nova);
+            sobras.splice(sobras.indexOf(sessao), 1);
+          }
+          ocupados.add(`${ano}|${familia}|${semana}|${dia}|${hora}`);
+          blocosPorPadrao.TP2_DUAS_UCS = (blocosPorPadrao.TP2_DUAS_UCS ?? 0) + 1;
+          break recuperarResidual;
+        }
+      }
+    }
   }
 
   // A compactação nunca pode degradar a solução válida produzida acima.
