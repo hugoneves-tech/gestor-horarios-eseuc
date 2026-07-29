@@ -1803,7 +1803,7 @@ export default function App() {
     showToast(`Regra "${item.nome}" criada pelo coordenador!`);
   };
 
-  // Distribuição local pelas 30 semanas letivas usando o motor de distribuição (distribuicao.ts).
+  // Distribuição local do semestre da semana aberta usando o motor de distribuição.
   // S1 = semanas 1-15; S2 = semanas 16-29 (offset +15 aplicado automaticamente).
   const aplicarPlanoDocenteProvisorio = (sessoes: SessaoHorario[]): SessaoHorario[] => {
     if (!atribuicoesAulasDocenteProvisorias.length) return sessoes;
@@ -1857,17 +1857,23 @@ export default function App() {
         const uc = ucs.find(u => u.sigla === s.ucSigla);
         return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
       };
+      // Gera apenas o semestre da semana aberta. O semestre oposto fica
+      // preservado: não é regenerado, reorganizado nem revalidado.
+      const semestreAlvo: 1 | 2 = Number(selectedWeekFilter) >= 16 ? 2 : 1;
+      const sessaoNoSemestreAlvo = (s: SessaoHorario) =>
+        s.semana != null && (semestreAlvo === 1 ? s.semana <= 15 : s.semana >= 16);
       const violaSemana1SemPL = (s: SessaoHorario) => {
         const uc = ucs.find(u => u.sigla === s.ucSigla);
         return Number(uc?.anoCurricular) === 2 && s.semana === 1 && s.tipoAula === "PL";
       };
-      const sessoesOutrosAnosAtivas = activeSessoesValidas.filter(s => !mesmoAnoGen(s));
+      const sessoesForaAmbitoAtivas = activeSessoesValidas.filter(s =>
+        !mesmoAnoGen(s) || !sessaoNoSemestreAlvo(s));
 
       // ONE shared occupancy set + PL-count map for the entire 30-week schedule.
       // A capacidade de PL é física e global: a chave não inclui ano/turma/UC.
       const ocupacaoGlobal = new Set<string>();
       const plCount = new Map<string, number>();
-      for (const s of sessoesOutrosAnosAtivas) {
+      for (const s of sessoesForaAmbitoAtivas) {
         if (s.tipoAula !== "PL" || s.semana == null) continue;
         const chave = `${s.semana}|${s.diaSemana}|${s.horaInicio}`;
         plCount.set(chave, (plCount.get(chave) || 0) + 1);
@@ -2082,7 +2088,7 @@ export default function App() {
       // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
       // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
       const layoutFixo = motorAI.layoutFixo;
-      const sessoesLayoutFixo: SessaoHorario[] = !semRegras && layoutFixo?.ano === 2
+      const sessoesLayoutFixo: SessaoHorario[] = semestreAlvo === 1 && !semRegras && layoutFixo?.ano === 2
         && Array.isArray(layoutFixo.sessoes)
         ? layoutFixo.sessoes.flatMap((entrada: any, indice: number) => {
           const uc = ucs.find(u => u.sigla === entrada.uc && Number(u.anoCurricular) === 2);
@@ -2119,11 +2125,11 @@ export default function App() {
 
       const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
       const fixasExistentes = activeSessoesValidas.filter(s =>
-        mesmoAnoGen(s) && s.bloqueado && !semanaPertenceAoLayout(s)
+        mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && s.bloqueado && !semanaPertenceAoLayout(s)
         && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
       const sessoesFixas = [
         ...sessoesLayoutFixo,
-        ...sessoesFixasImport.filter(s => !semanaPertenceAoLayout(s)),
+        ...sessoesFixasImport.filter(s => sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)),
         ...fixasExistentes,
       ]
         .filter(s => semRegras || !violaSemana1SemPL(s));
@@ -2154,10 +2160,15 @@ export default function App() {
         aulasTConjuntas: motorAI.aulasTConjuntas ?? [],
       };
 
-      // Schedule each semester fairly across its UCs (round-robin per week).
-      const sessoesS1 = gerarSessoesConjunto(entradasS1, 1, 0, ocupacaoGlobal, plCount, opcoes);
-      const sessoesS2 = gerarSessoesConjunto(entradasS2, 2, sessoesS1.length, ocupacaoGlobal, plCount, opcoes);
-      let allSessoes: SessaoHorario[] = [...sessoesS1, ...sessoesS2];
+      const entradasAtivas = semestreAlvo === 1 ? entradasS1 : entradasS2;
+      let allSessoes = gerarSessoesConjunto(
+        entradasAtivas,
+        semestreAlvo,
+        0,
+        ocupacaoGlobal,
+        plCount,
+        opcoes,
+      );
       const avisosBlocos: string[] = [];
       if (!semRegras && regraBlocos100) {
         const configBlocos = {
@@ -2178,13 +2189,13 @@ export default function App() {
           restricoesUC: motorAI.restricoesUC ?? [],
           diasPrioritarios: motorAI.diasPrioritarios ?? [],
         };
-        allSessoes = completarCargaParaBlocos100(allSessoes, [...entradasS1, ...entradasS2], sessoesFixas);
+        allSessoes = completarCargaParaBlocos100(allSessoes, entradasAtivas, sessoesFixas);
         const resultadoBlocos = organizarBlocos100(
           allSessoes,
           ucs,
           configBlocos,
-          [...entradasS1, ...entradasS2],
-          [...sessoesFixas, ...sessoesOutrosAnosAtivas],
+          entradasAtivas,
+          [...sessoesFixas, ...sessoesForaAmbitoAtivas],
         );
         if (resultadoBlocos.naoAlocadas.length > 0) {
           const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
@@ -2198,22 +2209,28 @@ export default function App() {
       // individualmente nas restantes semanas.
       // Geração por ano: ao gerar um ano específico, as sessões dos OUTROS anos preservam-se
       // tal como estão (não são tocadas). Com "todos", não há outros anos a preservar.
-      const outrosAnos = sessoesOutrosAnosAtivas;
+      const foraDoAmbito = sessoesForaAmbitoAtivas;
 
       const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
       const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
       const sessoesCongeladas = activeSessoesValidas.filter(s =>
-        ehBloqueada(s) && mesmoAnoGen(s) && !semanaPertenceAoLayout(s)
+        ehBloqueada(s) && mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)
         && (semRegras || !violaSemana1SemPL(s)));
       const fixadas = activeSessoesValidas.filter(s =>
-        s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s) && !semanaPertenceAoLayout(s)
+        s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)
         && (semRegras || !violaSemana1SemPL(s)));
+      const sessoesPreservadas = new Set([
+        ...foraDoAmbito,
+        ...sessoesCongeladas,
+        ...fixadas,
+      ]);
+      let proximoId = Math.max(0, ...activeSessoesValidas.map(s => Number(s.id) || 0)) + 1;
       const merged: SessaoHorario[] = [
-        ...outrosAnos,                    // anos não selecionados → intactos
+        ...foraDoAmbito,                  // outro semestre e outros anos → intactos
         ...sessoesCongeladas,            // semanas validadas → ficam exatamente como estão
         ...sessoesLayoutFixo,             // semana 1 definida pela regra hard do Supabase
         ...sessoesFixasImport
-          .filter(s => !semanaPertenceAoLayout(s) && (semRegras || !violaSemana1SemPL(s)))
+          .filter(s => sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s) && (semRegras || !violaSemana1SemPL(s)))
           .map(s => ({ ...s, bloqueado: true })),  // v2: importadas (fixas)
         ...fixadas,                       // sessões "fixa" em semanas não bloqueadas
         ...allSessoes.filter(s =>
@@ -2221,10 +2238,13 @@ export default function App() {
           !semanaPertenceAoLayout(s) &&   // a semana fixa não admite sessões adicionais
           !fixadas.some(p => p.ucSigla === s.ucSigla && p.turma === s.turma && p.semana === s.semana)
         ),
-      ].map((s, i) => ({ ...s, id: i + 1 }));  // IDs ÚNICOS (evita colisões: eliminar/desbloquear afetava o registo errado, ex.: semana 1)
+      ].map(s => sessoesPreservadas.has(s) ? s : { ...s, id: proximoId++ });
 
       if (!semRegras && regraBlocos100) {
-        const errosBlocos = validarBlocos100(merged.filter(mesmoAnoGen), ucs);
+        const errosBlocos = validarBlocos100(
+          merged.filter(s => mesmoAnoGen(s) && sessaoNoSemestreAlvo(s)),
+          ucs,
+        );
         if (errosBlocos.length) {
           const e0 = errosBlocos[0];
           avisosBlocos.push(`A proposta final contém ${errosBlocos.length} bloco(s) fora das combinações de 100%. Primeiro caso: ${e0.chave}, cobertura ${e0.cobertura}%. Reveja também as sessões importadas ou fixadas.`);
@@ -2232,15 +2252,25 @@ export default function App() {
       }
       if (!semRegras) {
         const maxPLporMancha = motorAI.maxPLporMancha ?? 6;
-        const plSemana1 = merged.filter(violaSemana1SemPL);
+        const plSemana1 = semestreAlvo === 1 ? merged.filter(violaSemana1SemPL) : [];
         if (plSemana1.length) {
           throw new Error(`A regra "2.º ano: semana 1 sem aulas PL" foi violada por ${plSemana1.length} sessão(ões).`);
         }
-        const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs, maxPLporMancha, motorAI.aulasTConjuntas ?? []);
+        const relatorioFinal = validarHorario(
+          merged.filter(s => mesmoAnoGen(s) && sessaoNoSemestreAlvo(s)),
+          ucs,
+          maxPLporMancha,
+          motorAI.aulasTConjuntas ?? [],
+        );
         if (relatorioFinal.violacoesTSimultaneas.length) {
           throw new Error(`A proposta viola a configuração de turmas T simultâneas: ${relatorioFinal.violacoesTSimultaneas[0]}. Reveja também as sessões importadas ou fixadas.`);
         }
-        const relatorioGlobal = validarHorario(merged, ucs, maxPLporMancha, motorAI.aulasTConjuntas ?? []);
+        const relatorioGlobal = validarHorario(
+          merged.filter(sessaoNoSemestreAlvo),
+          ucs,
+          maxPLporMancha,
+          motorAI.aulasTConjuntas ?? [],
+        );
         if (relatorioGlobal.excessosPLPorBloco.length) {
           const excesso = relatorioGlobal.excessosPLPorBloco[0];
           throw new Error(`Capacidade dos laboratórios excedida em ${excesso.chave}: ${excesso.total} PL em simultâneo (máximo ${maxPLporMancha}). Reveja também as sessões importadas, fixadas ou semanas bloqueadas.`);
@@ -2262,7 +2292,7 @@ export default function App() {
         conflitosContidos: avisosBlocos.length,
         detalhes: {
           iteracoes: allSessoes.length,
-          log: `Distribuição concluída: ${allSessoes.length} sessões geradas em ${durationMs}ms para 30 semanas letivas.${avisosBlocos.length ? ` Avisos: ${avisosBlocos.join(" ")}` : ""}`
+          log: `Distribuição concluída: ${allSessoes.length} sessões geradas em ${durationMs}ms para o ${semestreAlvo}.º semestre.${avisosBlocos.length ? ` Avisos: ${avisosBlocos.join(" ")}` : ""}`
         }
       };
 
@@ -2273,7 +2303,7 @@ export default function App() {
         showToast(`Horário criado com ${avisosBlocos.length} aviso(s) de blocos a 100%.`);
         window.setTimeout(() => alert(`Horário criado com aviso:\n\n${avisosBlocos.join("\n\n")}`), 0);
       } else {
-        showToast(` ${allSessoes.length} sessões distribuídas pelas 30 semanas letivas!`);
+        showToast(` ${allSessoes.length} sessões distribuídas no ${semestreAlvo}.º semestre!`);
       }
     } catch (e) {
       console.error(e);

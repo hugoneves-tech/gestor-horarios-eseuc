@@ -479,6 +479,25 @@ export function organizarBlocos100(
     slotsPermitidosPorUc.set(entrada.uc.id, slots);
   }
   const preservadas = sessoes.filter(s => s.tipoAula !== "TP" && s.tipoAula !== "PL");
+  const primeiraSemanaS2 = Math.min(
+    ...entradasAtivas
+      .filter(entrada => entrada.semanaGlobalOffset === 15)
+      .flatMap(entrada => entrada.semanas.map(semana => semana.numero + entrada.semanaGlobalOffset)),
+  );
+  const ucsComTNaQuartaDoArranqueS2 = new Map<string, Set<string>>();
+  if (Number.isFinite(primeiraSemanaS2)) {
+    for (const sessao of [...preservadas, ...sessoesExternas]) {
+      if (sessao.semana !== primeiraSemanaS2 || sessao.diaSemana !== "Quarta" || sessao.tipoAula !== "T") continue;
+      const ucT = ucPorSigla.get(sessao.ucSigla);
+      const familiaT = familiaTeorica(sessao.turma);
+      if (!ucT || !familiaT || ucT.anoCurricular !== 2) continue;
+      const chave = `${ucT.anoCurricular}|${familiaT}`;
+      if (!ucsComTNaQuartaDoArranqueS2.has(chave)) ucsComTNaQuartaDoArranqueS2.set(chave, new Set());
+      ucsComTNaQuartaDoArranqueS2.get(chave)!.add(sessao.ucSigla);
+    }
+  }
+  const grupoTemTresTIniciais = (ano: number, familia: Familia) =>
+    (ucsComTNaQuartaDoArranqueS2.get(`${ano}|${familia}`)?.size ?? 0) >= 3;
   const naoReconhecidas: SessaoHorario[] = [];
   const grupos = new Map<string, Item[]>();
 
@@ -704,6 +723,11 @@ export function organizarBlocos100(
       if (!cumprePrecedencias(bloco, semana, dia, hora)) continue;
       if (!cumpreRestricoesUC(bloco, semana, dia, hora)) continue;
       if (!cumpreSeparacaoTipologias(bloco, semana, dia, hora)) continue;
+      if (semana === primeiraSemanaS2 && dia === "Quinta" && grupoTemTresTIniciais(uc.anoCurricular, fam)) {
+        const permitidas = ucsComTNaQuartaDoArranqueS2.get(`${uc.anoCurricular}|${fam}`)!;
+        if (bloco.sessoes.some(sessao =>
+          sessao.tipoAula !== "TP" || !permitidas.has(sessao.ucSigla))) continue;
+      }
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (ocupados.has(k)) continue;
       if ((plPorMancha.get(chavePL(semana, dia, hora)) || 0) + plNesteBloco > cfg.maxPLporMancha) continue;
@@ -734,9 +758,13 @@ export function organizarBlocos100(
       }));
       const fragmentaDia = cfg.cargaDiariaEstudante.evitarDiasParciais === true && abreNovoDia && existeDiaParcial;
       const completaDiaAberto = cargasAtuais.some(carga => carga > 0 && carga < alvoBlocos);
-      const minimoPrioritario = (cfg.diasPrioritarios ?? []).find(
+      const minimoArranqueS2 = semana === primeiraSemanaS2 && dia === "Quinta"
+        && grupoTemTresTIniciais(uc.anoCurricular, fam)
+        ? alvoBlocos
+        : 0;
+      const minimoPrioritario = Math.max(minimoArranqueS2, (cfg.diasPrioritarios ?? []).find(
         prioridade => prioridade.semana === semana && prioridade.dia === dia,
-      )?.minimoBlocos ?? 0;
+      )?.minimoBlocos ?? 0);
       const faltaPreencherDataPrioritaria = minimoPrioritario > 0
         && cargasAtuais.some(carga => carga < minimoPrioritario);
       const distanciaSemana = Math.abs(semana - bloco.semanaPreferida);
@@ -916,6 +944,9 @@ export function organizarBlocos100(
         .filter(p => p.semana === semana && p.minimoBlocos > 0)
         .map(p => p.dia),
     );
+    if (semana === primeiraSemanaS2 && grupoTemTresTIniciais(ano, familia)) {
+      prioridade.add("Quinta");
+    }
     const slotsFixos = new Set(
       [...fixosPorDia].flatMap(([dia, horas]) => [...horas].map(hora => `${dia}|${hora}`)),
     ).size;

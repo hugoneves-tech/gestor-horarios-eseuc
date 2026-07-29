@@ -50,4 +50,33 @@ assert.ok(familiaA.length > 0 && familiaB.length > 0);
 assert.ok(familiaA.every(s => manha.has(s.horaInicio)), "a família A deve ficar exclusivamente de manhã");
 assert.ok(familiaB.every(s => tarde.has(s.horaInicio)), "a família B deve ficar exclusivamente de tarde");
 
+const semana16: SemanaInfo = {
+  numero: 1,
+  dataSegunda: "2027-02-08",
+  dataSexta: "2027-02-12",
+  diasUteis: 3,
+  fator: 3 / 5,
+  feriadosNesta: ["8 e 9 de fevereiro"],
+  diasBloqueados: ["Segunda", "Terça"],
+  numeroPedagogico: 1,
+};
+const entradasS2: EntradaUC[] = Array.from({ length: 4 }, (_, i) => {
+  const ucS2: UC = {
+    ...uc,
+    id: `uc_s2_${i + 1}`,
+    sigla: `S2-${i + 1}`,
+    nome: `UC S2 ${i + 1}`,
+    anoCurricular: 2,
+    semestre: 2,
+    cargaHorariaTeorica: 2,
+    cargaHorariaTP: 0,
+    turmasConfig: [{ id: `tb_${i + 1}`, nome: "Turma B", tipo: "Teórica" }],
+  };
+  return { uc: ucS2, semanas: [semana16], semanaGlobalOffset: 15 };
+});
+const arranqueS2 = gerarSessoesConjunto(entradasS2, 2);
+const tQuartaS16 = arranqueS2.filter(s => s.semana === 16 && s.diaSemana === "Quarta" && s.tipoAula === "T");
+assert.equal(tQuartaS16.length, 3);
+assert.equal(new Set(tQuartaS16.map(s => s.ucSigla)).size, 3, "as três T de quarta da semana 16 devem ser de UCs diferentes");
+
 console.log("Turnos rígidos: Turma A de manhã e Turma B de tarde no 1.º semestre.");

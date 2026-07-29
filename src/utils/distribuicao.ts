@@ -1676,6 +1676,40 @@ export function gerarSessoesConjunto(
   }
 
   const allWeeks = [...new Set(tasks.flatMap(t => t.weeks.map(w => w.semanaGlobal)))].sort((a, b) => a - b);
+  const primeiraSemana = allWeeks[0];
+
+  // Arranque do 2.º semestre do 2.º ano: a quarta-feira recebe três T de
+  // UCs diferentes. A regra fixa da semana global 1 não participa aqui.
+  // Esta reserva ocorre antes da distribuição genérica para impedir que uma
+  // UC com maior carga teórica ocupe dois dos três blocos iniciais.
+  if (!opts.semRegras && semestre === 2 && primeiraSemana === 16) {
+    const semana16 = tasks.flatMap(t => t.weeks).find(w => w.semanaGlobal === 16);
+    if (semana16 && !semana16.diasBloqueados.includes("Quarta")) {
+      const candidatas = tTasks
+        .filter(t => t.ano === 2 && t.placed < t.total
+          && t.weeks.some(w => w.semanaGlobal === 16))
+        .sort((a, b) => (a.placed / a.total) - (b.placed / b.total));
+      const familias = [...new Set(candidatas.map(t => t.family))];
+      for (const familia of familias) {
+        const daFamilia = candidatas.filter(t => t.family === familia);
+        const ucsDistintas = new Set(daFamilia.map(t => t.ucKey));
+        if (ucsDistintas.size < 3) continue;
+        const horas = daFamilia[0]?.manha ? PERIODOS_MANHA : PERIODOS_TARDE;
+        const usadas = new Set<string>();
+        for (const hora of horas.slice(0, 3)) {
+          const tarefa = daFamilia.find(t =>
+            !usadas.has(t.ucKey)
+            && !slotProibido(t.ucSigla, t.tipo, "Quarta", hora, 16)
+            && !ocupacao.has(slotKey(t.ano, 16, t.turmaNome, "Quarta", hora))
+            && gruposAlunoFolha(t.turmaNome).every(f =>
+              (diaCount.get(diaKey(t.ano, 16, "Quarta", f)) || 0) < MAX_BLOCOS_DIA));
+          if (!tarefa) break;
+          commit(tarefa, semana16, { dia: "Quarta", hora });
+          usadas.add(tarefa.ucKey);
+        }
+      }
+    }
+  }
   // Reserva pelo menos um bloco T conjunto em cada dia obrigatório antes de
   // distribuir TP/PL, para que essas atividades nunca consumam o auditório.
   if (!opts.semRegras) {
@@ -1723,7 +1757,6 @@ export function gerarSessoesConjunto(
   // Chronological: each week lays T, then the gated TP, then the gated PL.
   const gTP = opts.semRegras ? null : canTP;   // sem regras: ignora a ordem T→TP→PL
   const gPL = opts.semRegras ? null : canPL;
-  const primeiraSemana = allWeeks[0];
   for (const W of allWeeks) {
     placeWeek(tTasks,  W, null);
     // PL ANTES da TP dentro da semana: as PL (FT/ESDAC, blocos exclusivos por UC) têm

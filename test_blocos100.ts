@@ -228,6 +228,48 @@ assert.equal(
   "as datas assinaladas nas regras do Supabase devem receber os três blocos prioritários",
 );
 
+const catalogoArranqueS2 = ["U1", "U2", "U3"].map(sigla => ({
+  ...uc(sigla),
+  anoCurricular: 2,
+  semestre: 2,
+  cargaHorariaTeorica: 2,
+  cargaHorariaTP: 6,
+}));
+const tArranqueS2 = catalogoArranqueS2.map((ucT, indice) => ({
+  ...t(16, "Quarta", ["08:00", "10:00", "12:00"][indice]),
+  ucNome: ucT.nome,
+  ucSigla: ucT.sigla,
+  turma: "Turma B",
+}));
+const tpArranqueS2 = catalogoArranqueS2.flatMap(ucTP =>
+  [5, 6, 7, 8].map(n => ({
+    ...s(ucTP.sigla, "TP", `TP${n}`),
+    semana: 16,
+  })));
+const quintaS16 = organizarBlocos100(
+  [...tArranqueS2, ...tpArranqueS2],
+  catalogoArranqueS2,
+  {},
+  catalogoArranqueS2.map(ucAtiva => ({
+    uc: ucAtiva,
+    semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça"] }],
+    semanaGlobalOffset: 15,
+  })),
+);
+const blocosQuintaS16 = new Set(
+  quintaS16.sessoes
+    .filter(x => x.semana === 16 && x.diaSemana === "Quinta" && x.tipoAula === "TP")
+    .map(x => x.horaInicio),
+);
+assert.equal(quintaS16.naoAlocadas.length, 0);
+assert.deepEqual([...blocosQuintaS16].sort(), ["08:00", "10:00", "12:00"]);
+assert.ok(
+  quintaS16.sessoes
+    .filter(x => x.semana === 16 && x.diaSemana === "Quinta")
+    .every(x => x.tipoAula === "TP" && ["U1", "U2", "U3"].includes(x.ucSigla)),
+  "a quinta da semana 16 deve conter apenas TP das mesmas três UCs com T na quarta",
+);
+
 const quatroBlocos = Array.from({ length: 4 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
 const cargaExcecional = organizarBlocos100(
   quatroBlocos,
