@@ -270,6 +270,38 @@ assert.ok(
   "a quinta da semana 16 deve conter apenas TP das mesmas três UCs com T na quarta",
 );
 
+const quartoBlocoArranqueS2 = [5, 6, 7, 8].map((n, indice) => ({
+  ...s("U1", "TP", `TP${n}`),
+  id: 20_000 + indice,
+  semana: 16,
+}));
+const arranqueS2ComCargaExtra = organizarBlocos100(
+  [...tArranqueS2, ...tpArranqueS2, ...quartoBlocoArranqueS2],
+  catalogoArranqueS2,
+  {},
+  catalogoArranqueS2.map(ucAtiva => ({
+    uc: ucAtiva,
+    semanas: [{ numero: 1, diasBloqueados: ["Segunda", "Terça"] }],
+    semanaGlobalOffset: 15,
+  })),
+);
+const horasQuintaComCargaExtra = new Set(
+  arranqueS2ComCargaExtra.sessoes
+    .filter(x => x.semana === 16 && x.diaSemana === "Quinta")
+    .map(x => x.horaInicio),
+);
+assert.equal(arranqueS2ComCargaExtra.naoAlocadas.length, 0);
+assert.deepEqual(
+  [...horasQuintaComCargaExtra].sort(),
+  ["08:00", "10:00", "12:00"],
+  "mesmo com carga adicional, a quinta da semana 16 deve manter exatamente 6h",
+);
+assert.ok(
+  arranqueS2ComCargaExtra.sessoes.some(x =>
+    x.semana === 16 && x.diaSemana !== "Quinta" && x.tipoAula === "TP"),
+  "o quarto bloco deve ser deslocado para outro dia",
+);
+
 const quatroBlocos = Array.from({ length: 4 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();
 const cargaExcecional = organizarBlocos100(
   quatroBlocos,

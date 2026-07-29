@@ -727,6 +727,10 @@ export function organizarBlocos100(
         const permitidas = ucsComTNaQuartaDoArranqueS2.get(`${uc.anoCurricular}|${fam}`)!;
         if (bloco.sessoes.some(sessao =>
           sessao.tipoAula !== "TP" || !permitidas.has(sessao.ucSigla))) continue;
+        // A quinta do arranque do 2.º semestre é deliberadamente um dia de
+        // 6h. Os blocos adicionais seguem para outro dia, nunca para a reserva
+        // que transformaria esta quinta num dia de 8h.
+        if (!horasPreferidas.has(hora)) continue;
       }
       const k = `${uc.anoCurricular}|${fam}|${semana}|${dia}|${hora}`;
       if (ocupados.has(k)) continue;
@@ -960,7 +964,7 @@ export function organizarBlocos100(
     }
     for (const dia of DIAS) {
       const fixos = fixosPorDia.get(dia) ?? new Set<string>();
-      const candidatosBase = [
+      let candidatosBase = [
         { id: "vazio", horas: [] as string[], custo: 0 },
         { id: "seis", horas: padroes.seis, custo: 10 + Number(dia === "Sexta") },
         { id: "oito", horas: padroes.oito, custo: 10_000 + Number(dia === "Sexta") },
@@ -973,6 +977,9 @@ export function organizarBlocos100(
           { id: "seis_alt", horas: alternativo.seis, custo: 20 },
           { id: "oito_alt", horas: alternativo.oito, custo: 10_010 },
         );
+      }
+      if (semana === primeiraSemanaS2 && dia === "Quinta" && grupoTemTresTIniciais(ano, familia)) {
+        candidatosBase = candidatosBase.filter(padrao => !padrao.id.startsWith("oito"));
       }
       const candidatosPadrao = candidatosBase.filter(padrao =>
         !(padrao.id === "vazio" && prioridade.has(dia))
@@ -993,6 +1000,11 @@ export function organizarBlocos100(
       const plEvento = evento.sessoes.filter(s => s.tipoAula === "PL").length;
       for (const dia of DIAS) for (const hora of HORAS) {
         if (![...padroes.seis, ...padroes.oito].includes(hora)) continue;
+        if (semana === primeiraSemanaS2 && dia === "Quinta" && grupoTemTresTIniciais(ano, familia)) {
+          const permitidas = ucsComTNaQuartaDoArranqueS2.get(`${ano}|${familia}`)!;
+          if (!padroes.seis.includes(hora)
+            || evento.sessoes.some(sessao => sessao.tipoAula !== "TP" || !permitidas.has(sessao.ucSigla))) continue;
+        }
         if (slotsPermitidosPorUc && !idsUc.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
         const blocoEvento: Bloco = { sessoes: evento.sessoes, padrao: "T1", semanaPreferida: semana };
         if (!cumpreRestricoesUC(blocoEvento, semana, dia, hora)) continue;
