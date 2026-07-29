@@ -65,7 +65,7 @@ export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   diasPrioritarios: [],
   padroesAtivos: ["T1", "TP4_MESMA_UC", "TP2_DUAS_UCS", "TP2_PL6_DUAS_UCS", "TP2_PL3_PL3", "TP3_PL3"],
   padraoAEvitar: "TP3_PL3",
-  cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 3, evitarDiasParciais: false },
+  cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 5, evitarDiasParciais: false },
 };
 
 export const DESCRICAO_PADROES_BLOCOS_100: Record<PadraoBloco100Id, string> = {
@@ -149,6 +149,7 @@ function resolverPoolExato(
   ativos: Set<PadraoBloco100Id>,
   evitar: PadraoBloco100Id,
   slotsPermitidosPorUc: Map<string, Set<string>> | null,
+  maxSimultaneoTPPorUc: Map<string, number>,
   maxSimultaneoPLPorUc: Map<string, number>,
   reservarArranqueTP = true,
 ): { blocos: Bloco[]; sobras: Item[] } {
@@ -158,6 +159,8 @@ function resolverPoolExato(
     const ucsComPL = new Set(poolTrabalho.filter(x => x.tipo === "PL").map(x => x.ucId));
     const ucsTP = [...new Set(poolTrabalho.filter(x => x.tipo === "TP").map(x => x.ucId))];
     for (const ucId of ucsTP.filter(id => ucsComPL.has(id))) {
+      const limiteTP = maxSimultaneoTPPorUc.get(ucId);
+      if (limiteTP != null && limiteTP > 0 && limiteTP < 4) continue;
       const disponivel = [0, 1, 2, 3].every(quarto =>
         poolTrabalho.some(x => x.tipo === "TP" && x.ucId === ucId && x.quarto === quarto));
       if (!disponivel) continue;
@@ -182,10 +185,18 @@ function resolverPoolExato(
   const candidatos: CandidatoBloco[] = [];
   const adicionar = (padrao: PadraoBloco100Id, consumos: Consumo[]) => {
     if (!consumos.every(c => recursos.has(chaveRecurso(c.tipo, c.ucId, c.quarto)))) return;
+    const tpPorUc = new Map<string, number>();
     const plPorUc = new Map<string, number>();
+    for (const consumo of consumos.filter(c => c.tipo === "TP")) {
+      tpPorUc.set(consumo.ucId, (tpPorUc.get(consumo.ucId) ?? 0) + consumo.quantidade);
+    }
     for (const consumo of consumos.filter(c => c.tipo === "PL")) {
       plPorUc.set(consumo.ucId, (plPorUc.get(consumo.ucId) ?? 0) + consumo.quantidade);
     }
+    if ([...tpPorUc].some(([ucId, quantidade]) => {
+      const limite = maxSimultaneoTPPorUc.get(ucId);
+      return limite != null && limite > 0 && quantidade > limite;
+    })) return;
     if ([...plPorUc].some(([ucId, quantidade]) => {
       const limite = maxSimultaneoPLPorUc.get(ucId);
       return limite != null && limite > 0 && quantidade > limite;
@@ -258,7 +269,7 @@ function resolverPoolExato(
     ints[nome] = 1;
   });
   const modelo: Model = { optimize: "custo", opType: "min", constraints, variables, ints, options: { timeout: 15000, presolve: true } };
-  const solucao = solver.Solve(modelo) as SolveResult;
+  let solucao = solver.Solve(modelo) as SolveResult;
   if (!solucao.feasible) {
     if (blocosArranque.length) {
       return resolverPoolExato(
@@ -266,11 +277,39 @@ function resolverPoolExato(
         ativos,
         evitar,
         slotsPermitidosPorUc,
+        maxSimultaneoTPPorUc,
         maxSimultaneoPLPorUc,
         false,
       );
     }
-    return { blocos: [], sobras: [...poolOriginal] };
+    // Se uma pequena sobra impedir a igualdade total, não se rejeita o grupo
+    // inteiro. Maximiza-se a cobertura e devolvem-se apenas as sessões realmente
+    // incompatíveis. Isto mantém utilizáveis todos os blocos completos.
+    const constraintsParciais: Model["constraints"] = {};
+    for (const [chave, recurso] of recursos) {
+      constraintsParciais[nomesRecursos.get(chave)!] = { max: recurso.quantidade };
+    }
+    const variablesParciais: Model["variables"] = {};
+    candidatos.forEach((candidato, i) => {
+      const nome = `b${i}`;
+      const totalSessoes = candidato.consumos.reduce((total, consumo) => total + consumo.quantidade, 0);
+      const coeficientes: Record<string, number> = {
+        cobertura: totalSessoes * 1_000 - Number(candidato.padrao === evitar),
+      };
+      for (const consumo of candidato.consumos) {
+        coeficientes[nomesRecursos.get(chaveRecurso(consumo.tipo, consumo.ucId, consumo.quarto))!] = consumo.quantidade;
+      }
+      variablesParciais[nome] = coeficientes;
+    });
+    solucao = solver.Solve({
+      optimize: "cobertura",
+      opType: "max",
+      constraints: constraintsParciais,
+      variables: variablesParciais,
+      ints,
+      options: { timeout: 15000, presolve: true },
+    }) as SolveResult;
+    if (!solucao.feasible) return { blocos: [], sobras: [...poolOriginal] };
   }
 
   const pool = [...poolTrabalho];
@@ -363,6 +402,10 @@ export function validarBlocos100(sessoes: SessaoHorario[], ucsCatalogo: UC[]): E
       const m = new Map<string, number>(); for (const s of lista) m.set(s.ucSigla, (m.get(s.ucSigla) ?? 0) + 1); return m;
     };
     const tpUc = porUc(tp), plUc = porUc(pl);
+    const limitesTpOk = [...tpUc].every(([sigla, quantidade]) => {
+      const limite = ucPorSigla.get(sigla)?.maxSimultaneoTP;
+      return limite == null || limite <= 0 || quantidade <= limite;
+    });
     const limitesPlOk = [...plUc].every(([sigla, quantidade]) => {
       const limite = ucPorSigla.get(sigla)?.maxSimultaneoPL;
       return limite == null || limite <= 0 || quantidade <= limite;
@@ -388,7 +431,7 @@ export function validarBlocos100(sessoes: SessaoHorario[], ucsCatalogo: UC[]): E
         valido = tpUc.size === 1 && plUc.size === 1 && [...tpUc.keys()][0] !== [...plUc.keys()][0];
       }
     }
-    valido = valido && limitesPlOk;
+    valido = valido && limitesTpOk && limitesPlOk;
     if (!valido) erros.push({ chave, cobertura, motivo: `Combinação não autorizada (${t.length} T/S, ${tp.length} TP, ${pl.length} PL).` });
   }
   return erros;
@@ -453,6 +496,11 @@ export function organizarBlocos100(
   const blocos: Bloco[] = [];
   const sobras: SessaoHorario[] = [...naoReconhecidas];
   const ativos = new Set(cfg.padroesAtivos);
+  const maxSimultaneoTPPorUc = new Map(
+    ucsCatalogo
+      .filter(u => u.maxSimultaneoTP != null && u.maxSimultaneoTP > 0)
+      .map(u => [u.id, u.maxSimultaneoTP!] as const),
+  );
   const maxSimultaneoPLPorUc = new Map(
     ucsCatalogo
       .filter(u => u.maxSimultaneoPL != null && u.maxSimultaneoPL > 0)
@@ -465,6 +513,7 @@ export function organizarBlocos100(
       ativos,
       cfg.padraoAEvitar,
       slotsPermitidosPorUc,
+      maxSimultaneoTPPorUc,
       maxSimultaneoPLPorUc,
     );
     blocos.push(...resolvido.blocos);

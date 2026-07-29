@@ -22,7 +22,7 @@ const cargaLegada = rowToRegra({
   id: "h_carga_diaria_estudantes", nome: "Carga diária", tipo: "hard", ativa: true,
   config: { motor: { cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 } } },
 });
-assert.equal((cargaLegada.config as any).motor.cargaDiariaEstudante.maxDiasNoMaximoPorSemana, 3);
+assert.equal((cargaLegada.config as any).motor.cargaDiariaEstudante.maxDiasNoMaximoPorSemana, 5);
 let id = 0;
 const s = (ucSigla: string, tipoAula: "TP" | "PL", turma: string): SessaoHorario => ({
   id: ++id, ucNome: ucSigla, ucSigla, tipoAula, turma, docente: "", sala: "", salaTipo: "",
@@ -77,6 +77,20 @@ executar([
   ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
   ...[4, 5, 6].map(n => s("U3", "PL", `PL${n}`)),
 ], "TP2_PL3_PL3", catalogoMax3);
+
+const catalogoTpMax2 = catalogoMax3.map(u =>
+  u.id === "U1" ? { ...u, maxSimultaneoTP: 2 } : u);
+executar([
+  s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
+  ...[4, 5, 6].map(n => s("U3", "PL", `PL${n}`)),
+], "TP2_PL3_PL3", catalogoTpMax2);
+const tresTpAcimaDoMaximo = organizarBlocos100([
+  s("U1", "TP", "TP2"), s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+  ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),
+], catalogoTpMax2);
+assert.equal(tresTpAcimaDoMaximo.sessoes.length, 0);
+assert.equal(tresTpAcimaDoMaximo.naoAlocadas.length, 6);
 
 const seisPlAcimaDoMaximo = organizarBlocos100([
   s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
@@ -161,6 +175,32 @@ assert.ok(
 assert.ok(
   tardeQuartaBloqueada.sessoes.some(x => x.semana === 1 && x.diaSemana === "Quarta" && Number(x.horaInicio.slice(0, 2)) < 14),
   "bloquear quarta à tarde não pode bloquear a quarta-feira de manhã",
+);
+
+const plForaDaPrimeiraSemana = organizarBlocos100(
+  [
+    s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+    ...[1, 2, 3, 4, 5, 6].map(n => s("U2", "PL", `PL${n}`)),
+  ],
+  catalogo,
+  {
+    restricoesUC: [{
+      siglas: ["U2"],
+      tipos: ["PL"],
+      semanasRestritas: [1],
+      diasProibidos: ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"],
+    }],
+  },
+  catalogo.map(ucAtiva => ({
+    uc: ucAtiva,
+    semanas: [{ numero: 1 }, { numero: 2 }],
+    semanaGlobalOffset: 0,
+  })),
+);
+assert.equal(plForaDaPrimeiraSemana.naoAlocadas.length, 0);
+assert.ok(
+  plForaDaPrimeiraSemana.sessoes.filter(x => x.tipoAula === "PL").every(x => x.semana !== 1),
+  "uma regra hard do Supabase deve impedir qualquer PL na semana 1",
 );
 
 const cincoBlocos = Array.from({ length: 5 }, () => [1, 2, 3, 4].map(n => s("U1", "TP", `TP${n}`))).flat();

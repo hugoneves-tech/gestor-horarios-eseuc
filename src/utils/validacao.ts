@@ -112,7 +112,7 @@ export function validarHorario(
     dias8hPorSemanaAluno.set(semanaAluno, (dias8hPorSemanaAluno.get(semanaAluno) || 0) + 1);
   }
   const excessosDias8h = [...dias8hPorSemanaAluno]
-    .filter(([, total]) => total > 3)
+    .filter(([, total]) => total > 5)
     .map(([chave, total]) => ({ chave, total }));
   let violacoesAlmoco = 0;
   for (const hs of horasAluno.values()) if (hs.has("12:00") && hs.has("14:00")) violacoesAlmoco++;
@@ -152,7 +152,10 @@ export function validarHorario(
       if (!porMomento.has(k)) porMomento.set(k, []);
       porMomento.get(k)!.push(s);
       const diaHoraPermitidos = ["Segunda", "Quarta"].includes(s.diaSemana)
-        || (s.diaSemana === "Sexta" && s.horaInicio === "10:00");
+        || (s.diaSemana === "Sexta" && (
+          s.horaInicio === "10:00"
+          || (s.semana === 1 && ["08:00", "12:00"].includes(s.horaInicio))
+        ));
       if (!diaHoraPermitidos || !permitidos.has(s.horaInicio)) {
         violacoesTSimultaneas.push(`${uc.sigla}: ${k} fora dos blocos permitidos`);
       }

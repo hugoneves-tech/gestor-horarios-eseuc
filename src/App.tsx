@@ -121,10 +121,52 @@ const REGRA_LIMITE_GLOBAL_PL: RegraHorario = {
   ativa: true,
 };
 
-const garantirRegraLimiteGlobalPL = (lista: RegraHorario[]): RegraHorario[] => {
+const REGRA_SEM_PL_SEMANA_1: RegraHorario = {
+  id: "h_2ano_semana_1_sem_pl",
+  nome: "2.º ano: distribuição fixa da semana 1",
+  tipo: "hard",
+  categoria: "Calendário",
+  descricao: "Na semana 1 do 2.º ano, quarta e sexta têm as aulas T definidas e quinta tem apenas 4h de TP de FT e ESDAC. Não existem aulas PL.",
+  escopo: "ano",
+  anoCurricular: 2,
+  config: {
+    anos: [2],
+    traducaoSimples: "Quarta: T de FT, PSIS e ESDAC. Quinta: 4h de TP cruzadas de FT e ESDAC. Sexta: T de PS, PSIS e EIG. Não existem PL.",
+    motor: {
+      restricoesUC: [{
+        siglas: [],
+        tipos: ["T", "TP", "PL"],
+        semanasRestritas: [1],
+        diasProibidos: ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"],
+      }],
+      layoutFixo: {
+        ano: 2,
+        sessoes: [
+          { semana: 1, dia: "Quarta", hora: "08:00", uc: "FT", tipo: "T", turmas: ["T1", "T2"] },
+          { semana: 1, dia: "Quarta", hora: "10:00", uc: "PSIS", tipo: "T", turmas: ["T1", "T2"] },
+          { semana: 1, dia: "Quarta", hora: "12:00", uc: "ESDAC", tipo: "T", turmas: ["T1", "T2"] },
+          { semana: 1, dia: "Quinta", hora: "08:00", uc: "FT", tipo: "TP", turmas: ["TP1", "TP2"] },
+          { semana: 1, dia: "Quinta", hora: "08:00", uc: "ESDAC", tipo: "TP", turmas: ["TP3", "TP4"] },
+          { semana: 1, dia: "Quinta", hora: "10:00", uc: "ESDAC", tipo: "TP", turmas: ["TP1", "TP2"] },
+          { semana: 1, dia: "Quinta", hora: "10:00", uc: "FT", tipo: "TP", turmas: ["TP3", "TP4"] },
+          { semana: 1, dia: "Quinta", hora: "14:00", uc: "FT", tipo: "TP", turmas: ["TP5", "TP6"] },
+          { semana: 1, dia: "Quinta", hora: "14:00", uc: "ESDAC", tipo: "TP", turmas: ["TP7", "TP8"] },
+          { semana: 1, dia: "Quinta", hora: "16:00", uc: "ESDAC", tipo: "TP", turmas: ["TP5", "TP6"] },
+          { semana: 1, dia: "Quinta", hora: "16:00", uc: "FT", tipo: "TP", turmas: ["TP7", "TP8"] },
+          { semana: 1, dia: "Sexta", hora: "08:00", uc: "PS", tipo: "T", turmas: ["T1", "T2"] },
+          { semana: 1, dia: "Sexta", hora: "10:00", uc: "PSIS", tipo: "T", turmas: ["T1", "T2"] },
+          { semana: 1, dia: "Sexta", hora: "12:00", uc: "EIG", tipo: "T", turmas: ["T1", "T2"] },
+        ],
+      },
+    },
+  },
+  peso: 10,
+  ativa: true,
+};
+
+const garantirRegrasObrigatorias = (lista: RegraHorario[]): RegraHorario[] => {
   const existente = lista.find(r => r.id === REGRA_LIMITE_GLOBAL_PL.id);
-  if (!existente) return [REGRA_LIMITE_GLOBAL_PL, ...lista];
-  return lista.map(r => {
+  const comLimiteGlobal = !existente ? [REGRA_LIMITE_GLOBAL_PL, ...lista] : lista.map(r => {
     if (r.id !== REGRA_LIMITE_GLOBAL_PL.id) return r;
     const configurado = Number((r.config as any)?.motor?.maxPLporMancha);
     return {
@@ -138,6 +180,20 @@ const garantirRegraLimiteGlobalPL = (lista: RegraHorario[]): RegraHorario[] => {
         },
       },
     };
+  });
+  const semPLExistente = comLimiteGlobal.find(r => r.id === REGRA_SEM_PL_SEMANA_1.id);
+  if (!semPLExistente) return [REGRA_SEM_PL_SEMANA_1, ...comLimiteGlobal];
+  return comLimiteGlobal.map(r => r.id !== REGRA_SEM_PL_SEMANA_1.id ? r : {
+    ...r,
+    nome: REGRA_SEM_PL_SEMANA_1.nome,
+    tipo: "hard",
+    categoria: REGRA_SEM_PL_SEMANA_1.categoria,
+    descricao: REGRA_SEM_PL_SEMANA_1.descricao,
+    escopo: "ano",
+    anoCurricular: 2,
+    config: REGRA_SEM_PL_SEMANA_1.config,
+    peso: 10,
+    ativa: true,
   });
 };
 
@@ -260,7 +316,7 @@ export default function App() {
   };
   // Uma regra só é APLICADA ao motor se o seu config.motor tiver um dos parâmetros suportados;
   // caso contrário é apenas DOCUMENTAL (visível mas não influencia a geração).
-  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "maxPLporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "precedenciasUC", "aulasTConjuntas", "blocos100", "cargaDiariaEstudante", "bloqueiosCalendario", "limitesCalendario"] as const;
+  const MOTOR_PARAMS_SUPORTADOS = ["plDiasPermitidos", "ucConflitos", "maxTPporMancha", "maxPLporMancha", "semanasSoTurmaA", "semanasSoTurmaB", "restricoesUC", "precedenciasUC", "aulasTConjuntas", "layoutFixo", "blocos100", "cargaDiariaEstudante", "bloqueiosCalendario", "limitesCalendario"] as const;
   const regraAplicadaAoMotor = (r: RegraHorario): boolean => {
     const m = (r.config as any)?.motor;
     if (!m || typeof m !== "object") return false;
@@ -1315,7 +1371,7 @@ export default function App() {
         setFeriados(d.feriados);
         // Regra física obrigatória: se a migração SQL ainda não tiver sido
         // executada, o autosave cria-a no Supabase após este carregamento.
-        setRegras(garantirRegraLimiteGlobalPL(d.regras));
+        setRegras(garantirRegrasObrigatorias(d.regras));
         // Sanitizar propostas carregadas: remover quaisquer sessões órfãs (UCs que já não existem)
         const existingUcSiglas = new Set(d.ucs.map(u => u.sigla));
         const sanitizedVersoes = d.versoes.map(v => ({
@@ -1447,7 +1503,7 @@ export default function App() {
               }
               if (data && isSubscribed) {
                 import("./data/mappers").then(M => {
-                  const newRegras = garantirRegraLimiteGlobalPL(data.map(M.rowToRegra));
+                  const newRegras = garantirRegrasObrigatorias(data.map(M.rowToRegra));
                   setRegras(prev => {
                     // Evitar ciclo infinito: só atualiza se houver diferenças estruturais
                     const stringifiedPrev = JSON.stringify(prev);
@@ -1801,6 +1857,10 @@ export default function App() {
         const uc = ucs.find(u => u.sigla === s.ucSigla);
         return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
       };
+      const violaSemana1SemPL = (s: SessaoHorario) => {
+        const uc = ucs.find(u => u.sigla === s.ucSigla);
+        return Number(uc?.anoCurricular) === 2 && s.semana === 1 && s.tipoAula === "PL";
+      };
       const sessoesOutrosAnosAtivas = activeSessoesValidas.filter(s => !mesmoAnoGen(s));
 
       // ONE shared occupancy set + PL-count map for the entire 30-week schedule.
@@ -1884,6 +1944,9 @@ export default function App() {
               x && Array.isArray(x.semanas) && x.semanas.length
               && Array.isArray(x.dias) && x.dias.length),
           ];
+        }
+        if (m.layoutFixo && typeof m.layoutFixo === "object") {
+          motorAI.layoutFixo = m.layoutFixo;
         }
         if (typeof m.maxTPporMancha === "number" && m.maxTPporMancha > 0) motorAI.maxTPporMancha = m.maxTPporMancha;
         if (typeof m.maxPLporMancha === "number" && m.maxPLporMancha > 0) motorAI.maxPLporMancha = Math.floor(m.maxPLporMancha);
@@ -2018,10 +2081,52 @@ export default function App() {
       // Sessões FIXAS a semear no motor: as IMPORTADAS (deste import) + as já fixadas na
       // versão ativa (pins), exceto as de semanas inteiras congeladas. O motor regista a
       // ocupação delas e gera só o que falta À VOLTA (sem as duplicar no output).
+      const layoutFixo = motorAI.layoutFixo;
+      const sessoesLayoutFixo: SessaoHorario[] = !semRegras && layoutFixo?.ano === 2
+        && Array.isArray(layoutFixo.sessoes)
+        ? layoutFixo.sessoes.flatMap((entrada: any, indice: number) => {
+          const uc = ucs.find(u => u.sigla === entrada.uc && Number(u.anoCurricular) === 2);
+          if (!uc || !["T", "TP"].includes(entrada.tipo) || !Array.isArray(entrada.turmas)) return [];
+          const turmas = entrada.tipo === "T"
+            ? (uc.turmasConfig || []).filter(t => t.tipo === "Teórica").map(t => t.nome)
+            : entrada.turmas;
+          return turmas.flatMap((turma: string, turmaIndice: number) => {
+            const configurada = (uc.turmasConfig || []).find(t => t.nome === turma);
+            if (!configurada) return [];
+            const horaFim = `${String(Number(String(entrada.hora).slice(0, 2)) + 2).padStart(2, "0")}:00`;
+            return [{
+              id: 900_000 + indice * 10 + turmaIndice,
+              ucNome: uc.nome,
+              ucSigla: uc.sigla,
+              tipoAula: entrada.tipo as "T" | "TP",
+              docente: "",
+              sala: entrada.tipo === "T" ? "Auditório Geral ESEUC" : "",
+              salaTipo: entrada.tipo === "T" ? "Anfiteatro (Teórica T)" : "Sala Comum TP",
+              turma,
+              diaSemana: entrada.dia,
+              horaInicio: entrada.hora,
+              horaFim,
+              bloqueado: false,
+              semana: Number(entrada.semana),
+            } satisfies SessaoHorario];
+          });
+        })
+        : [];
+      const semanaPertenceAoLayout = (s: SessaoHorario) => {
+        const uc = ucs.find(u => u.sigla === s.ucSigla);
+        return sessoesLayoutFixo.length > 0 && Number(uc?.anoCurricular) === 2 && s.semana === 1;
+      };
+
       const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
       const fixasExistentes = activeSessoesValidas.filter(s =>
-        mesmoAnoGen(s) && s.bloqueado && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
-      const sessoesFixas = [...sessoesFixasImport, ...fixasExistentes];
+        mesmoAnoGen(s) && s.bloqueado && !semanaPertenceAoLayout(s)
+        && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
+      const sessoesFixas = [
+        ...sessoesLayoutFixo,
+        ...sessoesFixasImport.filter(s => !semanaPertenceAoLayout(s)),
+        ...fixasExistentes,
+      ]
+        .filter(s => semRegras || !violaSemana1SemPL(s));
 
       const opcoes = {
         plDiasPermitidos: motorAI.plDiasPermitidos ?? (regraPLDias
@@ -2064,7 +2169,11 @@ export default function App() {
           semanasSoTurmaA: motorAI.semanasSoTurmaA,
           semanasSoTurmaB: motorAI.semanasSoTurmaB,
           maxPLporMancha: motorAI.maxPLporMancha ?? CONFIGURACAO_BLOCOS_100_DEFAULT.maxPLporMancha,
-          cargaDiariaEstudante: motorAI.cargaDiariaEstudante ?? CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
+          cargaDiariaEstudante: {
+            ...CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
+            ...(motorAI.cargaDiariaEstudante || {}),
+            maxDiasNoMaximoPorSemana: 5,
+          },
           precedenciasUC: motorAI.precedenciasUC ?? [],
           restricoesUC: motorAI.restricoesUC ?? [],
           diasPrioritarios: motorAI.diasPrioritarios ?? [],
@@ -2093,15 +2202,23 @@ export default function App() {
 
       const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
       const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
-      const sessoesCongeladas = activeSessoesValidas.filter(s => ehBloqueada(s) && mesmoAnoGen(s));
-      const fixadas = activeSessoesValidas.filter(s => s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s));
+      const sessoesCongeladas = activeSessoesValidas.filter(s =>
+        ehBloqueada(s) && mesmoAnoGen(s) && !semanaPertenceAoLayout(s)
+        && (semRegras || !violaSemana1SemPL(s)));
+      const fixadas = activeSessoesValidas.filter(s =>
+        s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s) && !semanaPertenceAoLayout(s)
+        && (semRegras || !violaSemana1SemPL(s)));
       const merged: SessaoHorario[] = [
         ...outrosAnos,                    // anos não selecionados → intactos
         ...sessoesCongeladas,            // semanas validadas → ficam exatamente como estão
-        ...sessoesFixasImport.map(s => ({ ...s, bloqueado: true })),  // v2: importadas (fixas)
+        ...sessoesLayoutFixo,             // semana 1 definida pela regra hard do Supabase
+        ...sessoesFixasImport
+          .filter(s => !semanaPertenceAoLayout(s) && (semRegras || !violaSemana1SemPL(s)))
+          .map(s => ({ ...s, bloqueado: true })),  // v2: importadas (fixas)
         ...fixadas,                       // sessões "fixa" em semanas não bloqueadas
         ...allSessoes.filter(s =>
           !ehBloqueada(s) &&              // descarta as novas das semanas congeladas
+          !semanaPertenceAoLayout(s) &&   // a semana fixa não admite sessões adicionais
           !fixadas.some(p => p.ucSigla === s.ucSigla && p.turma === s.turma && p.semana === s.semana)
         ),
       ].map((s, i) => ({ ...s, id: i + 1 }));  // IDs ÚNICOS (evita colisões: eliminar/desbloquear afetava o registo errado, ex.: semana 1)
@@ -2115,6 +2232,10 @@ export default function App() {
       }
       if (!semRegras) {
         const maxPLporMancha = motorAI.maxPLporMancha ?? 6;
+        const plSemana1 = merged.filter(violaSemana1SemPL);
+        if (plSemana1.length) {
+          throw new Error(`A regra "2.º ano: semana 1 sem aulas PL" foi violada por ${plSemana1.length} sessão(ões).`);
+        }
         const relatorioFinal = validarHorario(merged.filter(mesmoAnoGen), ucs, maxPLporMancha, motorAI.aulasTConjuntas ?? []);
         if (relatorioFinal.violacoesTSimultaneas.length) {
           throw new Error(`A proposta viola a configuração de turmas T simultâneas: ${relatorioFinal.violacoesTSimultaneas[0]}. Reveja também as sessões importadas ou fixadas.`);
@@ -5723,7 +5844,7 @@ export default function App() {
                               <span className={relatorioImport.sobreposicoes ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.sobreposicoes ? "✗" : "✓"} Sobreposições: {relatorioImport.sobreposicoes}</span>
                               <span className={relatorioImport.excedeu8h ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excedeu8h ? "✗" : "✓"} Máx/dia: {relatorioImport.maxBlocosDia * 2}h</span>
                               <span className={relatorioImport.violacoesAlmoco ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesAlmoco ? "✗" : "✓"} Almoço: {relatorioImport.violacoesAlmoco}</span>
-                              <span className={relatorioImport.excessosDias8h.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excessosDias8h.length ? "✗" : "✓"} Semanas com mais de 3 dias de 8h: {relatorioImport.excessosDias8h.length}</span>
+                              <span className={relatorioImport.excessosDias8h.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excessosDias8h.length ? "✗" : "✓"} Semanas com mais de 5 dias de 8h: {relatorioImport.excessosDias8h.length}</span>
                               <span className={relatorioImport.violacoesCronologia.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.violacoesCronologia.length ? "✗" : "✓"} Cronologia: {relatorioImport.violacoesCronologia.length}</span>
                               <span className={relatorioImport.tpPlMesmaUC.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.tpPlMesmaUC.length ? "✗" : "✓"} TP+PL mesma UC: {relatorioImport.tpPlMesmaUC.length}</span>
                               <span className={relatorioImport.excessosPLPorBloco.length ? "text-red-600 font-semibold" : "text-emerald-600"}>{relatorioImport.excessosPLPorBloco.length ? "✗" : "✓"} Limite global de 6 PL: {relatorioImport.excessosPLPorBloco.length}</span>
