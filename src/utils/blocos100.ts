@@ -1326,6 +1326,131 @@ export function organizarBlocos100(
     if (candidatoTP) trocarMomento(primeiroPL, candidatoTP);
   }
 
+  // Fecho do 1.º semestre do 2.º ano: a última sexta-feira fica livre e a
+  // semana 15 não fica com um dia de 8h. Move-se apenas um bloco TP/PL já
+  // completo para uma semana anterior com margem, sem voltar a executar o
+  // solver nem alterar a composição pedagógica do bloco.
+  const todasAsSessoes = () => [...sessoesExternas, ...preservadas, ...alocadas];
+  const sessoesDaFamilia = (semana: number, dia: string, familia: Familia) =>
+    todasAsSessoes().filter(sessao => {
+      const uc = ucPorSigla.get(sessao.ucSigla);
+      return uc?.anoCurricular === 2 && sessao.semana === semana
+        && sessao.diaSemana === dia && familiaTeorica(sessao.turma) === familia;
+    });
+  const horasDaFamilia = (semana: number, dia: string, familia: Familia) =>
+    new Set(sessoesDaFamilia(semana, dia, familia).map(sessao => sessao.horaInicio));
+  const horaFimDe = (hora: string) =>
+    `${String(Number(hora.slice(0, 2)) + 2).padStart(2, "0")}:00`;
+  const padroesDestino = [padroesDia(true), padroesDia(false)];
+
+  for (const familia of ["A", "B"] as const) {
+    for (let tentativa = 0; tentativa < 4; tentativa++) {
+      const horasSexta = horasDaFamilia(15, "Sexta", familia);
+      const diaComOito = DIAS.find(dia => horasDaFamilia(15, dia, familia).size > 3);
+      const origemDia = horasSexta.size ? "Sexta" : diaComOito;
+      if (!origemDia) break;
+      const horasOrigem = horasDaFamilia(15, origemDia, familia);
+      const padraoOito = padroesDestino.find(padrao => slotsIguais(horasOrigem, padrao.oito));
+      const horasCandidatas = origemDia === "Sexta"
+        ? [...horasOrigem]
+        : padraoOito
+          ? padraoOito.oito.filter(hora => !padraoOito.seis.includes(hora))
+          : [];
+      let movido = false;
+
+      for (const horaOrigem of horasCandidatas) {
+        const preservadasNaOrigem = preservadas.some(sessao => {
+          const uc = ucPorSigla.get(sessao.ucSigla);
+          return uc?.anoCurricular === 2 && sessao.semana === 15
+            && sessao.diaSemana === origemDia && sessao.horaInicio === horaOrigem
+            && familiaTeorica(sessao.turma) === familia;
+        });
+        if (preservadasNaOrigem) continue;
+        const evento = alocadas.filter(sessao => {
+          const uc = ucPorSigla.get(sessao.ucSigla);
+          return uc?.anoCurricular === 2 && sessao.semana === 15
+            && sessao.diaSemana === origemDia && sessao.horaInicio === horaOrigem
+            && familiaTeorica(sessao.turma) === familia;
+        });
+        if (!evento.length || evento.some(sessao =>
+          sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL")) continue;
+        const idsUc = [...new Set(evento
+          .map(sessao => ucPorSigla.get(sessao.ucSigla)?.id)
+          .filter((id): id is string => !!id))];
+        const bloco: Bloco = { sessoes: evento, padrao: "T1", semanaPreferida: 15 };
+        const candidatos: { semana: number; dia: string; hora: string; custo: number }[] = [];
+
+        for (let semana = 8; semana <= 14; semana++) for (const dia of DIAS.filter(d => d !== "Sexta")) {
+          const horasAtuais = horasDaFamilia(semana, dia, familia);
+          for (const padrao of padroesDestino) {
+            const completaSeis = horasAtuais.size === 2
+              && [...horasAtuais].every(hora => padrao.seis.includes(hora));
+            const ampliaParaOito = slotsIguais(horasAtuais, padrao.seis);
+            if (!completaSeis && !ampliaParaOito) continue;
+            const hora = completaSeis
+              ? padrao.seis.find(item => !horasAtuais.has(item))
+              : padrao.oito.find(item => !horasAtuais.has(item));
+            if (!hora) continue;
+            if (slotsPermitidosPorUc
+              && !idsUc.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
+            if (!cumpreRestricoesUC(bloco, semana, dia, hora)
+              || !cumprePrecedencias(bloco, semana, dia, hora)) continue;
+            const existentes = todasAsSessoes().filter(sessao =>
+              sessao.semana === semana && sessao.diaSemana === dia
+              && sessao.horaInicio === hora && !evento.includes(sessao));
+            const misturaTipologias = evento.some(sessao =>
+              existentes.some(existente => existente.ucSigla === sessao.ucSigla
+                && existente.tipoAula !== sessao.tipoAula
+                && (existente.tipoAula === "TP" || existente.tipoAula === "PL")));
+            if (misturaTipologias) continue;
+            const plNovas = evento.filter(sessao => sessao.tipoAula === "PL").length;
+            const plAtuais = existentes.filter(sessao => sessao.tipoAula === "PL").length;
+            if (plAtuais + plNovas > cfg.maxPLporMancha) continue;
+            const excedeLimiteUc = idsUc.some(id => {
+              const uc = ucsCatalogo.find(item => item.id === id);
+              if (!uc) return true;
+              return (["TP", "PL"] as const).some(tipo => {
+                const limite = tipo === "TP" ? uc.maxSimultaneoTP : uc.maxSimultaneoPL;
+                if (!limite || limite <= 0) return false;
+                const atuais = existentes.filter(sessao =>
+                  sessao.ucSigla === uc.sigla && sessao.tipoAula === tipo).length;
+                const novas = evento.filter(sessao =>
+                  sessao.ucSigla === uc.sigla && sessao.tipoAula === tipo).length;
+                return atuais + novas > limite;
+              });
+            });
+            if (excedeLimiteUc) continue;
+            const cargaSemanaDestino = new Set(todasAsSessoes()
+              .filter(sessao => {
+                const uc = ucPorSigla.get(sessao.ucSigla);
+                return uc?.anoCurricular === 2 && sessao.semana === semana
+                  && familiaTeorica(sessao.turma) === familia;
+              })
+              .map(sessao => `${sessao.diaSemana}|${sessao.horaInicio}`)).size;
+            candidatos.push({
+              semana,
+              dia,
+              hora,
+              custo: Number(ampliaParaOito) * 1_000_000
+                + cargaSemanaDestino * 1_000 + (semana - 8) * 10 + DIAS.indexOf(dia),
+            });
+          }
+        }
+        const destino = candidatos.sort((a, b) => a.custo - b.custo)[0];
+        if (!destino) continue;
+        for (const sessao of evento) {
+          sessao.semana = destino.semana;
+          sessao.diaSemana = destino.dia;
+          sessao.horaInicio = destino.hora;
+          sessao.horaFim = horaFimDe(destino.hora);
+        }
+        movido = true;
+        break;
+      }
+      if (!movido) break;
+    }
+  }
+
   const avisos = sobras.length
     ? [`${sobras.length} sessões não foram alocadas porque não formam nenhuma combinação de 100%.`]
     : [];

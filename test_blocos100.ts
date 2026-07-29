@@ -431,6 +431,58 @@ assert.equal(semanaCincoDias.naoAlocadas.length, 0);
 assert.ok(diasTp1.has("Quinta"));
 assert.ok([...diasTp1.values()].filter(total => total === 4).length <= 3);
 
+const ucUltimaSextaLivre: UC = {
+  ...uc("U-FIM"),
+  anoCurricular: 2,
+  semestre: 1,
+};
+const cargaFimSemestre = organizarBlocos100(
+  Array.from({ length: 103 }, () =>
+    [1, 2, 3, 4].map(n => ({
+      ...s("U-FIM", "TP", `TP${n}`),
+      semana: 15,
+      ucNome: "U-FIM",
+    }))).flat(),
+  [ucUltimaSextaLivre],
+  {},
+  [{
+    uc: ucUltimaSextaLivre,
+    semanas: Array.from({ length: 8 }, (_, i) => ({ numero: i + 8 })),
+    semanaGlobalOffset: 0,
+  }],
+);
+assert.equal(cargaFimSemestre.naoAlocadas.length, 0);
+assert.ok(
+  cargaFimSemestre.sessoes.every(sessao =>
+    !(sessao.semana === 15 && sessao.diaSemana === "Sexta")),
+  "a última sexta-feira do 1.º semestre do 2.º ano deve ficar livre",
+);
+const manchasSemana15 = new Map<string, Set<string>>();
+for (const sessao of cargaFimSemestre.sessoes.filter(x => x.semana === 15 && x.turma === "TP1")) {
+  if (!manchasSemana15.has(sessao.diaSemana)) manchasSemana15.set(sessao.diaSemana, new Set());
+  manchasSemana15.get(sessao.diaSemana)!.add(sessao.horaInicio);
+}
+assert.ok(
+  [...manchasSemana15.values()].every(horas => horas.size <= 3),
+  "a semana 15 não pode usar dias de 8h para libertar a sexta-feira",
+);
+assert.equal(
+  [...manchasSemana15.values()].reduce((total, horas) => total + horas.size, 0),
+  12,
+  "a semana 15 deve conservar quatro dias completos de 6h",
+);
+const manchasAnteriores = new Map<string, Set<string>>();
+for (const sessao of cargaFimSemestre.sessoes.filter(x =>
+  x.semana != null && x.semana >= 8 && x.semana <= 14 && x.turma === "TP1")) {
+  const chave = `${sessao.semana}|${sessao.diaSemana}`;
+  if (!manchasAnteriores.has(chave)) manchasAnteriores.set(chave, new Set());
+  manchasAnteriores.get(chave)!.add(sessao.horaInicio);
+}
+assert.ok(
+  [...manchasAnteriores.values()].some(horas => horas.size === 4),
+  "o bloco excedente da semana 15 deve ser absorvido por uma semana anterior",
+);
+
 const ucUmaFamilia: UC = {
   ...uc("U-I"),
   sigla: "U-I",
