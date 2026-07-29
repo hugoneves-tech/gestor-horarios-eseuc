@@ -381,7 +381,11 @@ export function completarCargaParaBlocos100(
 }
 
 /** Validação independente para horários importados, fixados ou já persistidos. */
-export function validarBlocos100(sessoes: SessaoHorario[], ucsCatalogo: UC[]): ErroBloco100[] {
+export function validarBlocos100(
+  sessoes: SessaoHorario[],
+  ucsCatalogo: UC[],
+  sessoesGlobais: SessaoHorario[] = sessoes,
+): ErroBloco100[] {
   const ucPorSigla = new Map(ucsCatalogo.map(u => [u.sigla, u]));
   const grupos = new Map<string, SessaoHorario[]>();
   for (const s of sessoes) {
@@ -435,11 +439,11 @@ export function validarBlocos100(sessoes: SessaoHorario[], ucsCatalogo: UC[]): E
     if (!valido) erros.push({ chave, cobertura, motivo: `Combinação não autorizada (${t.length} T/S, ${tp.length} TP, ${pl.length} PL).` });
   }
   const manchasGlobais = new Map<string, SessaoHorario[]>();
-  for (const sessao of sessoes) {
+  for (const sessao of sessoesGlobais) {
     const uc = ucPorSigla.get(sessao.ucSigla);
     if (!uc || sessao.semana == null
       || (sessao.tipoAula !== "TP" && sessao.tipoAula !== "PL")) continue;
-    const chave = `${uc.anoCurricular}|${sessao.semana}|${sessao.diaSemana}|${sessao.horaInicio}`;
+    const chave = `${sessao.semana}|${sessao.diaSemana}|${sessao.horaInicio}`;
     if (!manchasGlobais.has(chave)) manchasGlobais.set(chave, []);
     manchasGlobais.get(chave)!.push(sessao);
   }
@@ -719,10 +723,25 @@ export function organizarBlocos100(
     }));
   };
 
+  const conflitosTPExternos = (bloco: Bloco) => {
+    if (!bloco.sessoes.every(sessao => sessao.tipoAula === "TP")) return 0;
+    const siglas = new Set(bloco.sessoes.map(sessao => sessao.ucSigla));
+    const semestre = bloco.semanaPreferida <= 15 ? 1 : 2;
+    return sessoesExternas.filter(sessao =>
+      sessao.tipoAula === "TP" && siglas.has(sessao.ucSigla) && sessao.semana != null
+      && (sessao.semana <= 15 ? 1 : 2) === semestre).length;
+  };
+  // As TP puras que disputam a mesma UC com sessões de outro ano são colocadas
+  // antes dos restantes blocos. Assim podem rodar para outra mancha do dia/semana,
+  // em vez de sobrarem depois de os slots terem sido ocupados por blocos menos
+  // condicionados.
   const prioridadeBloco = (bloco: Bloco) =>
-    bloco.arranqueTP ? 0 : bloco.sessoes.some(s => s.tipoAula === "PL") ? 1 : 2;
+    bloco.arranqueTP ? 0
+      : conflitosTPExternos(bloco) > 0 ? 1
+        : bloco.sessoes.some(s => s.tipoAula === "PL") ? 2 : 3;
   for (const bloco of blocos.sort((a, b) =>
     prioridadeBloco(a) - prioridadeBloco(b)
+    || conflitosTPExternos(b) - conflitosTPExternos(a)
     || b.sessoes.filter(s => s.tipoAula === "PL").length - a.sessoes.filter(s => s.tipoAula === "PL").length
     || a.semanaPreferida - b.semanaPreferida
     || Number(a.padrao === cfg.padraoAEvitar) - Number(b.padrao === cfg.padraoAEvitar))) {

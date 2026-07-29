@@ -109,6 +109,37 @@ const errosTpGlobais = validarBlocos100(tpMaximoGlobalDuasTurmas, catalogoTpMax2
 assert.equal(errosTpGlobais.length, 1);
 assert.match(errosTpGlobais[0].motivo, /4 TP.*máximo global 2/);
 
+const tpOutroAno = {
+  ...s("U1", "TP", "TP1"),
+  id: ++id,
+  diaSemana: "Segunda",
+  horaInicio: "08:00",
+  horaFim: "10:00",
+};
+const tpAnoAlvo = [
+  { ...s("U1", "TP", "TP1"), diaSemana: "Segunda", horaInicio: "08:00", horaFim: "10:00" },
+  { ...s("U1", "TP", "TP2"), diaSemana: "Segunda", horaInicio: "08:00", horaFim: "10:00" },
+  { ...s("U2", "TP", "TP3"), diaSemana: "Segunda", horaInicio: "08:00", horaFim: "10:00" },
+  { ...s("U2", "TP", "TP4"), diaSemana: "Segunda", horaInicio: "08:00", horaFim: "10:00" },
+];
+const errosTpEntreAnos = validarBlocos100(tpAnoAlvo, catalogoTpMax2, [...tpAnoAlvo, tpOutroAno]);
+assert.equal(errosTpEntreAnos.length, 1);
+assert.match(errosTpEntreAnos[0].motivo, /3 TP.*máximo global 2/);
+
+const tpRodadasContraOutroAno = organizarBlocos100(
+  tpAnoAlvo,
+  catalogoTpMax2,
+  {},
+  catalogoTpMax2.slice(0, 2).map(ucAtiva => ({
+    uc: ucAtiva,
+    semanas: [{ numero: 1, diasBloqueados: ["Terça", "Quarta", "Quinta", "Sexta"] }],
+    semanaGlobalOffset: 0,
+  })),
+  [tpOutroAno],
+);
+assert.equal(tpRodadasContraOutroAno.naoAlocadas.length, 0);
+assert.ok(tpRodadasContraOutroAno.sessoes.every(sessao => sessao.horaInicio !== "08:00"));
+
 const plMaximoGlobalDuasTurmas = [
   s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
   ...[1, 2, 3].map(n => s("U2", "PL", `PL${n}`)),

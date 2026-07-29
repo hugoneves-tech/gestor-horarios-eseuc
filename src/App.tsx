@@ -2249,6 +2249,7 @@ export default function App() {
         const errosBlocos = validarBlocos100(
           merged.filter(s => mesmoAnoGen(s) && sessaoNoSemestreAlvo(s)),
           ucs,
+          merged.filter(sessaoNoSemestreAlvo),
         );
         if (errosBlocos.length) {
           const e0 = errosBlocos[0];
