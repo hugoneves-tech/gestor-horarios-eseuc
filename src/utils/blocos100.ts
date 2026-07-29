@@ -753,6 +753,11 @@ export function organizarBlocos100(
     blocosPorPadrao[bloco.padrao] = (blocosPorPadrao[bloco.padrao] ?? 0) + 1;
   }
 
+  // A compactação nunca pode degradar a solução válida produzida acima.
+  // Este snapshot permite recuperar se a reorganização semanal criar, por
+  // interação entre as famílias A/B, mais de seis PL na mesma mancha.
+  const alocadasAntesCompactacao = alocadas.map(sessao => ({ ...sessao }));
+
   // Compactação semanal exata: o posicionamento guloso acima encontra rapidamente
   // slots viáveis, mas uma carga de 10 blocos podia terminar como 3+3+3+1 em vez de
   // 4+3+3. Reorganizamos apenas os blocos TP/PL já formados, dentro da mesma semana,
@@ -976,6 +981,67 @@ export function organizarBlocos100(
         plCompactado.set(chave, (plCompactado.get(chave) || 0) + 1);
       }
     }
+  }
+
+  const plFinalPorMancha = new Map<string, number>();
+  for (const sessao of [...sessoesExternas, ...alocadas]) {
+    if (sessao.tipoAula !== "PL" || sessao.semana == null) continue;
+    const chave = chavePL(sessao.semana, sessao.diaSemana, sessao.horaInicio);
+    plFinalPorMancha.set(chave, (plFinalPorMancha.get(chave) || 0) + 1);
+  }
+  if ([...plFinalPorMancha.values()].some(total => total > cfg.maxPLporMancha)) {
+    alocadas.splice(0, alocadas.length, ...alocadasAntesCompactacao);
+  }
+
+  // Correção pedagógica mínima: quando ESDAC/FT começam com PL, troca-se o
+  // bloco completo dessa PL com um bloco TP puro posterior da mesma família.
+  // A composição dos blocos não muda; mudam apenas os dois momentos.
+  const ordemMomento = (sessao: SessaoHorario) =>
+    (sessao.semana ?? 0) * 1000
+    + DIAS.indexOf(sessao.diaSemana) * 10
+    + HORAS.indexOf(sessao.horaInicio);
+  const chaveMomento = (sessao: SessaoHorario) =>
+    `${sessao.semana}|${sessao.diaSemana}|${sessao.horaInicio}`;
+  const trocarMomento = (a: SessaoHorario[], b: SessaoHorario[]) => {
+    const momentoA = {
+      semana: a[0].semana, diaSemana: a[0].diaSemana,
+      horaInicio: a[0].horaInicio, horaFim: a[0].horaFim,
+    };
+    const momentoB = {
+      semana: b[0].semana, diaSemana: b[0].diaSemana,
+      horaInicio: b[0].horaInicio, horaFim: b[0].horaFim,
+    };
+    for (const sessao of a) Object.assign(sessao, momentoB);
+    for (const sessao of b) Object.assign(sessao, momentoA);
+  };
+  for (const sigla of ["ESDAC", "FT"]) for (const familia of ["A", "B"] as const) {
+    const eventos = new Map<string, SessaoHorario[]>();
+    for (const sessao of alocadas) {
+      if (familiaTeorica(sessao.turma) !== familia || sessao.semana == null) continue;
+      const chave = chaveMomento(sessao);
+      if (!eventos.has(chave)) eventos.set(chave, []);
+      eventos.get(chave)!.push(sessao);
+    }
+    const ordenados = [...eventos.values()].sort((a, b) => ordemMomento(a[0]) - ordemMomento(b[0]));
+    const primeiroPL = ordenados.find(evento =>
+      evento.some(s => s.ucSigla === sigla && s.tipoAula === "PL"));
+    const primeiraTP = ordenados.find(evento =>
+      evento.some(s => s.ucSigla === sigla && s.tipoAula === "TP"));
+    if (!primeiroPL || !primeiraTP || ordemMomento(primeiraTP[0]) < ordemMomento(primeiroPL[0])) continue;
+    const plMovidas = primeiroPL.filter(s => s.tipoAula === "PL").length;
+    const candidatosTP = ordenados.filter(evento => {
+      if (ordemMomento(evento[0]) <= ordemMomento(primeiroPL[0])) return false;
+      if (!evento.every(s => s.tipoAula === "TP")) return false;
+      if (!evento.some(s => s.ucSigla === sigla)) return false;
+      const plNoDestino = alocadas.filter(s =>
+        s.tipoAula === "PL" && chaveMomento(s) === chaveMomento(evento[0])).length;
+      return plNoDestino + plMovidas <= cfg.maxPLporMancha;
+    });
+    const candidatoTP = candidatosTP.sort((a, b) =>
+      Number(b[0].diaSemana === primeiroPL[0].diaSemana)
+      - Number(a[0].diaSemana === primeiroPL[0].diaSemana)
+      || ordemMomento(a[0]) - ordemMomento(b[0]))[0];
+    if (candidatoTP) trocarMomento(primeiroPL, candidatoTP);
   }
 
   const avisos = sobras.length
