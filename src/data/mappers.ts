@@ -149,18 +149,17 @@ export const regraToRow = (r: RegraHorario) => ({
 });
 export const rowToRegra = (r: any): RegraHorario => {
   let config = r.config ?? {};
-  // Migração de compatibilidade: versões anteriores gravavam esta preferência
-  // como true. A regra atual utiliza a sexta-feira como dia letivo normal e o
-  // autosave volta a persistir o valor corrigido no Supabase.
+  // A sexta-feira é o último recurso: quando a carga semanal cabe entre
+  // segunda e quinta, fica livre para os estudantes.
   if (r.id === "h_blocos_ocupacao_100") {
     config = {
       ...config,
-      traducaoSimples: "Todos os blocos têm sempre 100% dos estudantes e a sexta-feira utiliza toda a capacidade disponível, incluindo 18h-20h.",
+      traducaoSimples: "Todos os blocos têm sempre 100% dos estudantes. Os dias usados têm 6h contínuas (8h apenas quando indispensável) e a sexta-feira fica livre sempre que a carga semanal o permita.",
       motor: {
         ...(config.motor || {}),
         blocos100: {
           ...(config.motor?.blocos100 || {}),
-          preferirSextaLivre: false,
+          preferirSextaLivre: true,
         },
       },
     };

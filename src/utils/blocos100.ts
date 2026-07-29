@@ -58,7 +58,7 @@ export interface ConfiguracaoBlocos100 {
 
 export const CONFIGURACAO_BLOCOS_100_DEFAULT: ConfiguracaoBlocos100 = {
   exigirCoberturaTotal: true,
-  preferirSextaLivre: false,
+  preferirSextaLivre: true,
   maxPLporMancha: 6,
   precedenciasUC: [],
   restricoesUC: [],
@@ -966,8 +966,16 @@ export function organizarBlocos100(
       const fixos = fixosPorDia.get(dia) ?? new Set<string>();
       let candidatosBase = [
         { id: "vazio", horas: [] as string[], custo: 0 },
-        { id: "seis", horas: padroes.seis, custo: 10 + Number(dia === "Sexta") },
-        { id: "oito", horas: padroes.oito, custo: 10_000 + Number(dia === "Sexta") },
+        {
+          id: "seis",
+          horas: padroes.seis,
+          custo: 10 + Number(cfg.preferirSextaLivre && dia === "Sexta") * 100_000,
+        },
+        {
+          id: "oito",
+          horas: padroes.oito,
+          custo: 10_000 + Number(cfg.preferirSextaLivre && dia === "Sexta") * 100_000,
+        },
       ];
       // Uma T conjunta pode obrigar excecionalmente a família da tarde a ter
       // manhã nesse dia. Nesse caso, usa-se o padrão matinal completo, nunca 12h+14h.
@@ -1083,6 +1091,83 @@ export function organizarBlocos100(
   }
   if ([...plFinalPorMancha.values()].some(total => total > cfg.maxPLporMancha)) {
     alocadas.splice(0, alocadas.length, ...alocadasAntesCompactacao);
+  }
+
+  // Última reparação segura para um residual TP isolado (20h = 6+6+6+2):
+  // absorve-o num dia de 6h, formando 8h com almoço, em vez de manter um
+  // quarto dia de apenas 2h. Não move PL nem altera a composição do bloco.
+  const slotsIguais = (horas: Set<string>, esperadas: string[]) =>
+    horas.size === esperadas.length && esperadas.every(hora => horas.has(hora));
+  const chavesAnoSemanaFamilia = new Set<string>();
+  for (const sessao of [...preservadas, ...alocadas]) {
+    const uc = ucPorSigla.get(sessao.ucSigla);
+    const familia = familiaTeorica(sessao.turma);
+    if (uc && familia && sessao.semana != null) {
+      chavesAnoSemanaFamilia.add(`${uc.anoCurricular}|${sessao.semana}|${familia}`);
+    }
+  }
+  for (const chaveGrupo of chavesAnoSemanaFamilia) {
+    const [anoTexto, semanaTexto, familiaTexto] = chaveGrupo.split("|");
+    const ano = Number(anoTexto);
+    const semana = Number(semanaTexto);
+    const familia = familiaTexto as Familia;
+    const sessoesGrupo = [...preservadas, ...alocadas].filter(sessao => {
+      const uc = ucPorSigla.get(sessao.ucSigla);
+      return uc?.anoCurricular === ano && sessao.semana === semana
+        && familiaTeorica(sessao.turma) === familia;
+    });
+    const ocupacao = new Map(DIAS.map(dia => [dia, new Set<string>()]));
+    for (const sessao of sessoesGrupo) ocupacao.get(sessao.diaSemana)?.add(sessao.horaInicio);
+    const origem = DIAS.find(dia => ocupacao.get(dia)?.size === 1);
+    if (!origem) continue;
+    const horaOrigem = [...(ocupacao.get(origem) ?? [])][0];
+    const blocoResidual = alocadas.filter(sessao => {
+      const uc = ucPorSigla.get(sessao.ucSigla);
+      return uc?.anoCurricular === ano && sessao.semana === semana
+        && familiaTeorica(sessao.turma) === familia
+        && sessao.diaSemana === origem && sessao.horaInicio === horaOrigem;
+    });
+    if (!blocoResidual.length || blocoResidual.some(sessao => sessao.tipoAula !== "TP")) continue;
+    const idsUc = [...new Set(blocoResidual
+      .map(sessao => ucPorSigla.get(sessao.ucSigla)?.id)
+      .filter((id): id is string => !!id))];
+    let destino: { dia: string; hora: string } | null = null;
+    for (const dia of [...DIAS.filter(d => d !== "Sexta"), "Sexta"]) {
+      if (dia === origem) continue;
+      const ocupadas = ocupacao.get(dia) ?? new Set<string>();
+      const padraoBase = [padroesDia(true), padroesDia(false)]
+        .find(padrao => slotsIguais(ocupadas, padrao.seis));
+      if (!padraoBase) continue;
+      const hora = padraoBase.oito.find(h => !ocupadas.has(h));
+      if (!hora) continue;
+      if (slotsPermitidosPorUc && !idsUc.every(id => slotsPermitidosPorUc.get(id)?.has(`${semana}|${dia}`))) continue;
+      const bloco: Bloco = { sessoes: blocoResidual, padrao: "T1", semanaPreferida: semana };
+      if (!cumpreRestricoesUC(bloco, semana, dia, hora) || !cumprePrecedencias(bloco, semana, dia, hora)) continue;
+      const existentes = [...sessoesExternas, ...preservadas, ...alocadas].filter(sessao =>
+        sessao.semana === semana && sessao.diaSemana === dia && sessao.horaInicio === hora
+        && !blocoResidual.includes(sessao));
+      const mistura = blocoResidual.some(sessao =>
+        existentes.some(existente => existente.ucSigla === sessao.ucSigla && existente.tipoAula === "PL"));
+      if (mistura) continue;
+      const excedeMaximo = blocoResidual.some(sessao => {
+        const maximo = ucPorSigla.get(sessao.ucSigla)?.maxSimultaneoTP;
+        if (!maximo || maximo <= 0) return false;
+        const atuais = existentes.filter(existente =>
+          existente.ucSigla === sessao.ucSigla && existente.tipoAula === "TP").length;
+        const novas = blocoResidual.filter(nova =>
+          nova.ucSigla === sessao.ucSigla && nova.tipoAula === "TP").length;
+        return atuais + novas > maximo;
+      });
+      if (excedeMaximo) continue;
+      destino = { dia, hora };
+      break;
+    }
+    if (!destino) continue;
+    for (const sessao of blocoResidual) {
+      sessao.diaSemana = destino.dia;
+      sessao.horaInicio = destino.hora;
+      sessao.horaFim = `${String(Number(destino.hora.slice(0, 2)) + 2).padStart(2, "0")}:00`;
+    }
   }
 
   // Correção pedagógica mínima: quando ESDAC/FT começam com PL, troca-se o

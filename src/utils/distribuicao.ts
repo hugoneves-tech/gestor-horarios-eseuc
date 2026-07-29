@@ -294,12 +294,15 @@ function poolDoTipo(
 
 
   // Dias permitidos por tipo (regra ESEUC):
-  //   T       → só 2ª e 4ª (todo o dia) e 6ª (só de manhã). T enche a 6ª primeiro.
+  //   T       → com preferência de sexta livre, usa 2ª–5ª antes da 6ª.
   //   TP/PL/S → 2ª–5ª; a 6ª entra em ÚLTIMO recurso (só quando as T já esgotaram a 6ª e
   //             os outros dias estão cheios → aproveita as 6ªs livres para TP/PL).
   let ordemDias: string[];
   if (tipo === "T") {
-    ordemDias = ["Sexta", "Segunda", "Quarta"].filter(d => avail.includes(d));
+    ordemDias = (preferirSextaLivre
+      ? ["Segunda", "Quarta", "Terça", "Quinta", "Sexta"]
+      : ["Sexta", "Segunda", "Quarta"])
+      .filter(d => avail.includes(d));
   } else if (tipo === "TP") {
     ordemDias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"].filter(d => avail.includes(d));
   } else if (tipo === "PL") {

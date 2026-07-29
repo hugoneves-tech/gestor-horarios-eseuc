@@ -40,6 +40,8 @@ export interface RelatorioValidacao {
   maxBlocosDia: number;              // máx blocos/aluno/dia (×2 = horas)
   excedeu8h: boolean;
   excessosDias8h: { chave: string; total: number }[];
+  diasParciais: string[];            // dias usados com apenas 2h ou 4h
+  diasComBuracos: string[];           // carga diária fora dos padrões contínuos de 6h/8h
   violacoesAlmoco: number;           // aluno com 12:00 e 14:00 no mesmo dia
   violacoesCronologia: { sigla: string; familia: string; problema: string }[];
   tpPlMesmaUC: string[];             // chaves ano|semana|dia|hora|UC com TP e PL juntas
@@ -114,6 +116,19 @@ export function validarHorario(
   const excessosDias8h = [...dias8hPorSemanaAluno]
     .filter(([, total]) => total > 5)
     .map(([chave, total]) => ({ chave, total }));
+  const padroesDiariosPermitidos = new Set([
+    "08:00|10:00|12:00",
+    "14:00|16:00|18:00",
+    "08:00|10:00|12:00|16:00",
+    "10:00|14:00|16:00|18:00",
+  ]);
+  const diasParciais: string[] = [];
+  const diasComBuracos: string[] = [];
+  for (const [chave, horas] of horasAluno) {
+    const ordenadas = [...horas].sort((a, b) => HORAS.indexOf(a) - HORAS.indexOf(b));
+    if (ordenadas.length < 3) diasParciais.push(chave);
+    else if (!padroesDiariosPermitidos.has(ordenadas.join("|"))) diasComBuracos.push(chave);
+  }
   let violacoesAlmoco = 0;
   for (const hs of horasAluno.values()) if (hs.has("12:00") && hs.has("14:00")) violacoesAlmoco++;
 
@@ -254,7 +269,8 @@ export function validarHorario(
   }
   const pctGlobal = alvoTot ? Math.round((colocTot / alvoTot) * 100) : 100;
 
-  const ok = sobreposicoes === 0 && maxBlocosDia <= 4 && excessosDias8h.length === 0 && violacoesAlmoco === 0
+  const ok = sobreposicoes === 0 && maxBlocosDia <= 4 && excessosDias8h.length === 0
+    && violacoesAlmoco === 0
     && violacoesCronologia.length === 0 && tpPlMesmaUC.length === 0
     && excessosPLPorBloco.length === 0 && violacoesTSimultaneas.length === 0
     && violacoesTConjuntas.length === 0;
@@ -267,6 +283,8 @@ export function validarHorario(
     maxBlocosDia,
     excedeu8h: maxBlocosDia > 4,
     excessosDias8h,
+    diasParciais,
+    diasComBuracos,
     violacoesAlmoco,
     violacoesCronologia,
     tpPlMesmaUC,

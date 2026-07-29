@@ -17,7 +17,7 @@ const regraLegada = rowToRegra({
   id: "h_blocos_ocupacao_100", nome: "Blocos", tipo: "hard", ativa: true,
   config: { motor: { blocos100: { preferirSextaLivre: true } } },
 });
-assert.equal((regraLegada.config as any).motor.blocos100.preferirSextaLivre, false);
+assert.equal((regraLegada.config as any).motor.blocos100.preferirSextaLivre, true);
 const cargaLegada = rowToRegra({
   id: "h_carga_diaria_estudantes", nome: "Carga diária", tipo: "hard", ativa: true,
   config: { motor: { cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 } } },
@@ -139,6 +139,57 @@ assert.ok(
   sextaComoDiaNormal.sessoes.some(x => x.diaSemana === "Quinta")
     && sextaComoDiaNormal.sessoes.every(x => ["08:00", "10:00", "12:00"].includes(x.horaInicio)),
   "uma semana de turma única deve preencher quinta-feira e usar a manhã antes da tarde",
+);
+
+const quatroDiasCombinados = organizarBlocos100(
+  Array.from({ length: 12 }, () => [
+    s("U1", "TP", "TP3"), s("U1", "TP", "TP4"),
+    ...[1, 2, 3, 4, 5, 6].map(n => s("U2", "PL", `PL${n}`)),
+  ]).flat(),
+  catalogo,
+  { preferirSextaLivre: true },
+);
+assert.equal(quatroDiasCombinados.naoAlocadas.length, 0);
+assert.ok(
+  quatroDiasCombinados.sessoes.every(x => x.diaSemana !== "Sexta"),
+  "quando quatro dias chegam para a carga semanal, a sexta-feira deve ficar livre",
+);
+
+const catalogoS2Parcial = ["T-S2", "TP-S2"].map(sigla => ({
+  ...uc(sigla),
+  anoCurricular: 2,
+  semestre: 2,
+}));
+const tS2 = (diaSemana: string, horaInicio: string): SessaoHorario => ({
+  ...t(25, diaSemana, horaInicio),
+  ucNome: "T-S2",
+  ucSigla: "T-S2",
+});
+const tS2B = (diaSemana: string, horaInicio: string): SessaoHorario => ({
+  ...tS2(diaSemana, horaInicio),
+  turma: "Turma B",
+});
+const completarDiaS2 = organizarBlocos100(
+  [
+    ...["Segunda", "Ter\u00e7a", "Quarta"].flatMap(dia =>
+      ["14:00", "16:00", "18:00"].map(hora => tS2(dia, hora))),
+    ...["Segunda", "Ter\u00e7a", "Quarta"].flatMap(dia =>
+      ["08:00", "10:00", "12:00"].map(hora => tS2B(dia, hora))),
+    ...[1, 2, 3, 4].map(n => ({ ...s("TP-S2", "TP", `TP${n}`), semana: 25 })),
+    ...[5, 6, 7, 8].map(n => ({ ...s("TP-S2", "TP", `TP${n}`), semana: 25 })),
+  ],
+  catalogoS2Parcial,
+  { preferirSextaLivre: true },
+);
+const cargaS2PorDia = new Map<string, number>();
+for (const sessao of completarDiaS2.sessoes.filter(x => x.turma === "TP1" || x.turma === "Turma A")) {
+  cargaS2PorDia.set(sessao.diaSemana, (cargaS2PorDia.get(sessao.diaSemana) || 0) + 1);
+}
+assert.equal(completarDiaS2.naoAlocadas.length, 0);
+assert.deepEqual(
+  [...cargaS2PorDia.values()].sort((a, b) => a - b),
+  [3, 3, 4],
+  "um bloco residual de 2h deve completar um dia de 6h para 8h, não abrir um dia parcial",
 );
 
 const incompleto = organizarBlocos100([s("U1", "TP", "TP1")], catalogo);
