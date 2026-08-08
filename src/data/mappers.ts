@@ -147,47 +147,16 @@ export const regraToRow = (r: RegraHorario) => ({
   escopo: r.escopo ?? null, ano_curricular: r.anoCurricular != null ? String(r.anoCurricular) : null,
   config: r.config ?? {}, peso: r.peso, ativa: r.ativa,
 });
-export const rowToRegra = (r: any): RegraHorario => {
-  let config = r.config ?? {};
-  // A sexta-feira é o último recurso: quando a carga semanal cabe entre
-  // segunda e quinta, fica livre para os estudantes.
-  if (r.id === "h_blocos_ocupacao_100") {
-    config = {
-      ...config,
-      traducaoSimples: "Todos os blocos têm sempre 100% dos estudantes. Os dias usados têm 6h contínuas (8h apenas quando indispensável) e a sexta-feira fica livre sempre que a carga semanal o permita.",
-      motor: {
-        ...(config.motor || {}),
-        blocos100: {
-          ...(config.motor?.blocos100 || {}),
-          preferirSextaLivre: true,
-        },
-      },
-    };
-  }
-  // O alvo continua a ser 6h, mas qualquer dia útil pode excecionalmente chegar
-  // às 8h quando isso for necessário para completar a distribuição.
-  if (r.id === "h_carga_diaria_estudantes") {
-    config = {
-      ...config,
-      traducaoSimples: "O motor procura limitar cada dia a 6h. Para completar a carga na semana correta, permite 8h em qualquer dia útil, sem nunca ultrapassar 8h por dia.",
-      motor: {
-        ...(config.motor || {}),
-        cargaDiariaEstudante: {
-          ...(config.motor?.cargaDiariaEstudante || {}),
-          alvoHoras: 6,
-          maxHoras: 8,
-          maxDiasNoMaximoPorSemana: 5,
-        },
-      },
-    };
-  }
-  return {
-    id: r.id, nome: r.nome, tipo: r.tipo, categoria: r.categoria ?? "", descricao: r.descricao ?? "",
-    escopo: r.escopo ?? undefined,
-    anoCurricular: r.ano_curricular == null ? undefined : (r.ano_curricular === "todos" ? "todos" : Number(r.ano_curricular)),
-    config, peso: r.peso ?? 5, ativa: !!r.ativa,
-  };
-};
+// Mapeador puro: a configuração é devolvida tal como está no Supabase. Não há
+// regras de negócio por id — quem precisa de valores por omissão aplica-os no
+// consumo (CONFIGURACAO_BLOCOS_100_DEFAULT, contrato de regras), para que editar
+// a regra na consola do coordenador tenha efeito.
+export const rowToRegra = (r: any): RegraHorario => ({
+  id: r.id, nome: r.nome, tipo: r.tipo, categoria: r.categoria ?? "", descricao: r.descricao ?? "",
+  escopo: r.escopo ?? undefined,
+  anoCurricular: r.ano_curricular == null ? undefined : (r.ano_curricular === "todos" ? "todos" : Number(r.ano_curricular)),
+  config: r.config ?? {}, peso: r.peso ?? 5, ativa: !!r.ativa,
+});
 
 // --- Versão (sessões em JSONB) -------------------------------------------
 export const versaoToRow = (v: VersaoHorario) => ({

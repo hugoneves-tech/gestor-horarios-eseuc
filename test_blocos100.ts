@@ -13,16 +13,34 @@ const catalogo = ["U1", "U2", "U3"].map(uc);
 const catalogoMax3 = catalogo.map(u => (
   u.id === "U2" || u.id === "U3" ? { ...u, maxSimultaneoPL: 3 } : u
 ));
-const regraLegada = rowToRegra({
+// O mapeador é puro: devolve a configuração tal como está no Supabase, sem
+// reescrever campos por id. Estas duas regras são as que outrora eram forçadas
+// no código — os valores usados aqui divergem de propósito desse antigo
+// hardcode (`preferirSextaLivre: true`, `maxDiasNoMaximoPorSemana: 5`), para que
+// o teste falhe se algum override regressar.
+const configBlocosNaLinha = {
+  traducaoSimples: "Texto da consola do coordenador.",
+  motor: { blocos100: { preferirSextaLivre: false } },
+};
+const regraBlocos = rowToRegra({
   id: "h_blocos_ocupacao_100", nome: "Blocos", tipo: "hard", ativa: true,
-  config: { motor: { blocos100: { preferirSextaLivre: true } } },
+  config: configBlocosNaLinha,
 });
-assert.equal((regraLegada.config as any).motor.blocos100.preferirSextaLivre, true);
-const cargaLegada = rowToRegra({
+assert.deepEqual(regraBlocos.config, configBlocosNaLinha);
+const configCargaNaLinha = {
+  traducaoSimples: "Carga diária definida na consola.",
+  motor: { cargaDiariaEstudante: { alvoHoras: 4, maxHoras: 6, maxDiasNoMaximoPorSemana: 1 } },
+};
+const regraCarga = rowToRegra({
   id: "h_carga_diaria_estudantes", nome: "Carga diária", tipo: "hard", ativa: true,
-  config: { motor: { cargaDiariaEstudante: { alvoHoras: 6, maxHoras: 8, maxDiasNoMaximoPorSemana: 1 } } },
+  config: configCargaNaLinha,
 });
-assert.equal((cargaLegada.config as any).motor.cargaDiariaEstudante.maxDiasNoMaximoPorSemana, 5);
+assert.deepEqual(regraCarga.config, configCargaNaLinha);
+// Uma linha sem `config` continua a dar um objeto vazio, não uma configuração inventada.
+assert.deepEqual(
+  rowToRegra({ id: "h_carga_diaria_estudantes", nome: "Carga diária", tipo: "hard", ativa: true }).config,
+  {},
+);
 let id = 0;
 const s = (ucSigla: string, tipoAula: "TP" | "PL", turma: string): SessaoHorario => ({
   id: ++id, ucNome: ucSigla, ucSigla, tipoAula, turma, docente: "", sala: "", salaTipo: "",

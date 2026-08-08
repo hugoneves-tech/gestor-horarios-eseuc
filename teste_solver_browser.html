@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <title>Teste do solver no browser</title>
+</head>
+<body>
+  <!--
+    Página de fumo para o OR-Tools em WebAssembly.
+
+    Existe por uma razão concreta: o `cpsat-js` importa `node:module`, que o Vite
+    substitui por um esboço que rebenta se alguém lhe tocar. Se esse caminho for
+    mesmo percorrido, o solver falha DENTRO do worker, onde ninguém vê o erro.
+    Esta página carrega a biblioteca no browser e resolve um modelo trivial —
+    responde à única pergunta que o `vite build` não responde: isto arranca?
+
+    Abrir em http://localhost:3000/teste_solver_browser.html com o servidor de
+    desenvolvimento a correr. Não precisa de autenticação.
+  -->
+  <pre id="saida" style="font: 13px/1.6 ui-monospace, monospace; padding: 16px">a carregar…</pre>
+  <script type="module">
+    const saida = document.getElementById("saida");
+    const escrever = (t) => { saida.textContent += "\n" + t; };
+    saida.textContent = "a importar cpsat-js…";
+    try {
+      const { CpModel, CpSolver, CpSolverStatus, LinearExpr } = await import("cpsat-js");
+      escrever("import: ok");
+
+      const m = new CpModel();
+      const a = m.newBoolVar("a");
+      const b = m.newBoolVar("b");
+      const soma = new LinearExpr(new Map([[a.index, 1n], [b.index, 1n]]), 0n);
+      m.add(soma.le(1));
+      m.minimize(soma);
+      escrever("modelo construído: 2 variáveis, 1 restrição");
+
+      const t0 = performance.now();
+      const solver = await CpSolver.create();
+      escrever("WebAssembly carregado em " + Math.round(performance.now() - t0) + " ms");
+
+      const r = solver.solve(m, { maxTimeInSeconds: 5, numWorkers: 1 });
+      escrever("estado: " + (CpSolverStatus[r.status] ?? r.status));
+      escrever("a=" + r.value(a) + " b=" + r.value(b));
+      escrever(
+        (CpSolverStatus[r.status] === "OPTIMAL")
+          ? "\nRESULTADO: o solver corre no browser."
+          : "\nRESULTADO: arrancou mas não resolveu — ver o estado acima.",
+      );
+    } catch (e) {
+      escrever("\nFALHOU: " + (e && e.stack ? e.stack : e));
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { criarHtmlHorarioPdf } from "./utils/exportarPdf";
 
 function calcCoverage(sessoes: import('./types').SessaoHorario[]) {
@@ -104,6 +104,21 @@ import { validarHorario, type RelatorioValidacao } from "./utils/validacao";
 import { completarCargaParaBlocos100, organizarBlocos100, validarBlocos100, CONFIGURACAO_BLOCOS_100_DEFAULT, DESCRICAO_PADROES_BLOCOS_100 } from "./utils/blocos100";
 import { calcularCoberturaDocente, distribuirTurmasDocentes } from "./utils/atribuicaoDocentes";
 import { repo } from "./data/supabaseRepo";
+// MOTOR NOVO (Fases 2 a 4 da reescrita): contrato de regras + alocador único + validador
+// independente. É este o caminho por omissão do botão "Validar e Gerar Distribuição";
+// o motor antigo (distribuicao/blocos100, importado acima) fica como rede de comparação.
+import { carregarRegras } from "./regras/carregar";
+import type { LinhaRegra, ResultadoCarregamento } from "./regras/carregar";
+import { alocar } from "./motor/alocador";
+import type { RelatorioAlocacao } from "./motor/relatorio";
+import { validar as validarComMotorNovo } from "./validacao/validador";
+import type { RelatorioValidacao as RelatorioValidacaoMotor, Violacao } from "./validacao/validador";
+import type { EntradaAlocacao } from "./motor/planeador";
+// Segunda passagem opcional: o solver exato. Corre num Web Worker porque bloqueia a
+// thread onde vive durante minutos — ver `motor/solver/worker.ts`.
+import { otimizarEmSegundoPlano } from "./motor/solver/cliente";
+import type { CorridaSolver } from "./motor/solver/cliente";
+import { SEGUNDOS_POR_JANELA_PADRAO } from "./motor/solver";
 
 const REGRA_LIMITE_GLOBAL_PL: RegraHorario = {
   id: "h_limite_global_6_pl",
@@ -164,37 +179,45 @@ const REGRA_SEM_PL_SEMANA_1: RegraHorario = {
   ativa: true,
 };
 
+/**
+ * Marca, em `config.notas`, uma regra que a APLICAÇÃO acrescentou por não a
+ * encontrar no Supabase. `notas` é metadado: o carregador de regras ignora-o
+ * (não é configuração de motor), e é assim que o veredito consegue AVISAR que a
+ * regra não veio da base de dados.
+ */
+const NOTA_REGRA_SUPLETIVA = "Regra criada pela aplicação por não existir no Supabase. Confirme-a e edite-a na base de dados.";
+
+const marcarComoSupletiva = (r: RegraHorario): RegraHorario => ({
+  ...r,
+  config: { ...(r.config || {}), notas: NOTA_REGRA_SUPLETIVA },
+});
+
+/** Regras acrescentadas pela aplicação por estarem em falta na base de dados. */
+const regrasSupletivas = (lista: RegraHorario[]): RegraHorario[] =>
+  lista.filter(r => (r.config as any)?.notas === NOTA_REGRA_SUPLETIVA);
+
+/**
+ * Garante que as regras FÍSICAS obrigatórias existem na lista — sem NUNCA
+ * reescrever o que vem do Supabase.
+ *
+ * Até à Fase 5A esta função sobrepunha o `config` das regras da base de dados
+ * por versões escritas no código: forçava `maxPLporMancha` a 6 e reescrevia por
+ * inteiro o layout da semana 1. O efeito era que editar a regra na consola do
+ * coordenador não produzia efeito nenhum — o código mandava sobre o Supabase.
+ * Agora:
+ *   - regra presente -> devolvida INTACTA (nem `ativa`, nem `config`, nada);
+ *   - regra ausente  -> acrescenta-se a versão mínima do código, MARCADA como
+ *     supletiva, para o relatório/veredito avisar que ela não existe na base de
+ *     dados e tem de ser criada lá (é a única coisa que a aplicação decide por
+ *     si, e fá-lo à vista).
+ */
 const garantirRegrasObrigatorias = (lista: RegraHorario[]): RegraHorario[] => {
-  const existente = lista.find(r => r.id === REGRA_LIMITE_GLOBAL_PL.id);
-  const comLimiteGlobal = !existente ? [REGRA_LIMITE_GLOBAL_PL, ...lista] : lista.map(r => {
-    if (r.id !== REGRA_LIMITE_GLOBAL_PL.id) return r;
-    const configurado = Number((r.config as any)?.motor?.maxPLporMancha);
-    return {
-      ...r,
-      ativa: true,
-      config: {
-        ...(r.config || {}),
-        motor: {
-          ...((r.config as any)?.motor || {}),
-          maxPLporMancha: configurado > 0 ? Math.floor(configurado) : 6,
-        },
-      },
-    };
-  });
-  const semPLExistente = comLimiteGlobal.find(r => r.id === REGRA_SEM_PL_SEMANA_1.id);
-  if (!semPLExistente) return [REGRA_SEM_PL_SEMANA_1, ...comLimiteGlobal];
-  return comLimiteGlobal.map(r => r.id !== REGRA_SEM_PL_SEMANA_1.id ? r : {
-    ...r,
-    nome: REGRA_SEM_PL_SEMANA_1.nome,
-    tipo: "hard",
-    categoria: REGRA_SEM_PL_SEMANA_1.categoria,
-    descricao: REGRA_SEM_PL_SEMANA_1.descricao,
-    escopo: "ano",
-    anoCurricular: 2,
-    config: REGRA_SEM_PL_SEMANA_1.config,
-    peso: 10,
-    ativa: true,
-  });
+  let saida = lista;
+  for (const obrigatoria of [REGRA_LIMITE_GLOBAL_PL, REGRA_SEM_PL_SEMANA_1]) {
+    if (saida.some(r => r.id === obrigatoria.id)) continue;
+    saida = [marcarComoSupletiva(obrigatoria), ...saida];
+  }
+  return saida;
 };
 
 export default function App() {
@@ -251,6 +274,26 @@ export default function App() {
   const regrasSyncSuspensaAteRef = useRef(0);
   const [versoes, setVersoes] = useState<VersaoHorario[]>([]);
   const [solverRuns, setSolverRuns] = useState<SolverRun[]>([]);
+
+  // CONTRATO DE REGRAS (Fase 2): a configuração do motor NOVO, derivada apenas do que
+  // está no Supabase — as linhas da tabela `regras`, os limites declarados nas UCs e as
+  // semanas personalizadas dos anos/semestres. É a ÚNICA fonte de valores de negócio
+  // (grelha, turnos, carga diária, capacidades, padrões de bloco): nada disto volta a ser
+  // escrito no código da interface. O relatório do carregamento diz o que foi aplicado, o
+  // que está em falta e o que está malformado, e é isso que o veredito mostra.
+  const regrasMotor: ResultadoCarregamento | null = useMemo(() => {
+    if (regras.length === 0) return null;
+    try {
+      return carregarRegras({
+        regras: regras as unknown as LinhaRegra[],
+        ucs,
+        anosSemestres,
+      });
+    } catch (err) {
+      console.error("Erro a interpretar as regras do Supabase:", err);
+      return null;
+    }
+  }, [regras, ucs, anosSemestres]);
 
   // Active Context Filters
   const [selectedSemestreId, setSelectedSemestreId] = useState<string>("as1");
@@ -403,12 +446,25 @@ export default function App() {
   const [editingUcId, setEditingUcId] = useState<string | null>(null);
   const [horasUcModal, setHorasUcModal] = useState<UC | null>(null);
   // Preferência manhã/tarde da turma teórica (Turma A) por ano do CLE e semestre.
-  // Chave `${ano}|${semestre}` → "manha" | "tarde". Default: manhã no 1.º sem., tarde no 2.º.
+  // Chave `${ano}|${semestre}` → "manha" | "tarde". Preferência LOCAL do browser.
   const [prefTurmaA, setPrefTurmaA] = useState<Record<string, "manha" | "tarde">>(() => {
     try { const raw = localStorage.getItem("eseuc_pref_turma_a"); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
     return {};
   });
+  /**
+   * Turno da turma teórica A (manhã ou tarde). PRECEDÊNCIA, por esta ordem:
+   *   1. a regra `turnos` do Supabase (`familiaDeManhaPorSemestre`) — é a decisão
+   *      institucional e manda sempre que exista;
+   *   2. a preferência local guardada no browser (localStorage), que só serve
+   *      enquanto a regra não existir na base de dados;
+   *   3. a omissão histórica: turma A de manhã no 1.º semestre.
+   *
+   * As EXCEÇÕES por intervalo de semanas (`turnos.excecoes`) não cabem neste
+   * booleano por ano/semestre — só o motor novo as aplica, a partir da mesma regra.
+   */
   const prefManhaDe = (ano: number, sem: number): boolean => {
+    const familiaDeManha = regrasMotor?.config.turnos.familiaDeManhaPorSemestre?.[sem];
+    if (familiaDeManha) return familiaDeManha === "A";
     const v = prefTurmaA[`${ano}|${sem}`];
     return v ? v === "manha" : sem === 1;
   };
@@ -783,6 +839,23 @@ export default function App() {
   // Optimizer solver running outputs
   const [isSolving, setIsSolving] = useState(false);
   const [lastSolverVerdict, setLastSolverVerdict] = useState<any>(null);
+  // INTERRUPTOR DE TRANSIÇÃO (Fase 5A). `true` = motor novo (regras do Supabase ->
+  // alocador único -> validador independente). `false` = pipeline antigo, exatamente
+  // como corria antes, para o coordenador poder comparar os dois resultados no mesmo
+  // ecrã. O código do motor antigo continua no sítio de propósito: é a rede de
+  // segurança desta transição, não é código morto.
+  const [motorNovo, setMotorNovo] = useState<boolean>(true);
+
+  // SOLVER (segunda passagem, opcional). O alocador coloca bloco a bloco e nunca volta
+  // atrás; o solver decide uma janela inteira de uma vez e fecha os dias que aquele
+  // deixa a meio. Medido sobre 30 semanas: 168 dias parciais -> 24, e completude de
+  // 97,96% -> 100%. Em troca leva minutos em vez de segundos, por isso é um passo que o
+  // coordenador pede quando quer, não algo que o botão de gerar faça sempre.
+  const entradaMotorRef = useRef<EntradaAlocacao | null>(null);
+  const corridaSolverRef = useRef<CorridaSolver | null>(null);
+  const [solverACorrer, setSolverACorrer] = useState<boolean>(false);
+  const [solverProgresso, setSolverProgresso] = useState<string | null>(null);
+  const [segundosPorJanela, setSegundosPorJanela] = useState<number>(SEGUNDOS_POR_JANELA_PADRAO);
 
   // Compare selection
   const [compareV1, setCompareV1] = useState<string>("v1");
@@ -1844,10 +1917,10 @@ export default function App() {
     return resultado;
   };
 
-  const handleTriggerSolver = (semRegras = false, sessoesFixasImport: SessaoHorario[] = []) => {
-    setIsSolving(true);
-    setLastSolverVerdict(null);
-
+  // Corpo do solucionador. É SÍNCRONO e bloqueia o thread durante 10-30s (o alocador do
+  // motor novo é o grosso do tempo), por isso nunca é chamado diretamente do handler do
+  // clique — ver `handleTriggerSolver`, que o adia para depois da primeira pintura.
+  const executarSolver = (semRegras: boolean, sessoesFixasImport: SessaoHorario[]) => {
     try {
       const t0 = performance.now();
       const existingUcSiglas = new Set(ucs.map(u => u.sigla));
@@ -1857,14 +1930,24 @@ export default function App() {
         const uc = ucs.find(u => u.sigla === s.ucSigla);
         return !!uc && Number(uc.anoCurricular) === Number(selectedYearFilter);
       };
-      // Gera apenas o semestre da semana aberta. O semestre oposto fica
-      // preservado: não é regenerado, reorganizado nem revalidado.
-      const semestreDaProposta = Number(
-        anosSemestres.find(item => item.id === activeVersao?.anoSemestreId)?.semestre,
-      );
-      const semestreAlvo: 1 | 2 = semestreDaProposta === 1 || semestreDaProposta === 2
-        ? semestreDaProposta
-        : Number(selectedWeekFilter) >= 16 ? 2 : 1;
+      // Gera apenas o semestre da SEMANA ABERTA. O semestre oposto fica
+      // preservado: não é regenerado, reorganizado nem revalidado — e é por isso
+      // que quem manda é a semana que o coordenador tem à frente, e não o
+      // semestre a que a proposta ficou presa quando nasceu. Uma proposta guarda
+      // o ano letivo inteiro: gerar com a semana 1 aberta e depois com a semana
+      // 16 preenche os dois semestres na mesma proposta.
+      const semestreAlvo: 1 | 2 = Number(selectedWeekFilter) >= 16 ? 2 : 1;
+      // Sem data de início do semestre alvo não há calendário para o gerar, e o
+      // motor devolveria zero sessões sem dizer porquê.
+      const definicaoDoAlvo = anosSemestres.find(a =>
+        a.anoLetivo === selectedAnoLetivo && Number(a.semestre) === semestreAlvo);
+      if (!definicaoDoAlvo?.dataInicioSemestre) {
+        throw new Error(
+          `Está a ver a semana ${selectedWeekFilter}, que pertence ao ${semestreAlvo}.º semestre, `
+          + `mas o ${semestreAlvo}.º semestre de ${selectedAnoLetivo} não tem data de início definida. `
+          + `Defina-a em Anos e Semestres, ou abra uma semana do outro semestre.`,
+        );
+      }
       const sessaoNoSemestreAlvo = (s: SessaoHorario) =>
         s.semana != null && (semestreAlvo === 1 ? s.semana <= 15 : s.semana >= 16);
       const violaSemana1SemPL = (s: SessaoHorario) => {
@@ -2117,7 +2200,10 @@ export default function App() {
               diaSemana: entrada.dia,
               horaInicio: entrada.hora,
               horaFim,
-              bloqueado: false,
+              // Imposta por uma regra HARD: entra fixa. É também assim que o validador a
+              // reconhece — a regra do layout veta a semana inteira para todas as OUTRAS
+              // aulas, e a aula imposta pelo coordenador não pode ser acusada por ela.
+              bloqueado: true,
               semana: Number(entrada.semana),
             } satisfies SessaoHorario];
           });
@@ -2127,17 +2213,44 @@ export default function App() {
         const uc = ucs.find(u => u.sigla === s.ucSigla);
         return sessoesLayoutFixo.length > 0 && Number(uc?.anoCurricular) === 2 && s.semana === 1;
       };
+      // As sessões de um layout fixo entram no horário marcadas como FIXAS (é a regra hard
+      // que as impõe e é assim que o validador as reconhece). No modo "sem regras" o layout
+      // não é aplicado — e as que uma execução anterior deixou também não podem ser tomadas
+      // por escolhas do coordenador, senão a comparação arrancava com elas.
+      const semanasDeclaradasNoLayout = new Set<number>(
+        Array.isArray(layoutFixo?.sessoes) ? layoutFixo.sessoes.map((e: any) => Number(e.semana)) : [],
+      );
+      const restoDeLayoutAnterior = (s: SessaoHorario) => {
+        if (!semRegras || !s.bloqueado || s.semana == null) return false;
+        const uc = ucs.find(u => u.sigla === s.ucSigla);
+        return Number(uc?.anoCurricular) === Number(layoutFixo?.ano) && semanasDeclaradasNoLayout.has(s.semana);
+      };
 
       const semanasCongeladasSeed = activeVersao?.semanasBloqueadas ?? [];
       const fixasExistentes = activeSessoesValidas.filter(s =>
         mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && s.bloqueado && !semanaPertenceAoLayout(s)
+        && !restoDeLayoutAnterior(s)
         && !(s.semana != null && semanasCongeladasSeed.includes(s.semana)));
-      const sessoesFixas = [
-        ...sessoesLayoutFixo,
+      // Fixas do âmbito desta geração (importadas agora + pins da versão ativa), sem o
+      // layout: o layout é tratado à parte porque cada motor o coloca de forma diferente.
+      const fixasDoAmbito = [
         ...sessoesFixasImport.filter(s => sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)),
         ...fixasExistentes,
-      ]
-        .filter(s => semRegras || !violaSemana1SemPL(s));
+      ].filter(s => semRegras || !violaSemana1SemPL(s));
+      const sessoesFixas = [...sessoesLayoutFixo, ...fixasDoAmbito];
+
+      // Semanas inteiras validadas (congeladas) e sessões fixadas individualmente. Ficam
+      // aqui, antes de qualquer motor correr, porque o motor novo precisa de as receber
+      // como ocupação já existente (o antigo redescobria-as só no fim).
+      const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
+      const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
+      const sessoesCongeladas = activeSessoesValidas.filter(s =>
+        ehBloqueada(s) && mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)
+        && (semRegras || !violaSemana1SemPL(s)));
+      const fixadas = activeSessoesValidas.filter(s =>
+        s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)
+        && !restoDeLayoutAnterior(s)
+        && (semRegras || !violaSemana1SemPL(s)));
 
       const opcoes = {
         plDiasPermitidos: motorAI.plDiasPermitidos ?? (regraPLDias
@@ -2165,50 +2278,183 @@ export default function App() {
         aulasTConjuntas: motorAI.aulasTConjuntas ?? [],
       };
 
+      // O modo "sem regras" existe para comparar cenários e é uma funcionalidade do motor
+      // ANTIGO (relaxa as regras pedagógicas uma a uma). O motor novo não tem — nem deve
+      // ter — um modo que ignore as regras: a configuração dele É o Supabase.
+      const usarMotorNovo = motorNovo && !semRegras;
+
       const entradasAtivas = semestreAlvo === 1 ? entradasS1 : entradasS2;
-      let allSessoes = gerarSessoesConjunto(
-        entradasAtivas,
-        semestreAlvo,
-        0,
-        ocupacaoGlobal,
-        plCount,
-        opcoes,
-      );
       const avisosBlocos: string[] = [];
-      if (!semRegras && regraBlocos100) {
-        const configBlocos = {
-          ...CONFIGURACAO_BLOCOS_100_DEFAULT,
-          ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
-          ...(motorAI.blocos100 || {}),
-          prefTurmaAManha,
-          // Semanas de turma única: a família ativa pode usar o dia inteiro (manhã preferida).
-          semanasSoTurmaA: motorAI.semanasSoTurmaA,
-          semanasSoTurmaB: motorAI.semanasSoTurmaB,
-          maxPLporMancha: motorAI.maxPLporMancha ?? CONFIGURACAO_BLOCOS_100_DEFAULT.maxPLporMancha,
-          cargaDiariaEstudante: {
-            ...CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
-            ...(motorAI.cargaDiariaEstudante || {}),
-            maxDiasNoMaximoPorSemana: 5,
-          },
-          precedenciasUC: motorAI.precedenciasUC ?? [],
-          restricoesUC: motorAI.restricoesUC ?? [],
-          diasPrioritarios: motorAI.diasPrioritarios ?? [],
-        };
-        allSessoes = completarCargaParaBlocos100(allSessoes, entradasAtivas, sessoesFixas);
-        const resultadoBlocos = organizarBlocos100(
-          allSessoes,
-          ucs,
-          configBlocos,
-          entradasAtivas,
-          [...sessoesFixas, ...sessoesForaAmbitoAtivas],
-        );
-        if (resultadoBlocos.naoAlocadas.length > 0) {
-          const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
-          avisosBlocos.push(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). O melhor horário possível foi criado; reveja as regras de blocos no Supabase.`);
+      let allSessoes: SessaoHorario[];
+      let relAlocacao: RelatorioAlocacao | null = null;
+      let relValidacao: RelatorioValidacaoMotor | null = null;
+      let relRegras: ResultadoCarregamento["relatorio"] | null = null;
+
+      if (usarMotorNovo) {
+        // ------------------------------------------------------------------------------
+        // MOTOR NOVO: carregar regras -> alocar -> validar.
+        // ------------------------------------------------------------------------------
+        const carregado = regrasMotor ?? carregarRegras({
+          regras: regras as unknown as LinhaRegra[], ucs, anosSemestres,
+        });
+        const configMotor = carregado.config;
+        relRegras = carregado.relatorio;
+        if (relRegras.malformadas.length > 0) {
+          const d = relRegras.malformadas[0];
+          throw new Error(
+            `Há ${relRegras.malformadas.length} regra(s) malformada(s) no Supabase. Primeiro caso: ${d.caminho} — ${d.mensagem}`,
+          );
         }
-        allSessoes = resultadoBlocos.sessoes;
+
+        // PROCURA limitada ao âmbito desta execução. O motor novo é global (vê a escola
+        // inteira), mas quem manda no que é REGENERADO continua a ser o ecrã: o semestre
+        // oposto e os outros anos curriculares preservam-se. Zerar a carga das UCs fora do
+        // âmbito diz "já não há nada a colocar aqui" sem esconder a UC do motor — e sem a
+        // esconder, as sessões que essas UCs já têm continuam a ser reconhecidas e a ocupar
+        // laboratórios (a capacidade de PL é física e global à escola).
+        const noAmbitoDaGeracao = (uc: UC) =>
+          Number(uc.semestre) === semestreAlvo
+          && Number(uc.anoCurricular) !== 3 // 3.º ano: ensino clínico, sem aulas em sala
+          && (selectedYearFilter === "todos" || Number(uc.anoCurricular) === Number(selectedYearFilter))
+          && (uc.turmasConfig?.length ?? 0) > 0;
+        const ucsParaMotor: UC[] = ucs.map(uc => noAmbitoDaGeracao(uc) ? uc : ({
+          ...uc,
+          cargaHorariaTeorica: 0,
+          cargaHorariaTP: 0,
+          cargaHorariaPratica: 0,
+          cargaHorariaS: 0,
+        }));
+
+        // Calendário efetivo: `construirCalendario` só desconta o que vier em `feriados`,
+        // por isso é aqui que os bloqueios declarados nas regras e o limite `dataFim` se
+        // traduzem em interrupções — era o que o pipeline antigo fazia com `motorAI`.
+        const feriadosMotor: FeriadoInterrupcao[] = [
+          ...feriados,
+          ...configMotor.calendario.bloqueios.map((b, i) => ({
+            id: `regra_cal_${i}_${b.dataInicio}`,
+            nome: b.nome,
+            tipo: (b.tipo || "Interrupção Letiva") as FeriadoInterrupcao["tipo"],
+            dataInicio: b.dataInicio,
+            dataFim: b.dataFim,
+          })),
+        ];
+        if (configMotor.calendario.dataFim) {
+          const depois = new Date(`${configMotor.calendario.dataFim}T12:00:00`);
+          depois.setDate(depois.getDate() + 1);
+          feriadosMotor.push({
+            id: "regra_limite_data_fim",
+            nome: "Fim do período letivo",
+            tipo: "Interrupção Letiva",
+            dataInicio: depois.toISOString().slice(0, 10),
+            dataFim: `${String(configMotor.calendario.dataFim).slice(0, 4)}-12-31`,
+          });
+        }
+
+        // Ocupação já existente que o motor tem de respeitar: pins, semanas congeladas,
+        // sessões importadas e TUDO o que está fora do âmbito (outro semestre, outros anos).
+        const fixasParaMotor: SessaoHorario[] = [
+          ...fixasDoAmbito,
+          ...sessoesCongeladas,
+          ...sessoesForaAmbitoAtivas,
+        ];
+        const chaveSessao = (s: SessaoHorario) =>
+          `${s.ucSigla}|${s.tipoAula}|${s.turma}|${s.semana}|${s.diaSemana}|${s.horaInicio}`;
+        // O layout fixo é colocado pelo próprio motor (vem das regras, em `layoutsFixos`),
+        // mas quem vai para a proposta é a cópia construída acima, que traz a sala do
+        // anfiteatro. As duas cópias são a MESMA aula: esta chave evita duplicá-la.
+        const jaContabilizadas = new Set([...fixasParaMotor, ...sessoesLayoutFixo].map(chaveSessao));
+
+        const entradaMotor = {
+          ucs: ucsParaMotor,
+          // Só os layouts do semestre em causa: o do semestre oposto já está no horário
+          // preservado e colocá-lo outra vez duplicaria a ocupação.
+          regras: {
+            ...configMotor,
+            layoutsFixos: configMotor.layoutsFixos.filter(l => (l.semestre ?? 1) === semestreAlvo),
+          },
+          feriados: feriadosMotor,
+          anosSemestres,
+          anoLetivo: selectedAnoLetivo,
+          sessoesFixas: fixasParaMotor,
+        };
+        // Guardada para o solver poder correr DEPOIS, sobre exatamente o mesmo âmbito.
+        // O solver é uma segunda passagem opcional, não um motor paralelo: parte do que
+        // o alocador produziu e só substitui se o validador disser que ficou melhor.
+        entradaMotorRef.current = entradaMotor;
+        const resultado = alocar(entradaMotor);
+        relAlocacao = resultado.relatorio;
+
+        // Novas sessões: o que o motor colocou, menos o que já existia (fixas e layout).
+        // O `bloqueado` que vem do motor NÃO se toca: as aulas que ele coloca de novo vêm
+        // com `false` e as que são impostas por um layout vêm com `true` — e é esse `true`
+        // que diz ao validador para não as acusar com a regra que elas próprias impõem.
+        // Semanas congeladas continuam a não receber nada de novo, como antes.
+        const emAmbito = (s: SessaoHorario) => mesmoAnoGen(s) && sessaoNoSemestreAlvo(s);
+        allSessoes = resultado.sessoes.filter(s => emAmbito(s) && !jaContabilizadas.has(chaveSessao(s)));
+
+        // VALIDADOR INDEPENDENTE sobre o resultado. Corre sobre a escola toda (as
+        // capacidades são globais), com as mesmas regras que alimentaram o alocador.
+        relValidacao = validarComMotorNovo(
+          [...sessoesForaAmbitoAtivas, ...sessoesCongeladas, ...fixasDoAmbito, ...sessoesLayoutFixo, ...allSessoes],
+          ucs,
+          configMotor,
+        );
+        allSessoes = aplicarPlanoDocenteProvisorio(allSessoes);
+      } else {
+        // ------------------------------------------------------------------------------
+        // MOTOR ANTIGO (comparação): pipeline tal e qual corria antes da Fase 5A.
+        // ------------------------------------------------------------------------------
+        allSessoes = gerarSessoesConjunto(
+          entradasAtivas,
+          semestreAlvo,
+          0,
+          ocupacaoGlobal,
+          plCount,
+          opcoes,
+        );
+        if (!semRegras && regraBlocos100) {
+          // Carga diária: resolvida pelo contrato de regras (a regra do ano prevalece sobre
+          // a transversal). Antes estava escrito aqui um `maxDiasNoMaximoPorSemana: 5` que
+          // ignorava o Supabase — e o Supabase declara 3 dias para o 2.º ano.
+          const anoDaGeracao = selectedYearFilter === "todos" ? null : Number(selectedYearFilter);
+          const cargaDiariaDasRegras = regrasMotor
+            ? ((anoDaGeracao !== null ? regrasMotor.config.cargaDiaria.porAno[anoDaGeracao] : undefined)
+              ?? regrasMotor.config.cargaDiaria.transversal)
+            : null;
+          const configBlocos = {
+            ...CONFIGURACAO_BLOCOS_100_DEFAULT,
+            ...((regraBlocos100.config as any)?.motor?.blocos100 || {}),
+            ...(motorAI.blocos100 || {}),
+            prefTurmaAManha,
+            // Semanas de turma única: a família ativa pode usar o dia inteiro (manhã preferida).
+            semanasSoTurmaA: motorAI.semanasSoTurmaA,
+            semanasSoTurmaB: motorAI.semanasSoTurmaB,
+            maxPLporMancha: motorAI.maxPLporMancha ?? CONFIGURACAO_BLOCOS_100_DEFAULT.maxPLporMancha,
+            cargaDiariaEstudante: {
+              ...CONFIGURACAO_BLOCOS_100_DEFAULT.cargaDiariaEstudante,
+              ...(motorAI.cargaDiariaEstudante || {}),
+              ...(cargaDiariaDasRegras ?? {}),
+            },
+            precedenciasUC: motorAI.precedenciasUC ?? [],
+            restricoesUC: motorAI.restricoesUC ?? [],
+            diasPrioritarios: motorAI.diasPrioritarios ?? [],
+          };
+          allSessoes = completarCargaParaBlocos100(allSessoes, entradasAtivas, sessoesFixas);
+          const resultadoBlocos = organizarBlocos100(
+            allSessoes,
+            ucs,
+            configBlocos,
+            entradasAtivas,
+            [...sessoesFixas, ...sessoesForaAmbitoAtivas],
+          );
+          if (resultadoBlocos.naoAlocadas.length > 0) {
+            const exemplos = resultadoBlocos.naoAlocadas.slice(0, 6).map(s => `${s.ucSigla}/${s.turma}`).join(", ");
+            avisosBlocos.push(`Não foi possível fechar todos os blocos a 100%: ${resultadoBlocos.naoAlocadas.length} sessões sem combinação (${exemplos}). O melhor horário possível foi criado; reveja as regras de blocos no Supabase.`);
+          }
+          allSessoes = resultadoBlocos.sessoes;
+        }
+        allSessoes = aplicarPlanoDocenteProvisorio(allSessoes);
       }
-      allSessoes = aplicarPlanoDocenteProvisorio(allSessoes);
 
       // Preservar (1) as SEMANAS validadas/bloqueadas inteiras e (2) as sessões fixadas
       // individualmente nas restantes semanas.
@@ -2216,14 +2462,6 @@ export default function App() {
       // tal como estão (não são tocadas). Com "todos", não há outros anos a preservar.
       const foraDoAmbito = sessoesForaAmbitoAtivas;
 
-      const bloqueadas = activeVersao?.semanasBloqueadas ?? [];
-      const ehBloqueada = (s: SessaoHorario) => s.semana != null && bloqueadas.includes(s.semana);
-      const sessoesCongeladas = activeSessoesValidas.filter(s =>
-        ehBloqueada(s) && mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)
-        && (semRegras || !violaSemana1SemPL(s)));
-      const fixadas = activeSessoesValidas.filter(s =>
-        s.bloqueado && !ehBloqueada(s) && mesmoAnoGen(s) && sessaoNoSemestreAlvo(s) && !semanaPertenceAoLayout(s)
-        && (semRegras || !violaSemana1SemPL(s)));
       const sessoesPreservadas = new Set([
         ...foraDoAmbito,
         ...sessoesCongeladas,
@@ -2245,7 +2483,7 @@ export default function App() {
         ),
       ].map(s => sessoesPreservadas.has(s) ? s : { ...s, id: proximoId++ });
 
-      if (!semRegras && regraBlocos100) {
+      if (!usarMotorNovo && !semRegras && regraBlocos100) {
         const errosBlocos = validarBlocos100(
           merged.filter(s => mesmoAnoGen(s) && sessaoNoSemestreAlvo(s)),
           ucs,
@@ -2256,7 +2494,7 @@ export default function App() {
           avisosBlocos.push(`A proposta final contém ${errosBlocos.length} bloco(s) inválido(s). Primeiro caso: ${e0.chave}. ${e0.motivo} Reveja também as sessões importadas ou fixadas.`);
         }
       }
-      if (!semRegras) {
+      if (!usarMotorNovo && !semRegras) {
         const maxPLporMancha = motorAI.maxPLporMancha ?? 6;
         const plSemana1 = semestreAlvo === 1 ? merged.filter(violaSemana1SemPL) : [];
         if (plSemana1.length) {
@@ -2284,7 +2522,101 @@ export default function App() {
       }
 
       const durationMs = Math.round(performance.now() - t0);
-      const score = Math.min(100, Math.max(60, 100 - Math.round(allSessoes.length / 50)));
+
+      // ----------------------------------------------------------------------------------
+      // VEREDITO. Com o motor novo, o que se mostra vem TODO do relatório do alocador e do
+      // validador independente: completude real, blocos em falta com o motivo mais
+      // frequente e a primeira violação de gravidade "erro". Nunca se afirma 100% quando a
+      // completude é inferior.
+      // ----------------------------------------------------------------------------------
+      const violacaoNoAmbito = (v: Violacao) => {
+        const noSemestre = semestreAlvo === 1 ? v.semana <= 15 : v.semana >= 16;
+        if (!noSemestre) return false;
+        if (selectedYearFilter === "todos") return true;
+        const uc = ucs.find(u => u.sigla === v.ucSigla);
+        // Violações agregadas ("(vários)", "(global)") não têm UC identificável: contam,
+        // porque a mancha em causa é do semestre que se acabou de gerar.
+        return !uc || Number(uc.anoCurricular) === Number(selectedYearFilter);
+      };
+      const errosValidador = (relValidacao?.violacoes ?? []).filter(v => v.gravidade === "erro" && violacaoNoAmbito(v));
+      const avisosValidador = (relValidacao?.violacoes ?? []).filter(v => v.gravidade === "aviso" && violacaoNoAmbito(v));
+      const textoViolacao = (v: Violacao) =>
+        `[${v.regra}] semana ${v.semana}, ${v.dia} ${v.hora} · ${v.ucSigla}/${v.turma}: ${v.mensagem}`;
+
+      // COMPLETUDE DESTE ÂMBITO. Não se usa `relAlocacao.completude` tal e qual: os blocos
+      // colocados do relatório incluem as sessões fixas que demos ao motor (o semestre
+      // oposto, os outros anos, os pins), e num âmbito restrito isso daria sempre 100%
+      // mesmo com carga por colocar. O que mede o âmbito é `blocosAlvo` (que só conta a
+      // procura desta execução) menos o défice, que o motor conta turma a turma.
+      const blocosEmFalta = relAlocacao ? relAlocacao.deficit.reduce((t, d) => t + d.blocosEmFalta, 0) : 0;
+      const blocosAlvo = relAlocacao?.blocosAlvo ?? null;
+      const blocosColocados = blocosAlvo === null ? null : Math.max(0, blocosAlvo - blocosEmFalta);
+      const completude = relAlocacao === null
+        ? null
+        : (blocosAlvo && blocosAlvo > 0 ? (blocosColocados! / blocosAlvo) * 100 : 100);
+      // Motivo dominante do défice: somam-se as ocorrências de cada motivo devolvido pelas
+      // restrições, em vez de inventar uma explicação.
+      let motivoPrincipal: string | null = null;
+      if (relAlocacao && relAlocacao.deficit.length > 0) {
+        const contagem = new Map<string, number>();
+        for (const d of relAlocacao.deficit) {
+          for (const m of d.motivosMaisFrequentes) contagem.set(m.motivo, (contagem.get(m.motivo) ?? 0) + m.ocorrencias);
+        }
+        motivoPrincipal = [...contagem.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      }
+
+      // Avisos (não são violações): défice de blocos e regras que faltam no Supabase.
+      const avisosRelatorio: string[] = [];
+      if (usarMotorNovo) {
+        if (blocosEmFalta > 0) {
+          avisosRelatorio.push(
+            `Faltam ${blocosEmFalta} bloco(s) para fechar a carga do ${semestreAlvo}.º semestre `
+            + `(completude ${completude!.toFixed(1)}%).`
+            + (motivoPrincipal ? ` Motivo mais frequente: ${motivoPrincipal}` : ""),
+          );
+        }
+        for (const r of regrasSupletivas(regras)) {
+          avisosRelatorio.push(`A regra obrigatória "${r.nome}" não existe no Supabase: está a ser usada a versão mínima da aplicação. Crie-a ou confirme-a na base de dados.`);
+        }
+        for (const falta of (relRegras?.emFalta ?? []).filter(f => f.critica)) {
+          avisosRelatorio.push(`Regra em falta no Supabase (${falta.chaveMotor}): ${falta.porque}`);
+        }
+        if (errosValidador.length > 0) {
+          avisosBlocos.push(
+            `A proposta viola ${errosValidador.length} regra(s) inviolável(is). Primeiro caso: ${textoViolacao(errosValidador[0])}`,
+          );
+        }
+        avisosBlocos.push(...avisosRelatorio);
+      }
+
+      // Qualidade: com o motor novo é a completude medida. Uma proposta que infringe uma
+      // regra inviolável não tem qualidade nenhuma a apresentar — mostra 0 e diz porquê.
+      const score = usarMotorNovo && completude !== null
+        ? (errosValidador.length > 0 ? 0 : Math.round(completude))
+        : Math.min(100, Math.max(60, 100 - Math.round(allSessoes.length / 50)));
+
+      const linhasLog: string[] = usarMotorNovo
+        ? [
+          `Motor novo (regras do Supabase -> alocador -> validador independente).`,
+          `${allSessoes.length} sessões novas em ${durationMs}ms para o ${semestreAlvo}.º semestre.`,
+          `Completude do âmbito: ${blocosColocados}/${blocosAlvo} blocos (${completude!.toFixed(1)}%).`,
+          blocosEmFalta > 0
+            ? `Blocos em falta: ${blocosEmFalta}${motivoPrincipal ? ` — motivo mais frequente: ${motivoPrincipal}` : ""}.`
+            : `Sem blocos em falta.`,
+          `Validador independente: ${errosValidador.length} erro(s), ${avisosValidador.length} aviso(s).`,
+          ...errosValidador.slice(0, 5).map(v => `  ERRO ${textoViolacao(v)}`),
+          ...avisosValidador.slice(0, 5).map(v => `  aviso ${textoViolacao(v)}`),
+          `Padrões de bloco usados: ${Object.entries(relAlocacao!.padroesUsados).map(([id, n]) => `${id}=${n}`).join(", ") || "nenhum"}.`,
+          relRegras
+            ? `Regras: ${relRegras.regrasLidas} lidas, ${relRegras.regrasAplicadas.length} aplicadas, ${relRegras.regrasInativas.length} inativas, ${relRegras.emFalta.length} em falta, ${relRegras.conflitos.length} conflito(s).`
+            : `Regras: relatório indisponível.`,
+          ...relAlocacao!.avisos.slice(0, 10).map(a => `  motor: ${a}`),
+        ]
+        : [
+          `Motor antigo (comparação${semRegras ? ", sem regras pedagógicas" : ""}).`,
+          `Distribuição concluída: ${allSessoes.length} sessões geradas em ${durationMs}ms para o ${semestreAlvo}.º semestre.`,
+          ...(avisosBlocos.length ? [`Avisos: ${avisosBlocos.join(" ")}`] : []),
+        ];
 
       const runId = "sr_" + Date.now();
       const newRun: SolverRun = {
@@ -2298,15 +2630,44 @@ export default function App() {
         conflitosContidos: avisosBlocos.length,
         detalhes: {
           iteracoes: allSessoes.length,
-          log: `Distribuição concluída: ${allSessoes.length} sessões geradas em ${durationMs}ms para o ${semestreAlvo}.º semestre.${avisosBlocos.length ? ` Avisos: ${avisosBlocos.join(" ")}` : ""}`
+          log: linhasLog.join("\n"),
         }
       };
 
-      setSolverRuns([newRun, ...solverRuns]);
-      setLastSolverVerdict({ score, conflicts: [], runDetails: { solveTimeMs: durationMs, iterations: allSessoes.length } });
-      setVersoes(versoes.map(v => v.id === selectedVersaoId ? { ...v, score, sessoes: merged } : v));
-      if (avisosBlocos.length) {
-        showToast(`Horário criado com ${avisosBlocos.length} aviso(s) de blocos a 100%.`);
+      // Atualizações funcionais: entre o clique e esta linha já houve uma pintura, por
+      // isso não se escreve por cima de um array capturado no render anterior.
+      setSolverRuns(anteriores => [newRun, ...anteriores]);
+      setLastSolverVerdict({
+        score,
+        // O painel de auditoria mostra estes itens; `type` decide se saem em vermelho.
+        conflicts: [
+          ...errosValidador.slice(0, 20).map(v => ({ regra: v.regra, descricao: textoViolacao(v), type: "error" as const })),
+          ...(usarMotorNovo ? avisosRelatorio : avisosBlocos)
+            .map(a => ({ regra: "Relatório do motor", descricao: a, type: "warning" as const })),
+        ],
+        runDetails: { solveTimeMs: durationMs, iterations: allSessoes.length },
+        motor: usarMotorNovo ? "novo" : "antigo",
+        ok: usarMotorNovo ? errosValidador.length === 0 && blocosEmFalta === 0 : avisosBlocos.length === 0,
+        semRegras,
+        completude,
+        blocosAlvo,
+        blocosColocados,
+        blocosEmFalta,
+        motivoPrincipal,
+        errosValidador: errosValidador.length,
+        avisosValidador: avisosValidador.length,
+        primeiraViolacao: errosValidador.length > 0 ? textoViolacao(errosValidador[0]) : null,
+        padroesUsados: relAlocacao?.padroesUsados ?? null,
+        sessoesNovas: allSessoes.length,
+        semestreAlvo,
+        log: linhasLog.join("\n"),
+      });
+      setVersoes(anteriores => anteriores.map(v => v.id === selectedVersaoId ? { ...v, score, sessoes: merged } : v));
+      if (usarMotorNovo && errosValidador.length > 0) {
+        showToast(`Horário criado, mas com ${errosValidador.length} violação(ões) de regras invioláveis.`);
+        window.setTimeout(() => alert(`A proposta foi criada MAS NÃO É VÁLIDA:\n\n${avisosBlocos.join("\n\n")}`), 0);
+      } else if (avisosBlocos.length) {
+        showToast(`Horário criado com ${avisosBlocos.length} aviso(s).`);
         window.setTimeout(() => alert(`Horário criado com aviso:\n\n${avisosBlocos.join("\n\n")}`), 0);
       } else {
         showToast(` ${allSessoes.length} sessões distribuídas no ${semestreAlvo}.º semestre!`);
@@ -2317,6 +2678,82 @@ export default function App() {
     } finally {
       setIsSolving(false);
     }
+  };
+
+  const handleTriggerSolver = (semRegras = false, sessoesFixasImport: SessaoHorario[] = []) => {
+    setIsSolving(true);
+    setLastSolverVerdict(null);
+    // O trabalho pesado tem de sair deste tick: correndo-o aqui, o React nunca chegaria a
+    // pintar o spinner "A Gerar..." nem a consola do solucionador — o ecrã ficaria parado
+    // no estado anterior durante os 10-30s do motor. O rAF corre antes da pintura do
+    // frame; o setTimeout aninhado só dispara depois de essa pintura estar feita.
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => executarSolver(semRegras, sessoesFixasImport), 0);
+    });
+  };
+
+  // --- SOLVER: segunda passagem sobre uma distribuição já gerada ----------------------
+  // Não substitui o botão de gerar. O alocador continua a dar uma resposta em segundos;
+  // isto é o passo que se pede quando se quer o horário definitivo e se pode esperar.
+  // Corre num Web Worker: o OR-Tools bloqueia a thread onde vive.
+  const handleOtimizarComSolver = async () => {
+    const entrada = entradaMotorRef.current;
+    if (!entrada) {
+      alert("Gera primeiro a distribuição com o motor novo. O solver parte do resultado dele e só o substitui se ficar melhor.");
+      return;
+    }
+    setSolverACorrer(true);
+    setSolverProgresso("A preparar o modelo…");
+    try {
+      const corrida = otimizarEmSegundoPlano(entrada, {
+        segundosPorJanela,
+        onProgresso: (p) => {
+          if (p.fase === "concluida") {
+            setSolverProgresso(`Janela ${p.janela}/${p.totalJanelas} (semanas ${p.de}-${p.ate}): ${p.blocosColocados}/${p.blocosTotais} blocos colocados.`);
+          } else if (p.fase === "a-construir") {
+            setSolverProgresso(`Janela ${p.janela}/${p.totalJanelas} — semanas ${p.de}-${p.ate}, a construir o modelo…`);
+          }
+        },
+      });
+      corridaSolverRef.current = corrida;
+      const r = await corrida.resultado;
+
+      const resumo = (m: { completude: number; erros: number; diasParciais: number }) =>
+        `${m.completude.toFixed(1)}% de completude, ${m.erros} erro(s), ${m.diasParciais} dia(s) por fechar`;
+
+      if (r.origem === "proposta-de-partida") {
+        // O solver não é determinista — há corridas em que não bate o alocador. Quando
+        // isso acontece o horário atual fica intacto, e diz-se porquê.
+        showToast("O solver não melhorou a proposta atual. Nada foi alterado.");
+        window.setTimeout(() => alert(
+          `O solver correu ${r.segundos.toFixed(0)}s e não melhorou o que já lá estava, por isso o horário ficou como estava.\n\n` +
+          `Proposta atual: ${resumo(r.medidaPartida)}.\nSolver: ${resumo(r.medidaSolver)}.\n\n` +
+          `O solver não dá sempre o mesmo resultado: corre com vários caminhos de pesquisa em paralelo e um limite de tempo. ` +
+          `Voltar a correr, ou dar-lhe mais segundos por janela, costuma resolver.`
+        ), 0);
+        return;
+      }
+
+      showToast(`Solver: ${r.blocosColocados}/${r.blocosTotais} blocos em ${r.segundos.toFixed(0)}s. A aplicar…`);
+      // Entra pelo mesmo caminho de uma proposta feita fora da plataforma: assim toda a
+      // validação, o versionamento e o relatório que já existem aplicam-se sem exceção.
+      handleTriggerSolver(false, r.sessoes);
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? `O solver falhou: ${e.message}` : "O solver falhou.");
+    } finally {
+      corridaSolverRef.current = null;
+      setSolverACorrer(false);
+      setSolverProgresso(null);
+    }
+  };
+
+  const handleCancelarSolver = () => {
+    corridaSolverRef.current?.cancelar();
+    corridaSolverRef.current = null;
+    setSolverACorrer(false);
+    setSolverProgresso(null);
+    showToast("Solver cancelado. O horário ficou como estava.");
   };
 
   // --- Importação de horário externo (Excel/CSV) -------------------------------------
@@ -5463,6 +5900,74 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* VEREDITO DA ÚLTIMA GERAÇÃO — completude real, blocos em falta com o motivo
+                    mais frequente e a primeira violação apanhada pelo validador independente.
+                    Nada aqui afirma 100% quando a completude medida é inferior. */}
+                {lastSolverVerdict && !isSolving && (
+                  <div className={`p-3 rounded-xl border space-y-2 ${lastSolverVerdict.errosValidador > 0
+                    ? "bg-rose-50/60 border-rose-200"
+                    : lastSolverVerdict.ok === false ? "bg-amber-50/60 border-amber-200" : "bg-emerald-50/50 border-emerald-150"}`}>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-bold text-2xs flex items-center gap-1.5 text-stone-800">
+                        {lastSolverVerdict.errosValidador > 0
+                          ? (<><ShieldAlert className="w-3.5 h-3.5 text-rose-600" /> Proposta INVÁLIDA: {lastSolverVerdict.errosValidador} violação(ões) de regras invioláveis</>)
+                          : lastSolverVerdict.ok === false
+                            ? (<><AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Proposta incompleta</>)
+                            : (<><ShieldCheck className="w-3.5 h-3.5 text-emerald-700" /> Proposta sem violações detetadas</>)}
+                      </span>
+                      <span className="text-[9px] font-mono uppercase tracking-wider text-stone-500">
+                        {lastSolverVerdict.motor === "novo" ? "motor novo" : "motor antigo"}
+                        {lastSolverVerdict.semRegras ? " · sem regras" : ""} · {lastSolverVerdict.runDetails?.solveTimeMs} ms
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono">
+                      <div>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-bold block">Completude</span>
+                        <span className="text-xs font-bold text-stone-900">
+                          {lastSolverVerdict.completude === null || lastSolverVerdict.completude === undefined
+                            ? "n/d"
+                            : `${lastSolverVerdict.completude.toFixed(1)}%`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-bold block">Blocos</span>
+                        <span className="text-xs font-bold text-stone-900">
+                          {lastSolverVerdict.blocosColocados ?? "—"}/{lastSolverVerdict.blocosAlvo ?? "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-bold block">Em falta</span>
+                        <span className={`text-xs font-bold ${lastSolverVerdict.blocosEmFalta ? "text-amber-700" : "text-stone-900"}`}>
+                          {lastSolverVerdict.blocosEmFalta ?? 0} bloco(s)
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-bold block">Sessões novas</span>
+                        <span className="text-xs font-bold text-stone-900">{lastSolverVerdict.sessoesNovas ?? lastSolverVerdict.runDetails?.iterations}</span>
+                      </div>
+                    </div>
+                    {lastSolverVerdict.primeiraViolacao && (
+                      <p className="text-[10px] leading-relaxed text-rose-900 bg-white/70 border border-rose-150 rounded-lg p-2">
+                        <strong>Primeira violação:</strong> {lastSolverVerdict.primeiraViolacao}
+                      </p>
+                    )}
+                    {lastSolverVerdict.blocosEmFalta > 0 && (
+                      <p className="text-[10px] leading-relaxed text-amber-900 bg-white/70 border border-amber-150 rounded-lg p-2">
+                        <strong>Faltam {lastSolverVerdict.blocosEmFalta} bloco(s).</strong>{" "}
+                        {lastSolverVerdict.motivoPrincipal
+                          ? <>Motivo mais frequente: {lastSolverVerdict.motivoPrincipal}</>
+                          : <>Sem motivo registado pelas restrições.</>}
+                      </p>
+                    )}
+                    {lastSolverVerdict.log && (
+                      <details className="text-[10px]">
+                        <summary className="cursor-pointer font-bold text-stone-600">Relatório completo do motor</summary>
+                        <pre className="mt-1 max-h-[180px] overflow-auto whitespace-pre-wrap font-mono text-[9.5px] text-stone-600 bg-white/70 border border-stone-200 rounded-lg p-2">{lastSolverVerdict.log}</pre>
+                      </details>
+                    )}
+                  </div>
+                )}
+
                 {/* Real-time solver log output */}
                 {isSolving && (
                   <div className="p-3 bg-stone-950 text-stone-300 font-mono text-[10px] rounded-xl leading-relaxed space-y-0.5">
@@ -5582,7 +6087,8 @@ export default function App() {
                     ...(lastSolverVerdict?.conflicts || []).map((c: any) => ({
                       regra: c.regra || "Fração de Distribuição",
                       descricao: c.descricao || c.desc,
-                      type: "warning" as const
+                      // O motor novo distingue violação (erro) de aviso; o antigo só avisa.
+                      type: (c.type === "error" ? "error" : "warning") as "error" | "warning"
                     }))
                   ].length > 0 ? (
                     [
@@ -5594,7 +6100,7 @@ export default function App() {
                       ...(lastSolverVerdict?.conflicts || []).map((c: any) => ({
                         regra: c.regra || "Fração de Distribuição",
                         descricao: c.descricao || c.desc,
-                        type: "warning" as const
+                        type: (c.type === "error" ? "error" : "warning") as "error" | "warning"
                       }))
                     ].map((conf, i) => (
                       <div
@@ -5833,6 +6339,36 @@ export default function App() {
                           className="px-3 py-1.5 bg-white border border-stone-300 text-stone-600 hover:bg-stone-100 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit">
                           <Zap className="w-3 h-3 text-stone-400" /> Gerar sem regras
                         </button>
+                        {/* Interruptor de transição entre motores (Fase 5A). Fica ao lado dos
+                            botões de gerar porque é isso que decide o que o botão executa. */}
+                        <button onClick={() => setMotorNovo(v => !v)} disabled={isSolving}
+                          title={motorNovo
+                            ? "A gerar com o motor novo: as regras do Supabase alimentam um único ciclo de colocação e o resultado é conferido por um validador independente. Clique para comparar com o motor antigo."
+                            : "A gerar com o motor antigo, para comparação. Clique para voltar ao motor novo (recomendado)."}
+                          className={`px-3 py-1.5 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit border ${motorNovo
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                            : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"}`}>
+                          {motorNovo
+                            ? (<><ShieldCheck className="w-3 h-3 text-emerald-700" /> Motor novo (recomendado)</>)
+                            : (<><AlertTriangle className="w-3 h-3 text-amber-600" /> Motor antigo (comparação)</>)}
+                        </button>
+                        {/* SOLVER — segunda passagem. Só faz sentido depois de haver uma
+                            distribuição gerada, que é o ponto de partida dele. */}
+                        {motorNovo && (solverACorrer ? (
+                          <button onClick={handleCancelarSolver}
+                            title="Interrompe o solver. O horário fica exatamente como está agora."
+                            className="px-3 py-1.5 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-2xs w-fit border bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100">
+                            <RefreshCw className="w-3 h-3 animate-spin" /> A otimizar — cancelar
+                          </button>
+                        ) : (
+                          <button onClick={handleOtimizarComSolver} disabled={isSolving || !entradaMotorRef.current}
+                            title={entradaMotorRef.current
+                              ? `Segunda passagem com o solver exato: decide cada janela de semanas de uma só vez, em vez de colocar bloco a bloco. Fecha os dias que o motor deixa a meio (medido: 168 dias por fechar -> 24, completude 97,96% -> 100%). Leva minutos, corre em segundo plano e só substitui o horário se o validador disser que ficou melhor.`
+                              : "Gera primeiro a distribuição — o solver parte do resultado dela."}
+                            className="px-3 py-1.5 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit border bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100">
+                            <Zap className="w-3 h-3 text-sky-600" /> Otimizar com solver
+                          </button>
+                        ))}
                         <button onClick={() => handleApagarHorario(selectedYearFilter)} disabled={isSolving || !activeVersao?.sessoes.length}
                           className="px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:border-rose-300 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 text-2xs w-fit ml-auto">
                           <Trash2 className="w-3 h-3 animate-pulse" /> Apagar Horário ({selectedYearFilter}.º Ano)
@@ -5848,6 +6384,35 @@ export default function App() {
                       </div>
                     )}
                   </div>
+
+                  {/* Progresso do solver. Só aparece enquanto ele corre: é a única forma de
+                      o coordenador saber que os minutos de espera estão a produzir algo. */}
+                  {solverACorrer && (
+                    <div className="mt-2 border border-sky-200 bg-sky-50/60 rounded-xl p-3 space-y-1.5">
+                      <p className="text-[11px] font-bold text-sky-900 flex items-center gap-1.5">
+                        <RefreshCw className="w-3 h-3 animate-spin" /> Solver a trabalhar
+                      </p>
+                      <p className="text-[10px] text-sky-800">{solverProgresso ?? "…"}</p>
+                      <p className="text-[9px] text-sky-700/80">
+                        Demora vários minutos e corre em segundo plano — podes continuar a usar a aplicação.
+                        O horário atual só é substituído no fim, e só se ficar melhor.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Orçamento de tempo do solver. Não é cosmético: com 45 s por janela
+                      ficaram 3 blocos por colocar e 36 dias por fechar; com 120 s, nenhum. */}
+                  {motorNovo && !solverACorrer && entradaMotorRef.current && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <label className="text-[9px] text-stone-500">Tempo do solver por janela de semanas:</label>
+                      <select value={segundosPorJanela} onChange={e => setSegundosPorJanela(Number(e.target.value))}
+                        className="text-[10px] border border-stone-200 rounded-lg px-2 py-1 bg-white text-stone-700">
+                        <option value={45}>45 s — mais rápido, resultado incompleto</option>
+                        <option value={120}>120 s — o medido a 100% (recomendado)</option>
+                        <option value={240}>240 s — mais margem</option>
+                      </select>
+                    </div>
+                  )}
 
                   {/* Importar horário feito fora da plataforma (Excel/CSV) */}
                   {selectedYearFilter !== "todos" && (
@@ -6897,23 +7462,39 @@ export default function App() {
 
               {lastSolverVerdict ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-                  <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-150 flex flex-col justify-between">
+                  {/* Estado do gerador: escrito a partir do relatório do motor e do validador
+                      independente. Nunca declara um horário ótimo sem o ter medido. */}
+                  <div className={`p-5 rounded-2xl border flex flex-col justify-between ${lastSolverVerdict.errosValidador > 0
+                    ? "bg-rose-50/50 border-rose-200"
+                    : lastSolverVerdict.ok === false ? "bg-amber-50/50 border-amber-200" : "bg-emerald-50/50 border-emerald-150"}`}>
                     <div className="space-y-15">
-                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest font-mono">Status do Gerador</span>
-                      <h4 className="text-base font-serif font-black text-emerald-950 mt-1">HORÁRIO OTIMIZADO!</h4>
+                      <span className="text-[10px] font-bold text-stone-600 uppercase tracking-widest font-mono">
+                        Status do Gerador · {lastSolverVerdict.motor === "novo" ? "motor novo" : "motor antigo"}
+                      </span>
+                      <h4 className="text-base font-serif font-black text-stone-900 mt-1">
+                        {lastSolverVerdict.errosValidador > 0
+                          ? "HORÁRIO INVÁLIDO"
+                          : lastSolverVerdict.ok === false ? "HORÁRIO INCOMPLETO" : "HORÁRIO VÁLIDO"}
+                      </h4>
                       <p className="text-[11px] text-stone-600 leading-relaxed font-light mt-1">
-                        O algoritmo calculou todas as variáveis. As regras invioláveis estáo 100% asseguradas.
+                        {lastSolverVerdict.errosValidador > 0
+                          ? <>O validador independente apanhou {lastSolverVerdict.errosValidador} violação(ões) de regras invioláveis. {lastSolverVerdict.primeiraViolacao}</>
+                          : lastSolverVerdict.blocosEmFalta > 0
+                            ? <>Faltam {lastSolverVerdict.blocosEmFalta} bloco(s) para fechar a carga{lastSolverVerdict.motivoPrincipal ? <>. Motivo mais frequente: {lastSolverVerdict.motivoPrincipal}</> : "."}</>
+                            : <>Sem violações de regras invioláveis e sem blocos em falta{lastSolverVerdict.completude != null ? <> (completude {lastSolverVerdict.completude.toFixed(1)}%)</> : null}.</>}
                       </p>
                     </div>
 
-                    <div className="pt-4 border-t border-emerald-150/40 mt-4 flex items-center justify-between font-mono">
+                    <div className="pt-4 border-t border-stone-200/60 mt-4 flex items-center justify-between font-mono">
                       <div>
-                        <span className="text-4xs text-emerald-800 font-bold tracking-wider uppercase block">Qualidade</span>
-                        <div className="text-lg font-black text-emerald-950">{lastSolverVerdict.score}/100</div>
+                        <span className="text-4xs text-stone-600 font-bold tracking-wider uppercase block">Completude</span>
+                        <div className="text-lg font-black text-stone-900">
+                          {lastSolverVerdict.completude != null ? `${lastSolverVerdict.completude.toFixed(1)}%` : `${lastSolverVerdict.score}/100`}
+                        </div>
                       </div>
                       <div>
-                        <span className="text-4xs text-emerald-800 font-bold tracking-wider uppercase block">Velocidade</span>
-                        <div className="text-xs font-bold text-emerald-950">{lastSolverVerdict.runDetails?.solveTimeMs} ms</div>
+                        <span className="text-4xs text-stone-600 font-bold tracking-wider uppercase block">Velocidade</span>
+                        <div className="text-xs font-bold text-stone-900">{lastSolverVerdict.runDetails?.solveTimeMs} ms</div>
                       </div>
                     </div>
                   </div>
@@ -6922,32 +7503,45 @@ export default function App() {
                     <h4 className="font-bold text-stone-900 border-b border-stone-200 pb-2 text-xs uppercase tracking-wider">Métricas da Geração</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-medium block">Caminhos Analisados</span>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-medium block">Blocos colocados</span>
                         <div className="font-mono text-xs font-bold text-stone-900">
-                          {lastSolverVerdict.runDetails?.iterations} combinações testadas
+                          {lastSolverVerdict.blocosColocados ?? "—"}/{lastSolverVerdict.blocosAlvo ?? "—"} · {lastSolverVerdict.sessoesNovas ?? lastSolverVerdict.runDetails?.iterations} sessões novas
                         </div>
                       </div>
                       <div>
-                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-medium block">Divergências Soft</span>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-medium block">Validador independente</span>
                         <div className="font-mono text-xs font-bold text-stone-900">
-                          {lastSolverVerdict.conflicts?.length || 0} infrações leves minimizadas
+                          {lastSolverVerdict.errosValidador ?? 0} erro(s) · {lastSolverVerdict.avisosValidador ?? 0} aviso(s)
                         </div>
                       </div>
                     </div>
 
+                    {lastSolverVerdict.padroesUsados && (
+                      <div>
+                        <span className="text-4xs uppercase tracking-widest text-stone-400 font-medium block">Padrões de bloco usados</span>
+                        <div className="font-mono text-[10px] text-stone-700">
+                          {Object.entries(lastSolverVerdict.padroesUsados).map(([id, n]) => `${id}=${n}`).join(" · ") || "nenhum"}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="pt-3 border-t border-stone-100">
-                      <span className="text-4xs uppercase tracking-widest text-stone-400 font-bold block mb-1">Avisos e sugestões de reajuste</span>
+                      <span className="text-4xs uppercase tracking-widest text-stone-400 font-bold block mb-1">Violações, blocos em falta e avisos</span>
                       <div className="max-h-[140px] overflow-y-auto space-y-1 text-[11px] leading-relaxed">
                         {lastSolverVerdict.conflicts && lastSolverVerdict.conflicts.length > 0 ? (
                           lastSolverVerdict.conflicts.map((c: any, i: number) => (
-                            <div key={i} className="flex items-start gap-1 p-2 bg-amber-50 text-amber-900 rounded-xl border border-amber-100">
-                              <span className="px-1 py-0.2 bg-amber-150 text-[9px] font-black uppercase rounded shrink-0">Dica</span>
+                            <div key={i} className={`flex items-start gap-1 p-2 rounded-xl border ${c.type === "error"
+                              ? "bg-rose-50 text-rose-900 border-rose-150"
+                              : "bg-amber-50 text-amber-900 border-amber-100"}`}>
+                              <span className={`px-1 py-0.2 text-[9px] font-black uppercase rounded shrink-0 ${c.type === "error" ? "bg-rose-150" : "bg-amber-150"}`}>
+                                {c.type === "error" ? "Violação" : "Aviso"}
+                              </span>
                               <p>{c.descricao}</p>
                             </div>
                           ))
                         ) : (
                           <div className="text-emerald-700 font-bold flex items-center gap-1.5 p-2 bg-emerald-50 rounded-xl">
-                            <Check className="w-4 h-4" /> Excelente. Parabéns, o seu calendário escolar atingiu o score ótimo sem nenhuma infração.
+                            <Check className="w-4 h-4" /> Sem violações e sem blocos em falta neste âmbito.
                           </div>
                         )}
                       </div>

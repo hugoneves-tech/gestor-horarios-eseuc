@@ -1,0 +1,9162 @@
+[
+ {
+  "semana": 1,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 1,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 2,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 1,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 1,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 2,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 3,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 2,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 1,
+  "total": 16
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 2,
+  "total": 16
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 3,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 4,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 3,
+  "total": 4
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 4,
+  "total": 4
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 3,
+  "total": 16
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 5,
+  "total": 16
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 4,
+  "total": 16
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 6,
+  "total": 16
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 7,
+  "total": 16
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 4,
+  "total": 4
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 9,
+  "total": 16
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 8,
+  "total": 16
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 10,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 12,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 13,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 11,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 14,
+  "total": 16
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 16,
+  "total": 16
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "12:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T1",
+  "indice": 15,
+  "total": 16
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL4",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL5",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL6",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "12:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP1",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP4",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL7",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL8",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL9",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP2",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP3",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL1",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL2",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL3",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL10",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL11",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL12",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quarta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 1,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Sexta",
+  "horaInicio": "08:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 2,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quarta",
+  "horaInicio": "12:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 1,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Sexta",
+  "horaInicio": "12:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 1,
+  "total": 4
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 1,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 1,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 2,
+  "total": 16
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 2,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 1,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 2,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 1,
+  "total": 16
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 1,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 3,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 1,
+  "total": 10
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Segunda",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 3,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 2,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 3,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 2,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 4,
+  "total": 4
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 2,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 1,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 5,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 5,
+  "total": 16
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 4,
+  "total": 4
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 6,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 3,
+  "total": 16
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 4,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Segunda",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 3,
+  "total": 4
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 2,
+  "total": 10
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 4,
+  "total": 16
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 3,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 3,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 7,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 2,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 4,
+  "total": 4
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 8,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 3,
+  "total": 10
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Segunda",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 6,
+  "total": 16
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 4,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 3,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 9,
+  "total": 16
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 4,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 1,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 4,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 5,
+  "total": 5
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 3,
+  "total": 9
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 7,
+  "total": 16
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 9,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 5,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 11,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 8,
+  "total": 16
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 10,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 4,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 12,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 6,
+  "total": 12
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 5,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 5,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 4,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "10:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 13,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 2,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 10,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 5,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 12,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 13,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 8,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Segunda",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 11,
+  "total": 16
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 7,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 7,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 6,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 14,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 15,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 6,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 9,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 6,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "10:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 8,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 7,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "14:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "14:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 14,
+  "total": 16
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 16,
+  "total": 16
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL16",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL17",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "16:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL18",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "PS",
+  "tipoAula": "TP",
+  "turma": "TP5",
+  "indice": 3,
+  "total": 3
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "16:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Segunda",
+  "horaInicio": "18:00",
+  "ucSigla": "PS",
+  "tipoAula": "T",
+  "turma": "T2",
+  "indice": 15,
+  "total": 16
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 8,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL19",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL20",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL21",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Terça",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 9,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 16,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 11,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quarta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 17,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 18,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL22",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL23",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL24",
+  "indice": 10,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Quinta",
+  "horaInicio": "18:00",
+  "ucSigla": "FT",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 10,
+  "total": 10
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP7",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "PSIS",
+  "tipoAula": "TP",
+  "turma": "TP6",
+  "indice": 9,
+  "total": 9
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "EIG",
+  "tipoAula": "TP",
+  "turma": "TP8",
+  "indice": 19,
+  "total": 19
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL13",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL14",
+  "indice": 12,
+  "total": 12
+ },
+ {
+  "semana": 7,
+  "diaSemana": "Sexta",
+  "horaInicio": "18:00",
+  "ucSigla": "ESDAC",
+  "tipoAula": "PL",
+  "turma": "PL15",
+  "indice": 12,
+  "total": 12
+ }
+]
